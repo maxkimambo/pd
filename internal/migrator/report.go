@@ -1,0 +1,120 @@
+package migrator
+
+import (
+	"fmt"
+	"os"
+	"sort"
+	"strings"
+	"text/tabwriter"
+	"time"
+
+	"github.com/sirupsen/logrus"
+)
+
+// GenerateReports prints the summary and detailed migration reports.
+func GenerateReports(results []MigrationResult) {
+	logrus.Info("--- Phase 4: Reporting ---")
+
+	if len(results) == 0 {
+		logrus.Info("No migration results to report.")
+		logrus.Info("--- Reporting Phase Complete ---")
+		return
+	}
+
+	// Sort results for consistent output (e.g., by disk name)
+	sort.Slice(results, func(i, j int) bool {
+		return results[i].OriginalDisk < results[j].OriginalDisk
+	})
+
+	printSummaryReport(results)
+	printDetailedReport(results) // Or optionally gate this behind a flag/verbosity level
+
+	logrus.Info("--- Reporting Phase Complete ---")
+}
+
+// printSummaryReport displays a table summarizing the outcome for each disk.
+func printSummaryReport(results []MigrationResult) {
+	fmt.Println("\n--- Migration Summary Report ---")
+
+	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0) // Min width 0, tab width 0, padding 2, pad char ' ', flags 0
+	fmt.Fprintln(w, "Original Disk\tNew Disk\tZone\tStatus\tDuration\tSnapshot\tCleaned Up\tError")
+	fmt.Fprintln(w, "-------------\t--------\t----\t------\t--------\t--------\t----------\t-----")
+
+	successCount := 0
+	failureCount := 0
+	totalDuration := time.Duration(0)
+
+	for _, res := range results {
+		status := res.Status
+		errorMsg := ""
+		if strings.HasPrefix(status, "Failed") {
+			failureCount++
+			// Truncate long error messages for summary
+			if len(res.ErrorMessage) > 50 {
+				errorMsg = res.ErrorMessage[:47] + "..."
+			} else {
+				errorMsg = res.ErrorMessage
+			}
+		} else if status == "Success" {
+			successCount++
+		}
+
+		cleanedUp := fmt.Sprintf("%t", res.SnapshotCleaned)
+		// Add a warning if successful migration but snapshot cleanup failed
+		if status == "Success" && !res.SnapshotCleaned {
+			cleanedUp += " (!)" // Indicate cleanup issue
+			if errorMsg == "" { // Add cleanup error if no other error shown
+				errorMsg = "Snapshot cleanup failed"
+			}
+		}
+
+		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
+			res.OriginalDisk,
+			res.NewDiskName,
+			res.Zone,
+			status,
+			res.Duration.Round(time.Millisecond).String(), // Format duration
+			res.SnapshotName,
+			cleanedUp,
+			errorMsg,
+		)
+		totalDuration += res.Duration
+	}
+
+	w.Flush() // Write buffered data to stdout
+
+	fmt.Printf("\n--- Overall Stats ---\n")
+	fmt.Printf("Total Disks Processed: %d\n", len(results))
+	fmt.Printf("Successful Migrations: %d\n", successCount)
+	fmt.Printf("Failed Migrations:     %d\n", failureCount)
+	if len(results) > 0 {
+		avgDuration := totalDuration / time.Duration(len(results))
+		fmt.Printf("Average Duration/Disk: %s\n", avgDuration.Round(time.Millisecond).String())
+	}
+	fmt.Println("---------------------")
+}
+
+// printDetailedReport displays more detailed logs or error messages for failures.
+// TODO: Enhance this to potentially show filtered logs per disk if logging is captured differently.
+func printDetailedReport(results []MigrationResult) {
+	fmt.Println("\n--- Detailed Error Report ---")
+	failuresFound := false
+	for _, res := range results {
+		if strings.HasPrefix(res.Status, "Failed") || (res.Status == "Success" && !res.SnapshotCleaned) {
+			failuresFound = true
+			fmt.Printf("\nDisk: %s (Zone: %s)\n", res.OriginalDisk, res.Zone)
+			fmt.Printf("  Status: %s\n", res.Status)
+			if res.ErrorMessage != "" {
+				fmt.Printf("  Error Details: %s\n", res.ErrorMessage)
+			}
+			if !res.SnapshotCleaned {
+				fmt.Printf("  Snapshot Cleanup: Failed for %s\n", res.SnapshotName)
+			}
+		}
+	}
+
+	if !failuresFound {
+		fmt.Println("No detailed errors to report.")
+	}
+	fmt.Println("---------------------------")
+}
