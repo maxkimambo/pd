@@ -1,4 +1,4 @@
-module gcp-disk-migrator
+module github.com/maxkimambo/pd
 
 go 1.23.0
 

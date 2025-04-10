@@ -1,8 +1,9 @@
 package main
 
 import (
-	"gcp-disk-migrator/cmd"
 	"os"
+
+	"github.com/maxkimambo/pd/cmd"
 )
 
 func main() {

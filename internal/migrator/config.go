@@ -1,6 +1,6 @@
 package migrator
 
-import "gcp-disk-migrator/internal/gcp" // Import gcp types if needed later
+import "github.com/maxkimambo/pd/internal/gcp" // Import gcp types if needed later
 
 // Config holds the configuration parameters for the migration process,
 // typically parsed from command-line flags.

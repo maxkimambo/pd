@@ -4,9 +4,10 @@ import (
 	"bufio"
 	"context"
 	"fmt"
-	"gcp-disk-migrator/internal/gcp"
 	"os"
 	"strings"
+
+	"github.com/maxkimambo/pd/internal/gcp"
 
 	computepb "cloud.google.com/go/compute/apiv1/computepb"
 	"github.com/sirupsen/logrus"

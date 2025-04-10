@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"strings"
 
-	"gcp-disk-migrator/internal/gcp"
-	"gcp-disk-migrator/internal/logger"
-	"gcp-disk-migrator/internal/migrator" // Placeholder for actual migrator package
+	"github.com/maxkimambo/pd/internal/gcp"
+	"github.com/maxkimambo/pd/internal/logger"
+	"github.com/maxkimambo/pd/internal/migrator" // Placeholder for actual migrator package
 
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"

@@ -3,8 +3,9 @@ package migrator
 import (
 	"context"
 	"fmt"
-	"gcp-disk-migrator/internal/gcp"
 	"sync"
+
+	"github.com/maxkimambo/pd/internal/gcp"
 
 	"github.com/sirupsen/logrus"
 )

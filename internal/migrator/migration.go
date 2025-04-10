@@ -3,11 +3,12 @@ package migrator
 import (
 	"context"
 	"fmt"
-	"gcp-disk-migrator/internal/gcp"
 	"math/rand" // For temporary unique suffix
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/maxkimambo/pd/internal/gcp"
 
 	computepb "cloud.google.com/go/compute/apiv1/computepb"
 	"github.com/sirupsen/logrus"
