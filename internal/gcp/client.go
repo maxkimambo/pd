@@ -5,41 +5,60 @@ import (
 	"fmt"
 
 	compute "cloud.google.com/go/compute/apiv1"
+	computepb "cloud.google.com/go/compute/apiv1/computepb"
+	"github.com/googleapis/gax-go/v2"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/api/option"
 )
 
-// Clients holds the initialized GCP Compute clients.
-type Clients struct {
-	Disks     *compute.DisksClient
-	Snapshots *compute.SnapshotsClient
-	Zones     *compute.ZonesClient
-	Regions   *compute.RegionsClient
-	// Add other clients like ImagesClient if needed later
+
+type DiskClientInterface interface {
+	AggregatedList(ctx context.Context, req *computepb.AggregatedListDisksRequest, opts ...gax.CallOption) *compute.DisksScopedListPairIterator
+	Insert(ctx context.Context, req *computepb.InsertDiskRequest, opts ...gax.CallOption) (*compute.Operation, error)
+	Get(ctx context.Context, req *computepb.GetDiskRequest, opts ...gax.CallOption) (*computepb.Disk, error)
+	SetLabels(ctx context.Context, req *computepb.SetLabelsDiskRequest, opts ...gax.CallOption) (*compute.Operation, error)
+	Delete(ctx context.Context, req *computepb.DeleteDiskRequest, opts ...gax.CallOption) (*compute.Operation, error)
+	Close() error
 }
 
-// NewClients creates and returns new GCP Compute API clients.
-// It uses Application Default Credentials (ADC) for authentication.
+type SnapshotClientInterface interface {
+	Insert(ctx context.Context, req *computepb.InsertSnapshotRequest, opts ...gax.CallOption) (*compute.Operation, error)
+	Delete(ctx context.Context, req *computepb.DeleteSnapshotRequest, opts ...gax.CallOption) (*compute.Operation, error)
+	List(ctx context.Context, req *computepb.ListSnapshotsRequest, opts ...gax.CallOption) *compute.SnapshotIterator
+	Close() error
+}
+
+type ZoneClientInterface interface {
+	Close() error
+}
+
+type RegionClientInterface interface {
+	Close() error
+}
+
+type Clients struct {
+	Disks     DiskClientInterface
+	Snapshots SnapshotClientInterface
+	Zones     ZoneClientInterface
+	Regions   RegionClientInterface
+}
+
 func NewClients(ctx context.Context) (*Clients, error) {
 	logrus.Debug("Initializing GCP Compute API clients...")
 
-	// Create Disks client
-	disksClient, err := compute.NewDisksRESTClient(ctx) // Using REST for potentially broader compatibility/simpler setup
+	disksClient, err := compute.NewDisksRESTClient(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create compute Disks client: %w", err)
 	}
 	logrus.Debug("Disks client initialized.")
 
-	// Create Snapshots client
 	snapshotsClient, err := compute.NewSnapshotsRESTClient(ctx)
 	if err != nil {
-		// Attempt to close already created clients on subsequent failure
 		disksClient.Close()
 		return nil, fmt.Errorf("failed to create compute Snapshots client: %w", err)
 	}
 	logrus.Debug("Snapshots client initialized.")
 
-	// Create Zones client (might be useful for validation or getting zone details)
 	zonesClient, err := compute.NewZonesRESTClient(ctx)
 	if err != nil {
 		disksClient.Close()
@@ -48,7 +67,6 @@ func NewClients(ctx context.Context) (*Clients, error) {
 	}
 	logrus.Debug("Zones client initialized.")
 
-	// Create Regions client (might be useful for validation or getting region details)
 	regionsClient, err := compute.NewRegionsRESTClient(ctx)
 	if err != nil {
 		disksClient.Close()
@@ -67,7 +85,6 @@ func NewClients(ctx context.Context) (*Clients, error) {
 	}, nil
 }
 
-// Close closes all the initialized clients.
 func (c *Clients) Close() {
 	logrus.Debug("Closing GCP Compute API clients...")
 	if c.Disks != nil {
@@ -85,9 +102,6 @@ func (c *Clients) Close() {
 	logrus.Debug("GCP Compute API clients closed.")
 }
 
-// Helper function to get default client options (useful if needing options explicitly)
 func getDefaultClientOptions() []option.ClientOption {
-	// Example: return []option.ClientOption{option.WithCredentialsFile("path/to/keyfile.json")}
-	// By default, New...RESTClient uses ADC, so often no explicit options are needed.
 	return nil
 }

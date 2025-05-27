@@ -4,15 +4,15 @@ import (
 	"context"
 	"fmt"
 	"strings"
-	"time" // Import time package
+	"time" 
 
 	computepb "cloud.google.com/go/compute/apiv1/computepb"
+	"github.com/maxkimambo/pd/internal/utils"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/api/iterator"
 	"google.golang.org/protobuf/proto"
 )
 
-// Define defaultOpTimeout here to match the one in disks.go
 const defaultOpTimeout = 5 * time.Minute
 
 func (c *Clients) ListDetachedDisks(
@@ -32,7 +32,11 @@ func (c *Clients) ListDetachedDisks(
 	}
 
 	it := c.Disks.AggregatedList(ctx, req)
-	var disks []*computepb.Disk
+	var disks []*computepb.Disk 
+	if it == nil {
+		logrus.WithFields(logFields).Warn("AggregatedList returned a nil iterator. Returning empty disk list.")
+		return disks, nil 
+	}
 
 	for {
 		resp, err := it.Next()
@@ -45,9 +49,10 @@ func (c *Clients) ListDetachedDisks(
 		}
 
 		for _, disk := range resp.Value.Disks {
-			if *disk.Status == "READY" && *disk.Zone == location && len(disk.Users) == 0 {
+			zone := utils.ExtractZoneName(disk.GetZone())
+			if *disk.Status == "READY" && zone == location && len(disk.Users) == 0 {
 				disks = append(disks, disk)
-				logrus.WithFields(logFields).Infof("Found detached disk: %s", disk.Name)
+				logrus.WithFields(logFields).Infof("Found detached disk: %s", *disk.Name)
 			}
 		}
 	}
@@ -56,8 +61,6 @@ func (c *Clients) ListDetachedDisks(
 	return disks, nil
 }
 
-// CreateNewDiskFromSnapshot creates a new disk from a snapshot with the specified type and labels.
-// This is a replacement for the problematic CreateDiskFromSnapshot function.
 func (c *Clients) CreateNewDiskFromSnapshot(
 	ctx context.Context,
 	projectID string,
@@ -76,13 +79,10 @@ func (c *Clients) CreateNewDiskFromSnapshot(
 	}
 	logrus.WithFields(logFields).Info("Initiating disk creation from snapshot...")
 
-	// Construct the full snapshot source URL
-	// Assuming snapshotSource is just the name, construct the global path
 	if !strings.Contains(snapshotSource, "/") {
 		snapshotSource = fmt.Sprintf("global/snapshots/%s", snapshotSource)
 	}
 
-	// Ensure target disk type URL is correct (e.g., zones/us-central1-a/diskTypes/pd-ssd)
 	targetDiskTypeURL := fmt.Sprintf("zones/%s/diskTypes/%s", zone, targetDiskType)
 
 	disk := &computepb.Disk{
@@ -90,7 +90,6 @@ func (c *Clients) CreateNewDiskFromSnapshot(
 		Type:           proto.String(targetDiskTypeURL),
 		SourceSnapshot: proto.String(snapshotSource),
 		Labels:         labels,
-		// SizeGb: // Size is usually inferred from snapshot, but can be specified if larger needed
 	}
 
 	req := &computepb.InsertDiskRequest{
@@ -108,11 +107,10 @@ func (c *Clients) CreateNewDiskFromSnapshot(
 	opName := op.Name()
 	logrus.WithFields(logFields).Infof("Waiting for disk creation operation %s to complete...", opName)
 
-	// Wait for the operation to complete
 	opCtx, cancel := context.WithTimeout(ctx, defaultOpTimeout)
 	defer cancel()
 
-	err = op.Wait(opCtx) // Wait only returns error
+	err = op.Wait(opCtx) 
 	if err != nil {
 		logrus.WithFields(logFields).WithError(err).Errorf("Waiting for disk creation operation %s failed", opName)
 		return fmt.Errorf("waiting for disk %s creation failed: %w", newDiskName, err)
@@ -122,8 +120,6 @@ func (c *Clients) CreateNewDiskFromSnapshot(
 	return nil
 }
 
-// UpdateDiskLabel adds or updates a label on a disk.
-// This is a replacement for the problematic SetDiskLabel function.
 func (c *Clients) UpdateDiskLabel(
 	ctx context.Context,
 	projectID string,
@@ -141,8 +137,6 @@ func (c *Clients) UpdateDiskLabel(
 	}
 	logrus.WithFields(logFields).Info("Setting disk label...")
 
-	// 1. Get the current disk to obtain the label fingerprint
-	// Get disk details directly instead of using c.GetDisk
 	req := &computepb.GetDiskRequest{
 		Project: projectID,
 		Zone:    zone,
@@ -151,7 +145,6 @@ func (c *Clients) UpdateDiskLabel(
 
 	currentDisk, err := c.Disks.Get(ctx, req)
 	if err != nil {
-		// Don't wrap error here as GetDisk already does
 		return fmt.Errorf("failed to get current disk state before setting label: %w", err)
 	}
 	currentLabels := currentDisk.GetLabels()
@@ -162,8 +155,7 @@ func (c *Clients) UpdateDiskLabel(
 	}
 	currentLabels[labelKey] = labelValue
 
-	// 2. Set the labels using the fingerprint
-	setLabelsReq := &computepb.SetLabelsDiskRequest{ // Use a different variable name
+	setLabelsReq := &computepb.SetLabelsDiskRequest{ 
 		Project:  projectID,
 		Zone:     zone,
 		Resource: diskName,
@@ -173,7 +165,7 @@ func (c *Clients) UpdateDiskLabel(
 		},
 	}
 
-	op, err := c.Disks.SetLabels(ctx, setLabelsReq) // Pass the correct request variable
+	op, err := c.Disks.SetLabels(ctx, setLabelsReq) 
 	if err != nil {
 		logrus.WithFields(logFields).WithError(err).Error("Failed to initiate set disk label operation")
 		return fmt.Errorf("failed to initiate set label for disk %s: %w", diskName, err)
@@ -182,11 +174,10 @@ func (c *Clients) UpdateDiskLabel(
 	opName := op.Name()
 	logrus.WithFields(logFields).Infof("Waiting for set label operation %s to complete...", opName)
 
-	// Wait for the operation to complete
 	opCtx, cancel := context.WithTimeout(ctx, defaultOpTimeout)
 	defer cancel()
 
-	err = op.Wait(opCtx) // Wait only returns error
+	err = op.Wait(opCtx) 
 	if err != nil {
 		logrus.WithFields(logFields).WithError(err).Errorf("Waiting for set label operation %s failed", opName)
 		return fmt.Errorf("waiting for disk %s set label failed: %w", diskName, err)
@@ -196,7 +187,6 @@ func (c *Clients) UpdateDiskLabel(
 	return nil
 }
 
-// DeleteDisk initiates disk deletion and waits for the operation to complete.
 func (c *Clients) DeleteDisk(ctx context.Context, projectID, zone, diskName string) error {
 	logFields := logrus.Fields{"project": projectID, "zone": zone, "disk": diskName}
 	logrus.WithFields(logFields).Info("Initiating deletion of disk...")
@@ -216,7 +206,6 @@ func (c *Clients) DeleteDisk(ctx context.Context, projectID, zone, diskName stri
 	opName := op.Name()
 	logrus.WithFields(logFields).Infof("Waiting for disk deletion operation %s to complete...", opName)
 
-	// Wait for the operation to complete
 	opCtx, cancel := context.WithTimeout(ctx, defaultOpTimeout)
 	defer cancel()
 

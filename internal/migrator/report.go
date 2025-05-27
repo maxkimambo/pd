@@ -11,7 +11,6 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// GenerateReports prints the summary and detailed migration reports.
 func GenerateReports(results []MigrationResult) {
 	logrus.Info("--- Phase 4: Reporting ---")
 
@@ -21,22 +20,20 @@ func GenerateReports(results []MigrationResult) {
 		return
 	}
 
-	// Sort results for consistent output (e.g., by disk name)
 	sort.Slice(results, func(i, j int) bool {
 		return results[i].OriginalDisk < results[j].OriginalDisk
 	})
 
 	printSummaryReport(results)
-	printDetailedReport(results) // Or optionally gate this behind a flag/verbosity level
+	printDetailedReport(results) 
 
 	logrus.Info("--- Reporting Phase Complete ---")
 }
 
-// printSummaryReport displays a table summarizing the outcome for each disk.
 func printSummaryReport(results []MigrationResult) {
 	fmt.Println("\n--- Migration Summary Report ---")
 
-	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0) // Min width 0, tab width 0, padding 2, pad char ' ', flags 0
+	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0) 
 	fmt.Fprintln(w, "Original Disk\tNew Disk\tZone\tStatus\tDuration\tSnapshot\tCleaned Up\tError")
 	fmt.Fprintln(w, "-------------\t--------\t----\t------\t--------\t--------\t----------\t-----")
 
@@ -49,7 +46,6 @@ func printSummaryReport(results []MigrationResult) {
 		errorMsg := ""
 		if strings.HasPrefix(status, "Failed") {
 			failureCount++
-			// Truncate long error messages for summary
 			if len(res.ErrorMessage) > 50 {
 				errorMsg = res.ErrorMessage[:47] + "..."
 			} else {
@@ -60,10 +56,9 @@ func printSummaryReport(results []MigrationResult) {
 		}
 
 		cleanedUp := fmt.Sprintf("%t", res.SnapshotCleaned)
-		// Add a warning if successful migration but snapshot cleanup failed
 		if status == "Success" && !res.SnapshotCleaned {
-			cleanedUp += " (!)" // Indicate cleanup issue
-			if errorMsg == "" { // Add cleanup error if no other error shown
+			cleanedUp += " (!)" 
+			if errorMsg == "" { 
 				errorMsg = "Snapshot cleanup failed"
 			}
 		}
@@ -73,7 +68,7 @@ func printSummaryReport(results []MigrationResult) {
 			res.NewDiskName,
 			res.Zone,
 			status,
-			res.Duration.Round(time.Millisecond).String(), // Format duration
+			res.Duration.Round(time.Millisecond).String(), 
 			res.SnapshotName,
 			cleanedUp,
 			errorMsg,
@@ -81,7 +76,7 @@ func printSummaryReport(results []MigrationResult) {
 		totalDuration += res.Duration
 	}
 
-	w.Flush() // Write buffered data to stdout
+	w.Flush() 
 
 	fmt.Printf("\n--- Overall Stats ---\n")
 	fmt.Printf("Total Disks Processed: %d\n", len(results))
@@ -94,8 +89,6 @@ func printSummaryReport(results []MigrationResult) {
 	fmt.Println("---------------------")
 }
 
-// printDetailedReport displays more detailed logs or error messages for failures.
-// TODO: Enhance this to potentially show filtered logs per disk if logging is captured differently.
 func printDetailedReport(results []MigrationResult) {
 	fmt.Println("\n--- Detailed Error Report ---")
 	failuresFound := false
