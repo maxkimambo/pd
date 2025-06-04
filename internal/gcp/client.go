@@ -11,7 +11,6 @@ import (
 	"google.golang.org/api/option"
 )
 
-
 type DiskClientInterface interface {
 	AggregatedList(ctx context.Context, req *computepb.AggregatedListDisksRequest, opts ...gax.CallOption) *compute.DisksScopedListPairIterator
 	Insert(ctx context.Context, req *computepb.InsertDiskRequest, opts ...gax.CallOption) (*compute.Operation, error)
@@ -36,30 +35,37 @@ type RegionClientInterface interface {
 	Close() error
 }
 
+type GceClientInterface interface {
+	Close() error
+}
+
 type Clients struct {
 	Disks     DiskClientInterface
 	Snapshots SnapshotClientInterface
 	Zones     ZoneClientInterface
 	Regions   RegionClientInterface
+	Gce       GceClientInterface
 }
 
 func NewClients(ctx context.Context) (*Clients, error) {
 	logrus.Debug("Initializing GCP Compute API clients...")
 
-	disksClient, err := compute.NewDisksRESTClient(ctx)
+	defaultOpts := getDefaultClientOptions()
+
+	disksClient, err := compute.NewDisksRESTClient(ctx, defaultOpts...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create compute Disks client: %w", err)
 	}
 	logrus.Debug("Disks client initialized.")
 
-	snapshotsClient, err := compute.NewSnapshotsRESTClient(ctx)
+	snapshotsClient, err := compute.NewSnapshotsRESTClient(ctx, defaultOpts...)
 	if err != nil {
 		disksClient.Close()
 		return nil, fmt.Errorf("failed to create compute Snapshots client: %w", err)
 	}
 	logrus.Debug("Snapshots client initialized.")
 
-	zonesClient, err := compute.NewZonesRESTClient(ctx)
+	zonesClient, err := compute.NewZonesRESTClient(ctx, defaultOpts...)
 	if err != nil {
 		disksClient.Close()
 		snapshotsClient.Close()
@@ -67,7 +73,7 @@ func NewClients(ctx context.Context) (*Clients, error) {
 	}
 	logrus.Debug("Zones client initialized.")
 
-	regionsClient, err := compute.NewRegionsRESTClient(ctx)
+	regionsClient, err := compute.NewRegionsRESTClient(ctx, defaultOpts...)
 	if err != nil {
 		disksClient.Close()
 		snapshotsClient.Close()
@@ -76,12 +82,23 @@ func NewClients(ctx context.Context) (*Clients, error) {
 	}
 	logrus.Debug("Regions client initialized.")
 
+	gceClient, err := compute.NewInstancesRESTClient(ctx, defaultOpts...)
+	if err != nil {
+		disksClient.Close()
+		snapshotsClient.Close()
+		zonesClient.Close()
+		regionsClient.Close()
+		return nil, fmt.Errorf("failed to create compute Instances (GCE) client: %w", err)
+	}
+	logrus.Debug("GCE client initialized.")
+
 	logrus.Info("Successfully initialized GCP Compute API clients.")
 	return &Clients{
 		Disks:     disksClient,
 		Snapshots: snapshotsClient,
 		Zones:     zonesClient,
 		Regions:   regionsClient,
+		Gce:       gceClient,
 	}, nil
 }
 
@@ -98,6 +115,9 @@ func (c *Clients) Close() {
 	}
 	if c.Regions != nil {
 		c.Regions.Close()
+	}
+	if c.Gce != nil {
+		c.Gce.Close()
 	}
 	logrus.Debug("GCP Compute API clients closed.")
 }
