@@ -30,39 +30,39 @@ func CleanupSnapshots(ctx context.Context, config *Config, gcpClient *gcp.Client
 	}
 
 	logrus.Infof("Found %d snapshot(s) to cleanup:", len(snapshotsToDelete))
-	snapshotMap := make(map[string]bool) 
+	snapshotMap := make(map[string]bool)
 	for _, snap := range snapshotsToDelete {
 		logrus.Infof("  - %s", snap.GetName())
-		snapshotMap[snap.GetName()] = false 
+		snapshotMap[snap.GetName()] = false
 	}
 
 	var wg sync.WaitGroup
 	concurrencyLimit := config.MaxConcurrency
 	if concurrencyLimit <= 0 || concurrencyLimit > 200 {
-		concurrencyLimit = 10 
+		concurrencyLimit = 10
 	}
 	semaphore := make(chan struct{}, concurrencyLimit)
-	deleteErrors := &sync.Map{} 
+	deleteErrors := &sync.Map{}
 
-	logrus.Infof("Starting cleanup for %d snapshot(s) with concurrency limit %d...", len(snapshotsToDelete), concurrencyLimit)
+	logrus.Infof("Starting cleanup for %d snapshot(s) with concurrency limit of %d...", len(snapshotsToDelete), concurrencyLimit)
 
 	for _, snap := range snapshotsToDelete {
 		wg.Add(1)
-		semaphore <- struct{}{} 
+		semaphore <- struct{}{}
 
 		go func(snapshotName string) {
 			defer wg.Done()
-			defer func() { <-semaphore }() 
+			defer func() { <-semaphore }()
 
 			logFields := logrus.Fields{"snapshot": snapshotName, "project": config.ProjectID}
 			logrus.WithFields(logFields).Info("Attempting to delete snapshot...")
 			err := gcpClient.DeleteSnapshot(ctx, config.ProjectID, snapshotName)
 			if err != nil {
 				logrus.WithFields(logFields).WithError(err).Warn("Failed to delete snapshot during cleanup")
-				deleteErrors.Store(snapshotName, err) 
+				deleteErrors.Store(snapshotName, err)
 			} else {
 				logrus.WithFields(logFields).Info("Snapshot deleted successfully during cleanup.")
-				snapshotMap[snapshotName] = true 
+				snapshotMap[snapshotName] = true
 			}
 		}(snap.GetName())
 	}
@@ -91,5 +91,5 @@ func CleanupSnapshots(ctx context.Context, config *Config, gcpClient *gcp.Client
 	}
 
 	logrus.Info("--- Cleanup Phase Complete ---")
-	return nil 
+	return nil
 }

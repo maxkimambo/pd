@@ -1,0 +1,10 @@
+project_id = "kimambo-sandbox" 
+zone         = "us-central1-a"         
+instance_count = 1                     
+disk_count_per_instance = 2            
+machine_type = "n2-standard-2"            
+boot_disk_image = "ubuntu-os-cloud/ubuntu-2204-lts" 
+disk_size_gb = 100                      
+disk_type    = "pd-ssd"                
+instance_name_prefix = "vm-mig"       
+disk_name_prefix     = "data-disk"    
