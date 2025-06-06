@@ -24,7 +24,7 @@ var (
 	gceKmsProject     string
 	gceRegion         string
 	gceZone           string
-	gceInstances      string
+	gceInstances      []string
 	gceAutoApprove    bool
 	gceMaxConcurrency int
 	gceRetainName     bool
@@ -47,7 +47,7 @@ For each targeted disk, it will (eventually):
 8. Clean up snapshots afterwards.
 
 Example:
-pd migrate compute --project my-gcp-project --zone us-central1-a --instances my-instance-1,my-instance-2 --target-disk-type pd-ssd
+pd migrate compute --project my-gcp-project --zone us-central1-a --instances vm1,vm2.. vmN --target-disk-type hyperdisk-balanced
 pd migrate compute --project my-gcp-project --region us-central1 --instances "*" --target-disk-type hyperdisk-balanced --auto-approve
 `,
 	PreRunE: validateComputeCmdFlags,
@@ -64,7 +64,7 @@ func init() {
 	computeCmd.Flags().StringVar(&gceKmsProject, "kms-project", "", "KMS Project ID (defaults to --project if not set, required if kms-key is set)")
 	computeCmd.Flags().StringVar(&gceRegion, "region", "", "GCP region (required if zone is not set)")
 	computeCmd.Flags().StringVar(&gceZone, "zone", "", "GCP zone (required if region is not set)")
-	computeCmd.Flags().StringVarP(&gceInstances, "instances", "i", "*", "Comma-separated list of instance names, or '*' for all instances in the scope (required)")
+	computeCmd.Flags().StringArrayP("instances", "i", gceInstances, "Comma-separated list of instance names, or '*' for all instances in the scope (required)")
 	computeCmd.Flags().BoolVar(&gceAutoApprove, "auto-approve", false, "Skip all interactive prompts")
 	computeCmd.Flags().IntVar(&gceMaxConcurrency, "max-concurrency", 5, "Maximum number of disks/instances to process concurrently (1-50)")
 	computeCmd.Flags().BoolVar(&gceRetainName, "retain-name", true, "Reuse original disk name. If false, keep original and suffix new name.")
@@ -98,8 +98,8 @@ func validateComputeCmdFlags(cmd *cobra.Command, args []string) error {
 	if gceMaxConcurrency < 1 || gceMaxConcurrency > 50 { // Adjusted max concurrency for instance operations
 		return fmt.Errorf("--max-concurrency must be between 1 and 50, got %d", gceMaxConcurrency)
 	}
-
-	if gceInstances == "" {
+	gceInstances, _ = cmd.Flags().GetStringArray("instances")
+	if len(gceInstances) == 0 {
 		return errors.New("required flag --instances not set")
 	}
 

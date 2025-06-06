@@ -17,9 +17,10 @@ type Config struct {
 	Concurrency    int
 	RetainName     bool
 	Debug          bool
-	iops           int64
-	throughput     int64
-	storagePoolId  string
+	Iops           int64
+	Throughput     int64
+	StoragePoolId  string
+	Instances      []string
 }
 
 func (c *Config) PopulateKmsParams() *gcp.SnapshotKmsParams {

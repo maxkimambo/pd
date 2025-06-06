@@ -80,15 +80,26 @@ func getShortDiskTypeName(typeURL string) string {
 	return parts[len(parts)-1]
 }
 
-// DiscoverInstances discovers GCP Compute Engine instances in a specified zone or region.
 func DiscoverInstances(ctx context.Context, config *Config, gcpClient *gcp.Clients) ([]*computepb.Instance, error) {
 	logrus.Info("--- Phase 1: Discovering Instances ---")
 
 	var discoveredInstances []*computepb.Instance
 	var err error
-
-	// If a specific zone is provided, list instances only in that zone.
-	if config.Zone != "" {
+	if len(config.Instances) > 0 && config.Instances[0] != "*" {
+		// get instances by names
+		for _, instanceName := range config.Instances {
+			logrus.Infof("Looking for instance: %s (Project: %s)", instanceName, config.ProjectID)
+			instance, err := gcpClient.GetInstance(ctx, config.ProjectID, config.Zone, instanceName)
+			if err != nil {
+				return nil, fmt.Errorf("failed to get instance %s in zone %s: %w", instanceName, config.Zone, err)
+			}
+			if instance != nil {
+				discoveredInstances = append(discoveredInstances, instance)
+			} else {
+				logrus.Warnf("Instance %s not found in zone %s", instanceName, config.Zone)
+			}
+		}
+	} else if config.Zone != "" {
 		logrus.Infof("Listing instances in zone %s (Project: %s)", config.Zone, config.ProjectID)
 		discoveredInstances, err = listInstancesInZone(ctx, config.ProjectID, config.Zone, gcpClient) // Updated call
 		if err != nil {
@@ -113,7 +124,6 @@ func DiscoverInstances(ctx context.Context, config *Config, gcpClient *gcp.Clien
 	logrus.Infof("Successfully discovered %d instance(s):", len(discoveredInstances))
 	var sb strings.Builder
 	for i, instance := range discoveredInstances {
-		// Extract zone from full URL for cleaner display if needed
 		zoneParts := strings.Split(instance.GetZone(), "/")
 		displayZone := zoneParts[len(zoneParts)-1]
 		sb.WriteString(fmt.Sprintf("  %d. %s (Zone: %s)\n", i+1, instance.GetName(), displayZone))
@@ -125,9 +135,8 @@ func DiscoverInstances(ctx context.Context, config *Config, gcpClient *gcp.Clien
 	return discoveredInstances, nil
 }
 
-// listInstancesInZone iterates and collects all instances from a single specified zone.
 func listInstancesInZone(ctx context.Context, projectID, zone string, gcpClient *gcp.Clients) ([]*computepb.Instance, error) {
-	// The iteration is now handled by gcpClient.ListInstancesInZone
+
 	instances, err := gcpClient.ListInstancesInZone(ctx, projectID, zone)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list instances in zone %s: %w", zone, err)
@@ -135,8 +144,6 @@ func listInstancesInZone(ctx context.Context, projectID, zone string, gcpClient 
 	return instances, nil
 }
 
-// listInstancesInRegion iterates through all zones in a project and filters instances by the specified region.
-// Note: This uses AggregatedList for efficiency.
 func listInstancesInRegion(ctx context.Context, projectID, region string, gcpClient *gcp.Clients) ([]*computepb.Instance, error) {
 	allInstances, err := gcpClient.AggregatedListInstances(ctx, projectID)
 	if err != nil {
@@ -146,7 +153,7 @@ func listInstancesInRegion(ctx context.Context, projectID, region string, gcpCli
 	var instancesInRegion []*computepb.Instance
 	for _, instance := range allInstances {
 		if instance.GetZone() != "" {
-			// Zone URL is like projects/PROJECT_ID/zones/ZONE_NAME
+
 			zoneParts := strings.Split(instance.GetZone(), "/")
 			instanceZone := zoneParts[len(zoneParts)-1]
 			if strings.HasPrefix(instanceZone, region) {
