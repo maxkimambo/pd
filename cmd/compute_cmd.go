@@ -55,7 +55,7 @@ pd migrate compute --project my-gcp-project --region us-central1 --instances "*"
 }
 
 func init() {
-
+	computeCmd.Flags().StringVarP(&projectID, "project", "p", "", "GCP Project ID (required)")
 	computeCmd.Flags().StringVarP(&gceTargetDiskType, "target-disk-type", "t", "", "Target disk type (e.g., pd-ssd, hyperdisk-balanced) (required)")
 	computeCmd.Flags().StringVar(&gceLabelFilter, "label", "", "Label filter for disks in key=value format (optional)")
 	computeCmd.Flags().StringVar(&gceKmsKey, "kms-key", "", "KMS Key name for snapshot encryption (optional)")
@@ -125,6 +125,7 @@ func runGceConvert(cmd *cobra.Command, args []string) error {
 		Concurrency:    gceMaxConcurrency,
 		RetainName:     gceRetainName,
 		Debug:          debug,
+		Instances:      gceInstances,
 	}
 
 	logrus.Infof("Project: %s", projectID)
