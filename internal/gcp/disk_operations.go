@@ -28,6 +28,30 @@ func supportsIopsAndThroughput(diskType string) bool {
 	return slices.Contains(supportedTypes, diskType)
 }
 
+func (c *Clients) GetDisk(ctx context.Context, projectID, zone, diskName string) (*computepb.Disk, error) {
+	logFields := logrus.Fields{
+		"project": projectID,
+		"zone":    zone,
+		"disk":    diskName,
+	}
+	logrus.WithFields(logFields).Info("Retrieving disk information...")
+
+	req := &computepb.GetDiskRequest{
+		Project: projectID,
+		Zone:    zone,
+		Disk:    diskName,
+	}
+
+	disk, err := c.Disks.Get(ctx, req)
+	if err != nil {
+		logrus.WithFields(logFields).WithError(err).Error("Failed to retrieve disk")
+		return nil, fmt.Errorf("failed to get disk %s in zone %s: %w", diskName, zone, err)
+	}
+
+	logrus.WithFields(logFields).Infof("Retrieved disk: %s", *disk.Name)
+	return disk, nil
+}
+
 func (c *Clients) ListDetachedDisks(
 	ctx context.Context,
 	projectID string,

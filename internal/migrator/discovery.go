@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/maxkimambo/pd/internal/gcp"
+	"github.com/maxkimambo/pd/internal/utils"
 
 	computepb "cloud.google.com/go/compute/apiv1/computepb"
 	"github.com/sirupsen/logrus"
@@ -88,7 +89,7 @@ func DiscoverInstances(ctx context.Context, config *Config, gcpClient *gcp.Clien
 	if len(config.Instances) > 0 && config.Instances[0] != "*" {
 		// get instances by names
 		for _, instanceName := range config.Instances {
-			logrus.Infof("Looking for instance: %s (Project: %s)", instanceName, config.ProjectID)
+			logrus.Infof("Getting compute instance %s", instanceName)
 			instance, err := gcpClient.GetInstance(ctx, config.ProjectID, config.Zone, instanceName)
 			if err != nil {
 				return nil, fmt.Errorf("failed to get instance %s in zone %s: %w", instanceName, config.Zone, err)
@@ -100,15 +101,14 @@ func DiscoverInstances(ctx context.Context, config *Config, gcpClient *gcp.Clien
 			}
 		}
 	} else if config.Zone != "" {
-		logrus.Infof("Listing instances in zone %s (Project: %s)", config.Zone, config.ProjectID)
-		discoveredInstances, err = listInstancesInZone(ctx, config.ProjectID, config.Zone, gcpClient) // Updated call
+		logrus.Infof("Listing instances in zone %s", config.Zone)
+		discoveredInstances, err = listInstancesInZone(ctx, config.ProjectID, config.Zone, gcpClient)
 		if err != nil {
 			return nil, fmt.Errorf("failed to discover instances in zone %s: %w", config.Zone, err)
 		}
 	} else if config.Region != "" {
-		// If a region is provided, list all instances in that region by aggregating across its zones.
-		logrus.Infof("Listing instances in region %s (Project: %s)", config.Region, config.ProjectID)
-		discoveredInstances, err = listInstancesInRegion(ctx, config.ProjectID, config.Region, gcpClient) // Updated call
+		logrus.Infof("Listing instances in region %s", config.Region)
+		discoveredInstances, err = listInstancesInRegion(ctx, config.ProjectID, config.Region, gcpClient)
 		if err != nil {
 			return nil, fmt.Errorf("failed to discover instances in region %s: %w", config.Region, err)
 		}
@@ -120,18 +120,11 @@ func DiscoverInstances(ctx context.Context, config *Config, gcpClient *gcp.Clien
 		logrus.Info("No instances found matching the specified location.")
 		return []*computepb.Instance{}, nil
 	}
-
-	logrus.Infof("Successfully discovered %d instance(s):", len(discoveredInstances))
 	var sb strings.Builder
-	for i, instance := range discoveredInstances {
-		zoneParts := strings.Split(instance.GetZone(), "/")
-		displayZone := zoneParts[len(zoneParts)-1]
-		sb.WriteString(fmt.Sprintf("  %d. %s (Zone: %s)\n", i+1, instance.GetName(), displayZone))
+	sb.WriteString("\n")
+	for _, instance := range discoveredInstances {
+		logrus.Infof("\t %s (Zone: %s)", instance.GetName(), utils.ExtractZoneName(instance.GetZone()))
 	}
-	if sb.Len() > 0 {
-		logrus.Info(sb.String())
-	}
-
 	return discoveredInstances, nil
 }
 

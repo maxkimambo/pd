@@ -47,7 +47,7 @@ For each targeted disk, it will (eventually):
 8. Clean up snapshots afterwards.
 
 Example:
-pd migrate compute --project my-gcp-project --zone us-central1-a --instances vm1,vm2.. vmN --target-disk-type hyperdisk-balanced
+pd migrate compute --project my-gcp-project --zone us-central1-a --instances vm1,vm2.. vm.N --target-disk-type hyperdisk-balanced
 pd migrate compute --project my-gcp-project --region us-central1 --instances "*" --target-disk-type hyperdisk-balanced --auto-approve
 `,
 	PreRunE: validateComputeCmdFlags,
@@ -127,16 +127,19 @@ func runGceConvert(cmd *cobra.Command, args []string) error {
 		Debug:          debug,
 		Instances:      gceInstances,
 	}
-
+	logrus.Debugf("Configuration: %+v", config)
 	logrus.Infof("Project: %s", projectID)
 	if gceZone != "" {
 		logrus.Infof("Zone: %s", gceZone)
 	} else {
 		logrus.Infof("Region: %s", gceRegion)
 	}
-	logrus.Infof("Instances: %s", gceInstances)
-	logrus.Infof("Target Disk Type: %s", gceTargetDiskType)
-	// ... log other parameters ...
+	if gceInstances[0] == "*" {
+		logrus.Infof("Target: All instances in scope (%s)", config.Location())
+	} else {
+		logrus.Infof("Target: %s", strings.Join(gceInstances, ", "))
+	}
+	logrus.Infof("Target disk type: %s", gceTargetDiskType)
 
 	ctx := context.Background()
 	gcpClient, err := gcp.NewClients(ctx)
@@ -150,20 +153,13 @@ func runGceConvert(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to discover GCE instances: %w", err)
 	}
 	logrus.Infof("Discovered %d instance(s) for migration.", len(discoveredInstances))
-
-	// 1. Parse gceInstances: if "*", list all instances in scope. Otherwise, use provided names.
-	// 2. For each instance, get its details, including attached disks.
-	// 3. Filter disks based on gceLabelFilter (if provided).
-	// 4. Present list to user for confirmation (unless --yes or --auto-approve).
-	// logrus.Warn("Discovery logic for GCE instances and their disks is not yet implemented.")
-	// discoveredInstanceDisks := []string{}                        // Placeholder
-	// if len(discoveredInstanceDisks) == 0 && gceInstances != "" { // Simulate finding nothing if not implemented
-	// 	logrus.Info("No instances/disks matching criteria found (or discovery not implemented). Exiting.")
-	// 	// return nil // In a real scenario, might return error or specific message
-	// }
-
-	// --- Placeholder for Migration Phase ---
 	logrus.Info("--- Phase 2: Migration (GCE Attached Disks) ---")
+
+	for _, instance := range discoveredInstances {
+		logrus.Infof("Processing instance: %s", *instance.Name)
+		migrator.MigrateInstanceDisks(ctx, &config, instance, gcpClient)
+	}
+
 	// For each disk:
 	//  a. Stop instance (optional, confirm with user).
 	//  b. Detach disk.

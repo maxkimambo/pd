@@ -48,7 +48,7 @@ func MigrateDisks(ctx context.Context, config *Config, gcpClient *gcp.Clients, d
 			defer wg.Done()
 			defer func() { <-semaphore }()
 
-			result := migrateSingleDisk(ctx, config, gcpClient, d)
+			result := MigrateSingleDisk(ctx, config, gcpClient, d)
 			resultsChan <- result
 		}(disk)
 	}
@@ -65,7 +65,7 @@ func MigrateDisks(ctx context.Context, config *Config, gcpClient *gcp.Clients, d
 	return allResults, nil
 }
 
-func migrateSingleDisk(ctx context.Context, config *Config, gcpClient *gcp.Clients, disk *computepb.Disk) MigrationResult {
+func MigrateSingleDisk(ctx context.Context, config *Config, gcpClient *gcp.Clients, disk *computepb.Disk) MigrationResult {
 	startTime := time.Now()
 	diskName := disk.GetName()
 	zone := "unknown-zone"

@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	computepb "cloud.google.com/go/compute/apiv1/computepb"
+	"github.com/maxkimambo/pd/internal/utils"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/api/iterator"
 )
@@ -48,7 +49,7 @@ func (ops *Clients) StopInstance(ctx context.Context, projectID, zone, instanceN
 		"instance": instanceName,
 	}
 	logrus.WithFields(logFields).Info("Stopping instance")
-
+	zone = utils.ExtractZoneName(zone)
 	req := &computepb.StopInstanceRequest{
 		Project:  projectID,
 		Zone:     zone,
@@ -75,10 +76,6 @@ func (ops *Clients) StopInstance(ctx context.Context, projectID, zone, instanceN
 }
 
 func (ops *Clients) ListInstancesInZone(ctx context.Context, projectID, zone string) ([]*computepb.Instance, error) {
-	logrus.WithFields(logrus.Fields{
-		"project": projectID,
-		"zone":    zone,
-	}).Info("Listing instances in zone")
 
 	req := &computepb.ListInstancesRequest{
 		Project: projectID,
@@ -97,10 +94,10 @@ func (ops *Clients) ListInstancesInZone(ctx context.Context, projectID, zone str
 		instances = append(instances, instance)
 	}
 	logrus.WithFields(logrus.Fields{
-		"project": projectID,
-		"zone":    zone,
-		"count":   len(instances),
-	}).Info("Successfully listed instances in zone.")
+		"project":  projectID,
+		"zone":     zone,
+		"instaces": len(instances),
+	}).Info("Instances found")
 	return instances, nil
 }
 
@@ -151,6 +148,11 @@ func (ops *Clients) GetInstance(ctx context.Context, projectID, zone, instanceNa
 		return nil, fmt.Errorf("failed to get instance %s in zone %s: %w", instanceName, zone, err)
 	}
 	return instance, nil
+}
+
+func (ops *Clients) InstanceIsRunning(ctx context.Context, instance *computepb.Instance) bool {
+
+	return *instance.Status == "RUNNING"
 }
 
 func (ops *Clients) GetInstanceDisks(ctx context.Context, projectID, zone, instanceName string) ([]*computepb.AttachedDisk, error) {
@@ -204,7 +206,6 @@ func (ops *Clients) DeleteInstance(ctx context.Context, projectID, zone, instanc
 	return nil
 }
 
-// AttachDisk attaches a disk to a GCE instance.
 func (ops *Clients) AttachDisk(ctx context.Context, projectID, zone, instanceName string, attachedDiskResource *computepb.AttachedDisk) error {
 	logFields := logrus.Fields{
 		"project":  projectID,
