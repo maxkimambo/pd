@@ -31,3 +31,13 @@ func AddSuffix(name string, length int) string {
 	suffix := fmt.Sprintf("%x", rand.Intn(0xFFF))
 	return fmt.Sprintf("%s-%s", name, suffix)
 }
+
+func GetStoragePoolURL(projectId, storagePoolId, zone string) string {
+	if storagePoolId == "" {
+		return ""
+	}
+	if strings.Contains(storagePoolId, "/") {
+		return storagePoolId
+	}
+	return fmt.Sprintf("projects/%s/zones/%s/storagePools/%s", projectId, zone, storagePoolId)
+}

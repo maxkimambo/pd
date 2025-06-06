@@ -84,6 +84,7 @@ func (c *Clients) CreateNewDiskFromSnapshot(
 	labels map[string]string,
 	iops int64,
 	throughput int64,
+	storagePoolID string,
 ) error {
 	logFields := logrus.Fields{
 		"project":        projectID,
@@ -116,6 +117,13 @@ func (c *Clients) CreateNewDiskFromSnapshot(
 			ProvisionedIops:       proto.Int64(iops),
 			ProvisionedThroughput: proto.Int64(throughput),
 		}
+	}
+	// If storagePoolID is provided, set it on the disk
+	// This is only applicable for certain disk types that support storage pools
+	// such as Hyperdisk.
+	// If the disk type does not support storage pools, this field will be ignored.
+	if storagePoolID != "" {
+		disk.StoragePool = proto.String(storagePoolID)
 	}
 
 	req := &computepb.InsertDiskRequest{

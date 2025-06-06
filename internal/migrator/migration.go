@@ -145,8 +145,8 @@ func migrateSingleDisk(ctx context.Context, config *Config, gcpClient *gcp.Clien
 		newDiskLabels = make(map[string]string)
 	}
 	newDiskLabels["migration"] = "success"
-
-	err = gcpClient.CreateNewDiskFromSnapshot(ctx, config.ProjectID, zone, newDiskName, config.TargetDiskType, snapshotName, newDiskLabels, config.iops, config.throughput)
+	storagePoolUrl := utils.GetStoragePoolURL(config.storagePoolId, config.ProjectID, zone)
+	err = gcpClient.CreateNewDiskFromSnapshot(ctx, config.ProjectID, zone, newDiskName, config.TargetDiskType, snapshotName, newDiskLabels, config.iops, config.throughput, storagePoolUrl)
 	if err != nil {
 		errMsg := fmt.Sprintf("Failed to recreate disk from snapshot: %v", err)
 		logrus.WithFields(logFields).Error(errMsg)

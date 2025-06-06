@@ -169,7 +169,7 @@ func TestCreateNewDiskFromSnapshot(t *testing.T) {
 	fullSnapshotPath := "global/snapshots/" + snapshotName
 	fullDiskTypePath := "zones/" + zone + "/diskTypes/" + targetDiskType
 	labels := map[string]string{"env": "test"}
-
+	storagePoolUrl := "projects/project/zones/zone/storagePools/storagePool"
 	mockOp := &compute.Operation{}
 
 	t.Run("Success", func(t *testing.T) {
@@ -178,7 +178,7 @@ func TestCreateNewDiskFromSnapshot(t *testing.T) {
 			InsertErr: nil,
 		}
 		clients := &Clients{Disks: mockDiskClient}
-		err := clients.CreateNewDiskFromSnapshot(ctx, projectID, zone, newDiskName, targetDiskType, snapshotName, labels, 0, 0)
+		err := clients.CreateNewDiskFromSnapshot(ctx, projectID, zone, newDiskName, targetDiskType, snapshotName, labels, 0, 0, storagePoolUrl)
 
 		assert.NoError(t, err)
 		assert.True(t, mockDiskClient.InsertCalled)
@@ -197,7 +197,8 @@ func TestCreateNewDiskFromSnapshot(t *testing.T) {
 			InsertErr: expectedErr,
 		}
 		clients := &Clients{Disks: mockDiskClient}
-		err := clients.CreateNewDiskFromSnapshot(ctx, projectID, zone, newDiskName, targetDiskType, snapshotName, labels, 0, 0)
+
+		err := clients.CreateNewDiskFromSnapshot(ctx, projectID, zone, newDiskName, targetDiskType, snapshotName, labels, 0, 0, storagePoolUrl)
 
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), expectedErr.Error())
