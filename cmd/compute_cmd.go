@@ -31,10 +31,10 @@ var (
 	gceRetainName     bool
 )
 
-var gceConvertCmd = &cobra.Command{
-	Use:   "gce-convert",
-	Short: "Migrate attached Persistent Disks on GCE instances to a new type",
-	Long: `Performs migration of Persistent Disks attached to specified GCE instances.
+var computeCmd = &cobra.Command{
+	Use:   "compute",
+	Short: "Migrate attached persistent disks on GCE instances to a new disk type",
+	Long: `Performs migration of persistent disks attached to specified GCE instances.
 
 Identifies instances and their disks based on project, location (zone or region), and instance names.
 For each targeted disk, it will (eventually):
@@ -48,35 +48,34 @@ For each targeted disk, it will (eventually):
 8. Clean up snapshots afterwards.
 
 Example:
-pd gce-convert --project my-gcp-project --zone us-central1-a --instances my-instance-1,my-instance-2 --target-disk-type pd-ssd
-pd gce-convert --project my-gcp-project --region us-central1 --instances "*" --target-disk-type hyperdisk-balanced --auto-approve
+pd migrate compute --project my-gcp-project --zone us-central1-a --instances my-instance-1,my-instance-2 --target-disk-type pd-ssd
+pd migrate compute --project my-gcp-project --region us-central1 --instances "*" --target-disk-type hyperdisk-balanced --auto-approve
 `,
-	PreRunE: validateGceConvertFlags,
+	PreRunE: validateComputeCmdFlags,
 	RunE:    runGceConvert,
 }
 
 func init() {
-	rootCmd.AddCommand(gceConvertCmd)
 
-	gceConvertCmd.Flags().StringVarP(&gceTargetDiskType, "target-disk-type", "t", "", "Target disk type (e.g., pd-ssd, hyperdisk-balanced) (required)")
-	gceConvertCmd.Flags().StringVar(&gceLabelFilter, "label", "", "Label filter for disks in key=value format (optional)")
-	gceConvertCmd.Flags().StringVar(&gceKmsKey, "kms-key", "", "KMS Key name for snapshot encryption (optional)")
-	gceConvertCmd.Flags().StringVar(&gceKmsKeyRing, "kms-keyring", "", "KMS KeyRing name (required if kms-key is set)")
-	gceConvertCmd.Flags().StringVar(&gceKmsLocation, "kms-location", "", "KMS Key location (required if kms-key is set)")
-	gceConvertCmd.Flags().StringVar(&gceKmsProject, "kms-project", "", "KMS Project ID (defaults to --project if not set, required if kms-key is set)")
-	gceConvertCmd.Flags().StringVar(&gceRegion, "region", "", "GCP region (required if zone is not set)")
-	gceConvertCmd.Flags().StringVar(&gceZone, "zone", "", "GCP zone (required if region is not set)")
-	gceConvertCmd.Flags().StringVarP(&gceInstances, "instances", "i", "", "Comma-separated list of instance names, or '*' for all instances in the scope (required)")
-	gceConvertCmd.Flags().BoolVar(&gceYes, "yes", false, "Skip initial confirmation prompts")
-	gceConvertCmd.Flags().BoolVar(&gceAutoApprove, "auto-approve", false, "Skip all interactive prompts (overrides --yes)")
-	gceConvertCmd.Flags().IntVar(&gceMaxConcurrency, "max-concurrency", 5, "Maximum number of disks/instances to process concurrently (1-50)")
-	gceConvertCmd.Flags().BoolVar(&gceRetainName, "retain-name", true, "Reuse original disk name. If false, keep original and suffix new name.")
+	computeCmd.Flags().StringVarP(&gceTargetDiskType, "target-disk-type", "t", "", "Target disk type (e.g., pd-ssd, hyperdisk-balanced) (required)")
+	computeCmd.Flags().StringVar(&gceLabelFilter, "label", "", "Label filter for disks in key=value format (optional)")
+	computeCmd.Flags().StringVar(&gceKmsKey, "kms-key", "", "KMS Key name for snapshot encryption (optional)")
+	computeCmd.Flags().StringVar(&gceKmsKeyRing, "kms-keyring", "", "KMS KeyRing name (required if kms-key is set)")
+	computeCmd.Flags().StringVar(&gceKmsLocation, "kms-location", "", "KMS Key location (required if kms-key is set)")
+	computeCmd.Flags().StringVar(&gceKmsProject, "kms-project", "", "KMS Project ID (defaults to --project if not set, required if kms-key is set)")
+	computeCmd.Flags().StringVar(&gceRegion, "region", "", "GCP region (required if zone is not set)")
+	computeCmd.Flags().StringVar(&gceZone, "zone", "", "GCP zone (required if region is not set)")
+	computeCmd.Flags().StringVarP(&gceInstances, "instances", "i", "*", "Comma-separated list of instance names, or '*' for all instances in the scope (required)")
+	computeCmd.Flags().BoolVar(&gceYes, "yes", false, "Skip initial confirmation prompts")
+	computeCmd.Flags().BoolVar(&gceAutoApprove, "auto-approve", false, "Skip all interactive prompts (overrides --yes)")
+	computeCmd.Flags().IntVar(&gceMaxConcurrency, "max-concurrency", 5, "Maximum number of disks/instances to process concurrently (1-50)")
+	computeCmd.Flags().BoolVar(&gceRetainName, "retain-name", true, "Reuse original disk name. If false, keep original and suffix new name.")
 
-	gceConvertCmd.MarkFlagRequired("target-disk-type")
-	gceConvertCmd.MarkFlagRequired("instances")
+	computeCmd.MarkFlagRequired("target-disk-type")
+	computeCmd.MarkFlagRequired("instances")
 }
 
-func validateGceConvertFlags(cmd *cobra.Command, args []string) error {
+func validateComputeCmdFlags(cmd *cobra.Command, args []string) error {
 	if projectID == "" { // projectID is from root persistent flag
 		return errors.New("required flag --project not set")
 	}

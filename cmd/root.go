@@ -1,9 +1,6 @@
 package cmd
 
 import (
-	"fmt"
-	"os"
-
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
@@ -11,12 +8,12 @@ import (
 var (
 	projectID string
 	debug     bool
+	version   = "v0.1.0"
 
 	rootCmd = &cobra.Command{
 		Use:   "pd",
-		Short: "A CLI tool for managing Google Cloud Persistent Disks",
-		Long: `pd is a command-line interface to help manage Google Cloud
-Persistent Disks, including bulk migrations between disk types.`,
+		Short: "A CLI tool for migrating Google Cloud persistent disks",
+		Long:  `A CLI tool for bulk migrating Google Cloud persistent disks from one type to another, either detached or attached to GCE instances.`,
 		PersistentPreRun: func(cmd *cobra.Command, args []string) {
 			if debug {
 				logrus.SetLevel(logrus.DebugLevel)
@@ -36,25 +33,8 @@ func Execute() error {
 }
 
 func init() {
-	rootCmd.PersistentFlags().StringVarP(&projectID, "project", "p", "", "Google Cloud Project ID (required)")
+	rootCmd.Version = version
 	rootCmd.PersistentFlags().BoolVar(&debug, "debug", false, "Enable debug logging")
 
-	// Add other commands like convertCmd here
-	// e.g., rootCmd.AddCommand(convertCmd)
-	// The gceConvertCmd will be added in its own init() function in gce_convert.go
-}
-
-func exitWithError(err error) {
-	logrus.Error(err)
-	os.Exit(1)
-}
-
-func checkRequiredFlags(cmd *cobra.Command, flags []string) error {
-	for _, flagName := range flags {
-		val, _ := cmd.Flags().GetString(flagName)
-		if val == "" {
-			return fmt.Errorf("required flag --%s not set", flagName)
-		}
-	}
-	return nil
+	rootCmd.AddCommand(migrateCmd)
 }
