@@ -25,7 +25,6 @@ var (
 	gceRegion         string
 	gceZone           string
 	gceInstances      string
-	gceYes            bool
 	gceAutoApprove    bool
 	gceMaxConcurrency int
 	gceRetainName     bool
@@ -66,8 +65,7 @@ func init() {
 	computeCmd.Flags().StringVar(&gceRegion, "region", "", "GCP region (required if zone is not set)")
 	computeCmd.Flags().StringVar(&gceZone, "zone", "", "GCP zone (required if region is not set)")
 	computeCmd.Flags().StringVarP(&gceInstances, "instances", "i", "*", "Comma-separated list of instance names, or '*' for all instances in the scope (required)")
-	computeCmd.Flags().BoolVar(&gceYes, "yes", false, "Skip initial confirmation prompts")
-	computeCmd.Flags().BoolVar(&gceAutoApprove, "auto-approve", false, "Skip all interactive prompts (overrides --yes)")
+	computeCmd.Flags().BoolVar(&gceAutoApprove, "auto-approve", false, "Skip all interactive prompts")
 	computeCmd.Flags().IntVar(&gceMaxConcurrency, "max-concurrency", 5, "Maximum number of disks/instances to process concurrently (1-50)")
 	computeCmd.Flags().BoolVar(&gceRetainName, "retain-name", true, "Reuse original disk name. If false, keep original and suffix new name.")
 
@@ -123,14 +121,11 @@ func runGceConvert(cmd *cobra.Command, args []string) error {
 		KmsProject:     gceKmsProject,
 		Region:         gceRegion,
 		Zone:           gceZone,
-
-		SkipConfirm:    gceYes || gceAutoApprove,
 		AutoApproveAll: gceAutoApprove,
 		Concurrency:    gceMaxConcurrency,
 		RetainName:     gceRetainName,
 		Debug:          debug,
 	}
-	// logrus.WithField("config", fmt.Sprintf("%+v", config)).Debug("GCE migration configuration prepared")
 
 	logrus.Infof("Project: %s", projectID)
 	if gceZone != "" {

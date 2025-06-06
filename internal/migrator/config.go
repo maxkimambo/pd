@@ -13,7 +13,6 @@ type Config struct {
 	KmsParams      *gcp.SnapshotKmsParams
 	Region         string
 	Zone           string
-	SkipConfirm    bool
 	AutoApproveAll bool
 	Concurrency    int
 	RetainName     bool

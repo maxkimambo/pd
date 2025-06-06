@@ -51,7 +51,7 @@ func DiscoverDisks(ctx context.Context, config *Config, gcpClient *gcp.Clients) 
 
 	logrus.Info(sb.String())
 
-	if !config.AutoApproveAll && !config.SkipConfirm {
+	if !config.AutoApproveAll {
 		fmt.Printf("\nProceed with migrating these %d disk(s) to type '%s'? (yes/no): ", len(disksToMigrate), config.TargetDiskType)
 		reader := bufio.NewReader(os.Stdin)
 		input, err := reader.ReadString('\n')
@@ -64,8 +64,8 @@ func DiscoverDisks(ctx context.Context, config *Config, gcpClient *gcp.Clients) 
 			return []*computepb.Disk{}, nil
 		}
 		logrus.Info("User confirmed. Proceeding with migration.")
-	} else if config.SkipConfirm || config.AutoApproveAll {
-		logrus.Warn("Skipping user confirmation due to --yes or --auto-approve flag.")
+	} else {
+		logrus.Info("Skipping user confirmation due to --auto-approve flag.")
 	}
 
 	logrus.Info("--- Discovery Phase Complete ---")

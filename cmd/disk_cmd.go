@@ -61,8 +61,7 @@ func init() {
 	diskCmd.Flags().StringVar(&kmsProject, "kms-project", "", "KMS Project ID (defaults to --project if not set, required if kms-key is set)")
 	diskCmd.Flags().StringVar(&region, "region", "", "GCP region (required if zone is not set)")
 	diskCmd.Flags().StringVar(&zone, "zone", "", "GCP zone (required if region is not set)")
-	diskCmd.Flags().BoolVar(&yes, "yes", false, "Skip initial disk list confirmation")
-	diskCmd.Flags().BoolVar(&autoApprove, "auto-approve", true, "Skip all interactive prompts (overrides --yes)")
+	diskCmd.Flags().BoolVar(&autoApprove, "auto-approve", true, "Skip all interactive prompts")
 	diskCmd.Flags().IntVar(&concurrency, "concurrency", 10, "Number of disks to process concurrently (1-200), default: 10")
 	diskCmd.Flags().BoolVar(&retainName, "retain-name", true, "Reuse original disk name (delete original). If false, keep original and suffix new name.")
 	diskCmd.Flags().Int64Var(&throughput, "throughput", 140, "Throughput in MB/s to set (optional, default: 140 MiB/s)")
@@ -125,7 +124,6 @@ func runConvert(cmd *cobra.Command, args []string) error {
 		KmsProject:     kmsProject,
 		Region:         region,
 		Zone:           zone,
-		SkipConfirm:    yes || autoApprove,
 		AutoApproveAll: autoApprove,
 		Concurrency:    concurrency,
 		RetainName:     retainName,
