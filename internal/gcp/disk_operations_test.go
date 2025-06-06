@@ -6,24 +6,23 @@ import (
 	"testing"
 
 	compute "cloud.google.com/go/compute/apiv1"
-	computepb "cloud.google.com/go/compute/apiv1/computepb" 
+	computepb "cloud.google.com/go/compute/apiv1/computepb"
 	"github.com/googleapis/gax-go/v2"
 	"github.com/stretchr/testify/assert"
 
 	"google.golang.org/protobuf/proto"
 )
 
-
 type mockDisksClient struct {
-	DiskClientInterface 
+	DiskClientInterface
 	AggregatedListFunc func(ctx context.Context, req *computepb.AggregatedListDisksRequest, opts ...gax.CallOption) *compute.DisksScopedListPairIterator
 	InsertFunc         func(ctx context.Context, req *computepb.InsertDiskRequest, opts ...gax.CallOption) (*compute.Operation, error)
 	GetFunc            func(ctx context.Context, req *computepb.GetDiskRequest, opts ...gax.CallOption) (*computepb.Disk, error)
 	SetLabelsFunc      func(ctx context.Context, req *computepb.SetLabelsDiskRequest, opts ...gax.CallOption) (*compute.Operation, error)
 	DeleteFunc         func(ctx context.Context, req *computepb.DeleteDiskRequest, opts ...gax.CallOption) (*compute.Operation, error)
-	CloseFunc          func() error 
+	CloseFunc          func() error
 
-	AggregatedListErr error 
+	AggregatedListErr error
 	InsertOp          *compute.Operation
 	InsertErr         error
 	GetResp           *computepb.Disk
@@ -45,7 +44,7 @@ type mockDisksClient struct {
 }
 
 func (m *mockDisksClient) AggregatedList(ctx context.Context, req *computepb.AggregatedListDisksRequest, opts ...gax.CallOption) *compute.DisksScopedListPairIterator {
-	m.AggregatedListCalled = true 
+	m.AggregatedListCalled = true
 	if m.AggregatedListFunc != nil {
 		return m.AggregatedListFunc(ctx, req, opts...)
 	}
@@ -95,55 +94,52 @@ func (m *mockDisksClient) Close() error {
 	return nil
 }
 
-
 func TestListDetachedDisks(t *testing.T) {
 	ctx := context.Background()
 	projectID := "test-project"
 	zone := "us-central1-a"
-	fullZonePath := "projects/" + projectID + "/zones/" + zone 
+	fullZonePath := "projects/" + projectID + "/zones/" + zone
 
 	t.Run("Success - Found detached disks", func(t *testing.T) {
-
 
 		mockDiskClient := &mockDisksClient{
 			AggregatedListFunc: func(ctx context.Context, req *computepb.AggregatedListDisksRequest, opts ...gax.CallOption) *compute.DisksScopedListPairIterator {
 
-				return nil 
+				return nil
 			},
 		}
 
-		clients := &Clients{Disks: mockDiskClient} 
+		clients := &Clients{Disks: mockDiskClient}
 
 		disks, err := clients.ListDetachedDisks(ctx, projectID, zone, "")
 
 		assert.NoError(t, err)
 		assert.NotNil(t, disks)
 
-		disks, err = clients.ListDetachedDisks(ctx, projectID, fullZonePath, "") 
+		disks, err = clients.ListDetachedDisks(ctx, projectID, fullZonePath, "")
 
-		assert.True(t, mockDiskClient.AggregatedListCalled) 
+		assert.True(t, mockDiskClient.AggregatedListCalled)
 
-		assert.NoError(t, err) 
+		assert.NoError(t, err)
 		assert.NotNil(t, disks)
-		assert.Len(t, disks, 0) 
-
+		assert.Len(t, disks, 0)
 
 	})
 
 	t.Run("Success - No detached disks found", func(t *testing.T) {
 		mockDiskClient := &mockDisksClient{
 			AggregatedListFunc: func(ctx context.Context, req *computepb.AggregatedListDisksRequest, opts ...gax.CallOption) *compute.DisksScopedListPairIterator {
-				return nil 
+				return nil
 			},
 		}
 		clients := &Clients{Disks: mockDiskClient}
 
-		disks, err := clients.ListDetachedDisks(ctx, projectID, fullZonePath, "") 
+		disks, err := clients.ListDetachedDisks(ctx, projectID, fullZonePath, "")
 
-		assert.True(t, mockDiskClient.AggregatedListCalled) 
-		assert.NoError(t, err)                              
+		assert.True(t, mockDiskClient.AggregatedListCalled)
+		assert.NoError(t, err)
 		assert.NotNil(t, disks)
-		assert.Len(t, disks, 0) 
+		assert.Len(t, disks, 0)
 	})
 
 	t.Run("API Error - Nil Iterator", func(t *testing.T) {
@@ -154,11 +150,11 @@ func TestListDetachedDisks(t *testing.T) {
 		}
 		clients := &Clients{Disks: mockDiskClient}
 
-		disks, err := clients.ListDetachedDisks(ctx, projectID, fullZonePath, "") 
+		disks, err := clients.ListDetachedDisks(ctx, projectID, fullZonePath, "")
 
 		assert.True(t, mockDiskClient.AggregatedListCalled)
-		assert.NoError(t, err)  
-		assert.NotNil(t, disks) 
+		assert.NoError(t, err)
+		assert.NotNil(t, disks)
 		assert.Len(t, disks, 0)
 	})
 }
@@ -170,21 +166,21 @@ func TestCreateNewDiskFromSnapshot(t *testing.T) {
 	newDiskName := "new-disk"
 	targetDiskType := "pd-ssd"
 	snapshotName := "snap-1"
-	fullSnapshotPath := "global/snapshots/" + snapshotName               
-	fullDiskTypePath := "zones/" + zone + "/diskTypes/" + targetDiskType 
+	fullSnapshotPath := "global/snapshots/" + snapshotName
+	fullDiskTypePath := "zones/" + zone + "/diskTypes/" + targetDiskType
 	labels := map[string]string{"env": "test"}
 
 	mockOp := &compute.Operation{}
 
 	t.Run("Success", func(t *testing.T) {
 		mockDiskClient := &mockDisksClient{
-			InsertOp:  mockOp, 
+			InsertOp:  mockOp,
 			InsertErr: nil,
 		}
 		clients := &Clients{Disks: mockDiskClient}
-		err := clients.CreateNewDiskFromSnapshot(ctx, projectID, zone, newDiskName, targetDiskType, snapshotName, labels)
+		err := clients.CreateNewDiskFromSnapshot(ctx, projectID, zone, newDiskName, targetDiskType, snapshotName, labels, 0, 0)
 
-		assert.NoError(t, err) 
+		assert.NoError(t, err)
 		assert.True(t, mockDiskClient.InsertCalled)
 		assert.NotNil(t, mockDiskClient.LastInsertReq)
 		assert.Equal(t, projectID, mockDiskClient.LastInsertReq.GetProject())
@@ -201,11 +197,11 @@ func TestCreateNewDiskFromSnapshot(t *testing.T) {
 			InsertErr: expectedErr,
 		}
 		clients := &Clients{Disks: mockDiskClient}
-		err := clients.CreateNewDiskFromSnapshot(ctx, projectID, zone, newDiskName, targetDiskType, snapshotName, labels)
+		err := clients.CreateNewDiskFromSnapshot(ctx, projectID, zone, newDiskName, targetDiskType, snapshotName, labels, 0, 0)
 
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), expectedErr.Error())
-		assert.True(t, mockDiskClient.InsertCalled) 
+		assert.True(t, mockDiskClient.InsertCalled)
 	})
 
 }
@@ -219,23 +215,23 @@ func TestUpdateDiskLabel(t *testing.T) {
 	labelValue := "updated"
 	initialFingerprint := "fingerprint123"
 
-	mockSetLabelsOp := &compute.Operation{} 
+	mockSetLabelsOp := &compute.Operation{}
 
 	t.Run("Success - Add new label", func(t *testing.T) {
 		mockDiskClient := &mockDisksClient{
 			GetResp: &computepb.Disk{
 				Name:             proto.String(diskName),
 				LabelFingerprint: proto.String(initialFingerprint),
-				Labels:           nil, 
+				Labels:           nil,
 			},
-			GetErr: nil,
+			GetErr:       nil,
 			SetLabelsOp:  mockSetLabelsOp,
 			SetLabelsErr: nil,
 		}
 		clients := &Clients{Disks: mockDiskClient}
 		err := clients.UpdateDiskLabel(ctx, projectID, zone, diskName, labelKey, labelValue)
 
-		assert.NoError(t, err) 
+		assert.NoError(t, err)
 		assert.True(t, mockDiskClient.GetCalled)
 		assert.Equal(t, diskName, mockDiskClient.LastGetReq.GetDisk())
 		assert.True(t, mockDiskClient.SetLabelsCalled)
@@ -260,13 +256,13 @@ func TestUpdateDiskLabel(t *testing.T) {
 			SetLabelsErr: nil,
 		}
 		clients := &Clients{Disks: mockDiskClient}
-		err := clients.UpdateDiskLabel(ctx, projectID, zone, diskName, labelKey, labelValue) 
+		err := clients.UpdateDiskLabel(ctx, projectID, zone, diskName, labelKey, labelValue)
 
-		assert.NoError(t, err) 
+		assert.NoError(t, err)
 		assert.True(t, mockDiskClient.GetCalled)
 		assert.True(t, mockDiskClient.SetLabelsCalled)
 		assert.Equal(t, initialFingerprint, mockDiskClient.LastSetLabelsReq.GetZoneSetLabelsRequestResource().GetLabelFingerprint())
-		expectedLabels := map[string]string{"existing": "value", labelKey: labelValue} 
+		expectedLabels := map[string]string{"existing": "value", labelKey: labelValue}
 		assert.Equal(t, expectedLabels, mockDiskClient.LastSetLabelsReq.GetZoneSetLabelsRequestResource().GetLabels())
 	})
 
@@ -281,19 +277,19 @@ func TestUpdateDiskLabel(t *testing.T) {
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), expectedErr.Error())
 		assert.True(t, mockDiskClient.GetCalled)
-		assert.False(t, mockDiskClient.SetLabelsCalled) 
+		assert.False(t, mockDiskClient.SetLabelsCalled)
 	})
 
 	t.Run("SetLabels API Error", func(t *testing.T) {
 		expectedErr := errors.New("setlabels failed")
 		mockDiskClient := &mockDisksClient{
-			GetResp: &computepb.Disk{ 
+			GetResp: &computepb.Disk{
 				Name:             proto.String(diskName),
 				LabelFingerprint: proto.String(initialFingerprint),
 				Labels:           nil,
 			},
 			GetErr:       nil,
-			SetLabelsErr: expectedErr, 
+			SetLabelsErr: expectedErr,
 		}
 		clients := &Clients{Disks: mockDiskClient}
 		err := clients.UpdateDiskLabel(ctx, projectID, zone, diskName, labelKey, labelValue)
@@ -311,7 +307,7 @@ func TestDeleteDisk(t *testing.T) {
 	zone := "us-central1-a"
 	diskName := "disk-to-delete"
 
-	mockDeleteOp := &compute.Operation{} 
+	mockDeleteOp := &compute.Operation{}
 
 	t.Run("Success", func(t *testing.T) {
 		mockDiskClient := &mockDisksClient{
@@ -321,7 +317,7 @@ func TestDeleteDisk(t *testing.T) {
 		clients := &Clients{Disks: mockDiskClient}
 		err := clients.DeleteDisk(ctx, projectID, zone, diskName)
 
-		assert.NoError(t, err) 
+		assert.NoError(t, err)
 		assert.True(t, mockDiskClient.DeleteCalled)
 		assert.NotNil(t, mockDiskClient.LastDeleteReq)
 		assert.Equal(t, projectID, mockDiskClient.LastDeleteReq.GetProject())

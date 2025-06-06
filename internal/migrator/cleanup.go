@@ -37,7 +37,7 @@ func CleanupSnapshots(ctx context.Context, config *Config, gcpClient *gcp.Client
 	}
 
 	var wg sync.WaitGroup
-	concurrencyLimit := config.MaxConcurrency
+	concurrencyLimit := config.Concurrency
 	if concurrencyLimit <= 0 || concurrencyLimit > 200 {
 		concurrencyLimit = 10
 	}

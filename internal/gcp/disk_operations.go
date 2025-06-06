@@ -4,7 +4,9 @@ import (
 	"context"
 	"fmt"
 	"strings"
-	"time" 
+	"time"
+
+	"slices"
 
 	computepb "cloud.google.com/go/compute/apiv1/computepb"
 	"github.com/maxkimambo/pd/internal/utils"
@@ -14,6 +16,17 @@ import (
 )
 
 const defaultOpTimeout = 5 * time.Minute
+
+func supportsIopsAndThroughput(diskType string) bool {
+
+	supportedTypes := []string{
+		"pd-extreme",
+		"hyperdisk-balanced",
+		"hyperdisk-extreme",
+		"hyperdisk-ml",
+	}
+	return slices.Contains(supportedTypes, diskType)
+}
 
 func (c *Clients) ListDetachedDisks(
 	ctx context.Context,
@@ -32,10 +45,10 @@ func (c *Clients) ListDetachedDisks(
 	}
 
 	it := c.Disks.AggregatedList(ctx, req)
-	var disks []*computepb.Disk 
+	var disks []*computepb.Disk
 	if it == nil {
 		logrus.WithFields(logFields).Warn("AggregatedList returned a nil iterator. Returning empty disk list.")
-		return disks, nil 
+		return disks, nil
 	}
 
 	for {
@@ -69,6 +82,8 @@ func (c *Clients) CreateNewDiskFromSnapshot(
 	targetDiskType string,
 	snapshotSource string,
 	labels map[string]string,
+	iops int64,
+	throughput int64,
 ) error {
 	logFields := logrus.Fields{
 		"project":        projectID,
@@ -84,12 +99,23 @@ func (c *Clients) CreateNewDiskFromSnapshot(
 	}
 
 	targetDiskTypeURL := fmt.Sprintf("zones/%s/diskTypes/%s", zone, targetDiskType)
-
-	disk := &computepb.Disk{
-		Name:           proto.String(newDiskName),
-		Type:           proto.String(targetDiskTypeURL),
-		SourceSnapshot: proto.String(snapshotSource),
-		Labels:         labels,
+	var disk *computepb.Disk
+	if !supportsIopsAndThroughput(targetDiskType) {
+		disk = &computepb.Disk{
+			Name:           proto.String(newDiskName),
+			Type:           proto.String(targetDiskTypeURL),
+			SourceSnapshot: proto.String(snapshotSource),
+			Labels:         labels,
+		}
+	} else {
+		disk = &computepb.Disk{
+			Name:                  proto.String(newDiskName),
+			Type:                  proto.String(targetDiskTypeURL),
+			SourceSnapshot:        proto.String(snapshotSource),
+			Labels:                labels,
+			ProvisionedIops:       proto.Int64(iops),
+			ProvisionedThroughput: proto.Int64(throughput),
+		}
 	}
 
 	req := &computepb.InsertDiskRequest{
@@ -110,7 +136,7 @@ func (c *Clients) CreateNewDiskFromSnapshot(
 	opCtx, cancel := context.WithTimeout(ctx, defaultOpTimeout)
 	defer cancel()
 
-	err = op.Wait(opCtx) 
+	err = op.Wait(opCtx)
 	if err != nil {
 		logrus.WithFields(logFields).WithError(err).Errorf("Waiting for disk creation operation %s failed", opName)
 		return fmt.Errorf("waiting for disk %s creation failed: %w", newDiskName, err)
@@ -155,7 +181,7 @@ func (c *Clients) UpdateDiskLabel(
 	}
 	currentLabels[labelKey] = labelValue
 
-	setLabelsReq := &computepb.SetLabelsDiskRequest{ 
+	setLabelsReq := &computepb.SetLabelsDiskRequest{
 		Project:  projectID,
 		Zone:     zone,
 		Resource: diskName,
@@ -165,7 +191,7 @@ func (c *Clients) UpdateDiskLabel(
 		},
 	}
 
-	op, err := c.Disks.SetLabels(ctx, setLabelsReq) 
+	op, err := c.Disks.SetLabels(ctx, setLabelsReq)
 	if err != nil {
 		logrus.WithFields(logFields).WithError(err).Error("Failed to initiate set disk label operation")
 		return fmt.Errorf("failed to initiate set label for disk %s: %w", diskName, err)
@@ -177,7 +203,7 @@ func (c *Clients) UpdateDiskLabel(
 	opCtx, cancel := context.WithTimeout(ctx, defaultOpTimeout)
 	defer cancel()
 
-	err = op.Wait(opCtx) 
+	err = op.Wait(opCtx)
 	if err != nil {
 		logrus.WithFields(logFields).WithError(err).Errorf("Waiting for set label operation %s failed", opName)
 		return fmt.Errorf("waiting for disk %s set label failed: %w", diskName, err)

@@ -39,6 +39,9 @@ func init() {
 	rootCmd.PersistentFlags().StringVarP(&projectID, "project", "p", "", "Google Cloud Project ID (required)")
 	rootCmd.PersistentFlags().BoolVar(&debug, "debug", false, "Enable debug logging")
 
+	// Add other commands like convertCmd here
+	// e.g., rootCmd.AddCommand(convertCmd)
+	// The gceConvertCmd will be added in its own init() function in gce_convert.go
 }
 
 func exitWithError(err error) {
@@ -48,7 +51,7 @@ func exitWithError(err error) {
 
 func checkRequiredFlags(cmd *cobra.Command, flags []string) error {
 	for _, flagName := range flags {
-		val, _ := cmd.Flags().GetString(flagName) 
+		val, _ := cmd.Flags().GetString(flagName)
 		if val == "" {
 			return fmt.Errorf("required flag --%s not set", flagName)
 		}

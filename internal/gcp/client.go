@@ -36,6 +36,14 @@ type RegionClientInterface interface {
 }
 
 type GceClientInterface interface {
+	Start(ctx context.Context, req *computepb.StartInstanceRequest, opts ...gax.CallOption) (*compute.Operation, error)
+	Stop(ctx context.Context, req *computepb.StopInstanceRequest, opts ...gax.CallOption) (*compute.Operation, error)
+	List(ctx context.Context, req *computepb.ListInstancesRequest, opts ...gax.CallOption) *compute.InstanceIterator
+	AggregatedList(ctx context.Context, req *computepb.AggregatedListInstancesRequest, opts ...gax.CallOption) *compute.InstancesScopedListPairIterator
+	Get(ctx context.Context, req *computepb.GetInstanceRequest, opts ...gax.CallOption) (*computepb.Instance, error)
+	Delete(ctx context.Context, req *computepb.DeleteInstanceRequest, opts ...gax.CallOption) (*compute.Operation, error)
+	AttachDisk(ctx context.Context, req *computepb.AttachDiskInstanceRequest, opts ...gax.CallOption) (*compute.Operation, error)
+	DetachDisk(ctx context.Context, req *computepb.DetachDiskInstanceRequest, opts ...gax.CallOption) (*compute.Operation, error)
 	Close() error
 }
 
@@ -48,7 +56,7 @@ type Clients struct {
 }
 
 func NewClients(ctx context.Context) (*Clients, error) {
-	logrus.Debug("Initializing GCP Compute API clients...")
+	logrus.Debug("Initializing GCP Compute API client...")
 
 	defaultOpts := getDefaultClientOptions()
 

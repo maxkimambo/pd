@@ -1,6 +1,10 @@
 package utils
 
-import "strings"
+import (
+	"fmt"
+	"math/rand"
+	"strings"
+)
 
 func ExtractZoneName(zone string) string {
 
@@ -18,4 +22,12 @@ func ExtractDiskType(diskType string) string {
 		return diskType
 	}
 	return parts[len(parts)-1]
+}
+
+func AddSuffix(name string, length int) string {
+	if length == 0 {
+		length = 4
+	}
+	suffix := fmt.Sprintf("%x", rand.Intn(0xFFF))
+	return fmt.Sprintf("%s-%s", name, suffix)
 }

@@ -25,7 +25,7 @@ var (
 	zone           string
 	yes            bool
 	autoApprove    bool
-	maxConcurrency int
+	concurrency    int
 	retainName     bool
 	throughput     int64
 	iops           int64
@@ -65,7 +65,7 @@ func init() {
 	convertCmd.Flags().StringVar(&zone, "zone", "", "GCP zone (required if region is not set)")
 	convertCmd.Flags().BoolVar(&yes, "yes", false, "Skip initial disk list confirmation")
 	convertCmd.Flags().BoolVar(&autoApprove, "auto-approve", true, "Skip all interactive prompts (overrides --yes)")
-	convertCmd.Flags().IntVar(&maxConcurrency, "max-concurrency", 10, "Maximum number of disks to process concurrently (1-200)")
+	convertCmd.Flags().IntVar(&concurrency, "concurrency", 10, "Number of disks to process concurrently (1-200), default: 10")
 	convertCmd.Flags().BoolVar(&retainName, "retain-name", true, "Reuse original disk name (delete original). If false, keep original and suffix new name.")
 	convertCmd.Flags().Int64Var(&throughput, "throughput", 140, "Throughput in MB/s to set (optional, default: 140 MiB/s)")
 	convertCmd.Flags().Int64Var(&iops, "iops", 2000, "IOPS to set(optional, default: 2000 IOPS)")
@@ -95,8 +95,8 @@ func validateConvertFlags(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("invalid label format: %s. Expected key=value", labelFilter)
 	}
 
-	if maxConcurrency < 1 || maxConcurrency > 200 {
-		return fmt.Errorf("--max-concurrency must be between 1 and 200, got %d", maxConcurrency)
+	if concurrency < 1 || concurrency > 200 {
+		return fmt.Errorf("--max-concurrency must be between 1 and 200, got %d", concurrency)
 	}
 	if throughput < 140 || throughput > 5000 {
 		return fmt.Errorf("--throughput must be between 0 and 5000 MB/s, got %d", throughput)
@@ -104,6 +104,9 @@ func validateConvertFlags(cmd *cobra.Command, args []string) error {
 
 	if iops < 2000 || iops > 350000 {
 		return fmt.Errorf("--iops must be between 3000 and 350,000, got %d", iops)
+	}
+	if concurrency < 1 || concurrency > 200 {
+		return fmt.Errorf("--max-concurrency must be between 1 and 200, got %d", concurrency)
 	}
 
 	return nil
@@ -126,7 +129,7 @@ func runConvert(cmd *cobra.Command, args []string) error {
 		Zone:           zone,
 		SkipConfirm:    yes || autoApprove,
 		AutoApproveAll: autoApprove,
-		MaxConcurrency: maxConcurrency,
+		Concurrency:    concurrency,
 		RetainName:     retainName,
 		Debug:          debug,
 	}

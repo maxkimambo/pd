@@ -7,23 +7,10 @@ import (
 	compute "cloud.google.com/go/compute/apiv1"
 	computepb "cloud.google.com/go/compute/apiv1/computepb"
 	"github.com/sirupsen/logrus"
+	"google.golang.org/api/iterator"
 )
 
-// InstanceOps handles GCE instance operations.
-type InstanceOps struct {
-	instancesClient *compute.InstancesClient // Using concrete type for specific instance operations
-}
-
-// NewInstanceOps creates a new InstanceOps.
-// Note: You might want to pass GceClientInterface if it's extended with necessary methods,
-// or pass the concrete *compute.InstancesClient from your Clients struct.
-// For this example, we assume *compute.InstancesClient is passed directly.
-func NewInstanceOps(client *compute.InstancesClient) *InstanceOps {
-	return &InstanceOps{instancesClient: client}
-}
-
-// StartInstance starts a GCE instance.
-func (ops *InstanceOps) StartInstance(ctx context.Context, projectID, zone, instanceName string) (*compute.Operation, error) {
+func (ops *Clients) StartInstance(ctx context.Context, projectID, zone, instanceName string) (*compute.Operation, error) {
 	logrus.WithFields(logrus.Fields{
 		"project":  projectID,
 		"zone":     zone,
@@ -36,15 +23,14 @@ func (ops *InstanceOps) StartInstance(ctx context.Context, projectID, zone, inst
 		Instance: instanceName,
 	}
 
-	op, err := ops.instancesClient.Start(ctx, req)
+	op, err := ops.Gce.Start(ctx, req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to start instance %s in zone %s: %w", instanceName, zone, err)
 	}
 	return op, nil
 }
 
-// StopInstance stops a GCE instance.
-func (ops *InstanceOps) StopInstance(ctx context.Context, projectID, zone, instanceName string) (*compute.Operation, error) {
+func (ops *Clients) StopInstance(ctx context.Context, projectID, zone, instanceName string) (*compute.Operation, error) {
 	logrus.WithFields(logrus.Fields{
 		"project":  projectID,
 		"zone":     zone,
@@ -57,15 +43,14 @@ func (ops *InstanceOps) StopInstance(ctx context.Context, projectID, zone, insta
 		Instance: instanceName,
 	}
 
-	op, err := ops.instancesClient.Stop(ctx, req)
+	op, err := ops.Gce.Stop(ctx, req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to stop instance %s in zone %s: %w", instanceName, zone, err)
 	}
 	return op, nil
 }
 
-// ListInstancesInZone lists all instances in a specific zone.
-func (ops *InstanceOps) ListInstancesInZone(ctx context.Context, projectID, zone string) *compute.InstanceIterator {
+func (ops *Clients) ListInstancesInZone(ctx context.Context, projectID, zone string) ([]*computepb.Instance, error) {
 	logrus.WithFields(logrus.Fields{
 		"project": projectID,
 		"zone":    zone,
@@ -75,23 +60,56 @@ func (ops *InstanceOps) ListInstancesInZone(ctx context.Context, projectID, zone
 		Project: projectID,
 		Zone:    zone,
 	}
-	return ops.instancesClient.List(ctx, req)
-}
-
-// ListInstancesInProject lists all instances in a project (aggregated list).
-func (ops *InstanceOps) ListInstancesInProject(ctx context.Context, projectID string) *compute.InstancesScopedListPairIterator {
+	it := ops.Gce.List(ctx, req)
+	var instances []*computepb.Instance
+	for {
+		instance, err := it.Next()
+		if err == iterator.Done {
+			break
+		}
+		if err != nil {
+			return nil, fmt.Errorf("failed to iterate instances in zone %s: %w", zone, err)
+		}
+		instances = append(instances, instance)
+	}
 	logrus.WithFields(logrus.Fields{
 		"project": projectID,
-	}).Info("Listing instances in project")
+		"zone":    zone,
+		"count":   len(instances),
+	}).Info("Successfully listed instances in zone.")
+	return instances, nil
+}
+
+func (ops *Clients) AggregatedListInstances(ctx context.Context, projectID string) ([]*computepb.Instance, error) {
+	logrus.WithFields(logrus.Fields{
+		"project": projectID,
+	}).Info("Listing all compute instances in project (aggregated list)")
 
 	req := &computepb.AggregatedListInstancesRequest{
 		Project: projectID,
 	}
-	return ops.instancesClient.AggregatedList(ctx, req)
+	it := ops.Gce.AggregatedList(ctx, req)
+	var instances []*computepb.Instance
+	for {
+		pair, err := it.Next()
+		if err == iterator.Done {
+			break
+		}
+		if err != nil {
+			return nil, fmt.Errorf("failed to iterate aggregated instances for project %s: %w", projectID, err)
+		}
+		if pair.Value != nil && pair.Value.Instances != nil {
+			instances = append(instances, pair.Value.Instances...)
+		}
+	}
+	logrus.WithFields(logrus.Fields{
+		"project": projectID,
+		"count":   len(instances),
+	}).Info("Successfully listed all instances in project.")
+	return instances, nil
 }
 
-// GetInstance gets details of a specific GCE instance.
-func (ops *InstanceOps) GetInstance(ctx context.Context, projectID, zone, instanceName string) (*computepb.Instance, error) {
+func (ops *Clients) GetInstance(ctx context.Context, projectID, zone, instanceName string) (*computepb.Instance, error) {
 	logrus.WithFields(logrus.Fields{
 		"project":  projectID,
 		"zone":     zone,
@@ -104,15 +122,14 @@ func (ops *InstanceOps) GetInstance(ctx context.Context, projectID, zone, instan
 		Instance: instanceName,
 	}
 
-	instance, err := ops.instancesClient.Get(ctx, req)
+	instance, err := ops.Gce.Get(ctx, req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get instance %s in zone %s: %w", instanceName, zone, err)
 	}
 	return instance, nil
 }
 
-// DeleteInstance deletes a GCE instance.
-func (ops *InstanceOps) DeleteInstance(ctx context.Context, projectID, zone, instanceName string) (*compute.Operation, error) {
+func (ops *Clients) DeleteInstance(ctx context.Context, projectID, zone, instanceName string) (*compute.Operation, error) {
 	logrus.WithFields(logrus.Fields{
 		"project":  projectID,
 		"zone":     zone,
@@ -125,7 +142,7 @@ func (ops *InstanceOps) DeleteInstance(ctx context.Context, projectID, zone, ins
 		Instance: instanceName,
 	}
 
-	op, err := ops.instancesClient.Delete(ctx, req)
+	op, err := ops.Gce.Delete(ctx, req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to delete instance %s in zone %s: %w", instanceName, zone, err)
 	}
@@ -133,7 +150,7 @@ func (ops *InstanceOps) DeleteInstance(ctx context.Context, projectID, zone, ins
 }
 
 // AttachDisk attaches a disk to a GCE instance.
-func (ops *InstanceOps) AttachDisk(ctx context.Context, projectID, zone, instanceName string, attachedDiskResource *computepb.AttachedDisk) (*compute.Operation, error) {
+func (ops *Clients) AttachDisk(ctx context.Context, projectID, zone, instanceName string, attachedDiskResource *computepb.AttachedDisk) (*compute.Operation, error) {
 	logrus.WithFields(logrus.Fields{
 		"project":  projectID,
 		"zone":     zone,
@@ -148,7 +165,7 @@ func (ops *InstanceOps) AttachDisk(ctx context.Context, projectID, zone, instanc
 		AttachedDiskResource: attachedDiskResource,
 	}
 
-	op, err := ops.instancesClient.AttachDisk(ctx, req)
+	op, err := ops.Gce.AttachDisk(ctx, req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to attach disk to instance %s in zone %s: %w", instanceName, zone, err)
 	}
@@ -156,7 +173,7 @@ func (ops *InstanceOps) AttachDisk(ctx context.Context, projectID, zone, instanc
 }
 
 // DetachDisk detaches a disk from a GCE instance.
-func (ops *InstanceOps) DetachDisk(ctx context.Context, projectID, zone, instanceName, deviceName string) (*compute.Operation, error) {
+func (ops *Clients) DetachDisk(ctx context.Context, projectID, zone, instanceName, deviceName string) (*compute.Operation, error) {
 	logrus.WithFields(logrus.Fields{
 		"project":    projectID,
 		"zone":       zone,
@@ -171,7 +188,7 @@ func (ops *InstanceOps) DetachDisk(ctx context.Context, projectID, zone, instanc
 		DeviceName: deviceName,
 	}
 
-	op, err := ops.instancesClient.DetachDisk(ctx, req)
+	op, err := ops.Gce.DetachDisk(ctx, req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to detach disk %s from instance %s in zone %s: %w", deviceName, instanceName, zone, err)
 	}

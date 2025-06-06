@@ -3,12 +3,12 @@ package migrator
 import (
 	"context"
 	"fmt"
-	"math/rand" 
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/maxkimambo/pd/internal/gcp"
+	"github.com/maxkimambo/pd/internal/utils"
 
 	computepb "cloud.google.com/go/compute/apiv1/computepb"
 	"github.com/sirupsen/logrus"
@@ -16,14 +16,14 @@ import (
 
 type MigrationResult struct {
 	DiskName        string
-	Zone            string 
-	Status          string 
+	Zone            string
+	Status          string
 	Duration        time.Duration
-	SnapshotName    string 
-	NewDiskName     string 
-	OriginalDisk    string 
-	ErrorMessage    string 
-	SnapshotCleaned bool   
+	SnapshotName    string
+	NewDiskName     string
+	OriginalDisk    string
+	ErrorMessage    string
+	SnapshotCleaned bool
 }
 
 func MigrateDisks(ctx context.Context, config *Config, gcpClient *gcp.Clients, disksToMigrate []*computepb.Disk) ([]MigrationResult, error) {
@@ -35,22 +35,18 @@ func MigrateDisks(ctx context.Context, config *Config, gcpClient *gcp.Clients, d
 
 	var wg sync.WaitGroup
 	resultsChan := make(chan MigrationResult, len(disksToMigrate))
-	concurrencyLimit := config.MaxConcurrency
-	if concurrencyLimit <= 0 || concurrencyLimit > 200 {
-		logrus.Warnf("Invalid concurrency %d, defaulting to 10", concurrencyLimit)
-		concurrencyLimit = 10
-	}
+	concurrencyLimit := config.Concurrency
 	semaphore := make(chan struct{}, concurrencyLimit)
 
 	logrus.Infof("Starting migration for %d disk(s) with concurrency limit %d...", len(disksToMigrate), concurrencyLimit)
 
 	for _, disk := range disksToMigrate {
 		wg.Add(1)
-		semaphore <- struct{}{} 
+		semaphore <- struct{}{}
 
 		go func(d *computepb.Disk) {
 			defer wg.Done()
-			defer func() { <-semaphore }() 
+			defer func() { <-semaphore }()
 
 			result := migrateSingleDisk(ctx, config, gcpClient, d)
 			resultsChan <- result
@@ -66,7 +62,7 @@ func MigrateDisks(ctx context.Context, config *Config, gcpClient *gcp.Clients, d
 	}
 
 	logrus.Info("--- Migration Phase Complete ---")
-	return allResults, nil 
+	return allResults, nil
 }
 
 func migrateSingleDisk(ctx context.Context, config *Config, gcpClient *gcp.Clients, disk *computepb.Disk) MigrationResult {
@@ -84,33 +80,33 @@ func migrateSingleDisk(ctx context.Context, config *Config, gcpClient *gcp.Clien
 	result := MigrationResult{
 		DiskName:     diskName,
 		Zone:         zone,
-		OriginalDisk: diskName, 
+		OriginalDisk: diskName,
 		Status:       "Pending",
 	}
 
 	snapshotName := fmt.Sprintf("pd-migrate-%s-%d", diskName, time.Now().Unix())
-	result.SnapshotName = snapshotName 
+	result.SnapshotName = snapshotName
 	logFields["snapshot"] = snapshotName
-	logrus.WithFields(logFields).Info("Step 2.1: Creating snapshot...")
+	logrus.WithFields(logFields).Info("Creating snapshot...")
 
-	kmsParams := config.PopulateKmsParams() 
+	kmsParams := config.PopulateKmsParams()
 	err := gcpClient.CreateSnapshot(ctx, config.ProjectID, zone, diskName, snapshotName, kmsParams, disk.GetLabels())
 	if err != nil {
 		errMsg := fmt.Sprintf("Failed to create snapshot: %v", err)
 		logrus.WithFields(logFields).Error(errMsg)
 		result.Status = "Failed: Snapshot Creation"
 		result.ErrorMessage = errMsg
-		labelErr := gcpClient.UpdateDiskLabel(ctx, config.ProjectID, zone, diskName, "migration", "error") 
+		labelErr := gcpClient.UpdateDiskLabel(ctx, config.ProjectID, zone, diskName, "migration", "error")
 		if labelErr != nil {
 			logrus.WithFields(logFields).Warnf("Failed to apply 'migration:error' label to disk %s: %v", diskName, labelErr)
 		}
 		result.Duration = time.Since(startTime)
 		return result
 	}
-	logrus.WithFields(logFields).Info("Step 2.1: Snapshot created successfully.")
+	logrus.WithFields(logFields).Info("Snapshot created successfully.")
 
 	if config.RetainName {
-		logrus.WithFields(logFields).Info("Step 2.2: Deleting original disk (retainName=true)...")
+		logrus.WithFields(logFields).Info("Deleting original disk (retainName=true)...")
 		err = gcpClient.DeleteDisk(ctx, config.ProjectID, zone, diskName)
 		if err != nil {
 			errMsg := fmt.Sprintf("Failed to delete original disk: %v", err)
@@ -121,29 +117,28 @@ func migrateSingleDisk(ctx context.Context, config *Config, gcpClient *gcp.Clien
 			cleanupErr := gcpClient.DeleteSnapshot(ctx, config.ProjectID, snapshotName)
 			if cleanupErr != nil {
 				logrus.WithFields(logFields).Warnf("Failed to cleanup snapshot %s: %v", snapshotName, cleanupErr)
-				result.ErrorMessage += fmt.Sprintf(" | Snapshot cleanup failed: %v", cleanupErr)
+				result.ErrorMessage += fmt.Sprintf("Snapshot cleanup failed: %v", cleanupErr)
 			} else {
 				logrus.WithFields(logFields).Info("Snapshot cleanup successful.")
-				result.SnapshotCleaned = true 
+				result.SnapshotCleaned = true
 			}
 			result.Duration = time.Since(startTime)
 			return result
 		}
-		logrus.WithFields(logFields).Info("Step 2.2: Original disk deleted successfully.")
+		logrus.WithFields(logFields).Info("Original disk deleted successfully.")
 	} else {
-		logrus.WithFields(logFields).Info("Step 2.2: Skipping original disk deletion (retainName=false).")
+		logrus.WithFields(logFields).Info("Skipping original disk deletion (retainName=false).")
 	}
 
 	newDiskName := diskName
 	if !config.RetainName {
-		suffix := fmt.Sprintf("%x", rand.Intn(0xFFF)) 
-		newDiskName = fmt.Sprintf("%s-%s", diskName, suffix)
+		newDiskName = utils.AddSuffix(diskName, 4)
 		logrus.WithFields(logFields).Infof("Generated new disk name: %s", newDiskName)
 	}
 	result.NewDiskName = newDiskName
 	logFields["newDisk"] = newDiskName
 
-	logrus.WithFields(logFields).Infof("Step 2.3: Recreating disk as type '%s'...", config.TargetDiskType)
+	logrus.WithFields(logFields).Infof("Recreating disk as type '%s'...", config.TargetDiskType)
 
 	newDiskLabels := disk.GetLabels()
 	if newDiskLabels == nil {
@@ -151,14 +146,14 @@ func migrateSingleDisk(ctx context.Context, config *Config, gcpClient *gcp.Clien
 	}
 	newDiskLabels["migration"] = "success"
 
-	err = gcpClient.CreateNewDiskFromSnapshot(ctx, config.ProjectID, zone, newDiskName, config.TargetDiskType, snapshotName, newDiskLabels) 
+	err = gcpClient.CreateNewDiskFromSnapshot(ctx, config.ProjectID, zone, newDiskName, config.TargetDiskType, snapshotName, newDiskLabels, config.iops, config.throughput)
 	if err != nil {
 		errMsg := fmt.Sprintf("Failed to recreate disk from snapshot: %v", err)
 		logrus.WithFields(logFields).Error(errMsg)
 		result.Status = "Failed: Disk Recreation"
 		result.ErrorMessage = errMsg
 		if !config.RetainName {
-			labelErr := gcpClient.UpdateDiskLabel(ctx, config.ProjectID, zone, diskName, "migration", "error-recreation-failed") 
+			labelErr := gcpClient.UpdateDiskLabel(ctx, config.ProjectID, zone, diskName, "migration", "error-recreation-failed")
 			if labelErr != nil {
 				logrus.WithFields(logFields).Warnf("Failed to apply error label to original disk %s: %v", diskName, labelErr)
 			}
@@ -167,11 +162,10 @@ func migrateSingleDisk(ctx context.Context, config *Config, gcpClient *gcp.Clien
 		result.Duration = time.Since(startTime)
 		return result
 	}
-	logrus.WithFields(logFields).Info("Step 2.3: Disk recreated successfully.")
+	logrus.WithFields(logFields).Info("Disk recreated successfully.")
 
 	result.Status = "Success"
 	result.Duration = time.Since(startTime)
 	logrus.WithFields(logFields).Infof("Migration successful in %v", result.Duration)
 	return result
 }
-

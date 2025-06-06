@@ -1,31 +1,33 @@
 package migrator
 
-import "github.com/maxkimambo/pd/internal/gcp" 
+import "github.com/maxkimambo/pd/internal/gcp"
 
 type Config struct {
 	ProjectID      string
 	TargetDiskType string
-	LabelFilter    string 
-	KmsKey         string 
+	LabelFilter    string
+	KmsKey         string
 	KmsKeyRing     string
 	KmsLocation    string
 	KmsProject     string
-	KmsParams      *gcp.SnapshotKmsParams 
+	KmsParams      *gcp.SnapshotKmsParams
 	Region         string
 	Zone           string
-	SkipConfirm    bool 
-	AutoApproveAll bool 
-	MaxConcurrency int
+	SkipConfirm    bool
+	AutoApproveAll bool
+	Concurrency    int
 	RetainName     bool
 	Debug          bool
-
+	iops           int64
+	throughput     int64
+	storagePoolId  string
 }
 
 func (c *Config) PopulateKmsParams() *gcp.SnapshotKmsParams {
 	if c.KmsKey != "" {
 		kmsProject := c.KmsProject
 		if kmsProject == "" {
-			kmsProject = c.ProjectID 
+			kmsProject = c.ProjectID
 		}
 		return &gcp.SnapshotKmsParams{
 			KmsKey:      c.KmsKey,
