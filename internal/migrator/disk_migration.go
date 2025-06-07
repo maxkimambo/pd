@@ -96,7 +96,7 @@ func MigrateSingleDisk(ctx context.Context, config *Config, gcpClient *gcp.Clien
 		logrus.WithFields(logFields).Error(errMsg)
 		result.Status = "Failed: Snapshot Creation"
 		result.ErrorMessage = errMsg
-		labelErr := gcpClient.UpdateDiskLabel(ctx, config.ProjectID, zone, diskName, "migration", "error")
+		labelErr := gcpClient.DiskClient.UpdateDiskLabel(ctx, config.ProjectID, zone, diskName, "migration", "error")
 		if labelErr != nil {
 			logrus.WithFields(logFields).Warnf("Failed to apply 'migration:error' label to disk %s: %v", diskName, labelErr)
 		}
@@ -107,7 +107,7 @@ func MigrateSingleDisk(ctx context.Context, config *Config, gcpClient *gcp.Clien
 
 	if config.RetainName {
 		logrus.WithFields(logFields).Info("Deleting original disk (retainName=true)...")
-		err = gcpClient.DeleteDisk(ctx, config.ProjectID, zone, diskName)
+		err = gcpClient.DiskClient.DeleteDisk(ctx, config.ProjectID, zone, diskName)
 		if err != nil {
 			errMsg := fmt.Sprintf("Failed to delete original disk: %v", err)
 			logrus.WithFields(logFields).Error(errMsg)
@@ -146,14 +146,14 @@ func MigrateSingleDisk(ctx context.Context, config *Config, gcpClient *gcp.Clien
 	}
 	newDiskLabels["migration"] = "success"
 	storagePoolUrl := utils.GetStoragePoolURL(config.StoragePoolId, config.ProjectID, zone)
-	err = gcpClient.CreateNewDiskFromSnapshot(ctx, config.ProjectID, zone, newDiskName, config.TargetDiskType, snapshotName, newDiskLabels, config.Iops, config.Throughput, storagePoolUrl)
+	err = gcpClient.DiskClient.CreateNewDiskFromSnapshot(ctx, config.ProjectID, zone, newDiskName, config.TargetDiskType, snapshotName, newDiskLabels, config.Iops, config.Throughput, storagePoolUrl)
 	if err != nil {
 		errMsg := fmt.Sprintf("Failed to recreate disk from snapshot: %v", err)
 		logrus.WithFields(logFields).Error(errMsg)
 		result.Status = "Failed: Disk Recreation"
 		result.ErrorMessage = errMsg
 		if !config.RetainName {
-			labelErr := gcpClient.UpdateDiskLabel(ctx, config.ProjectID, zone, diskName, "migration", "error-recreation-failed")
+			labelErr := gcpClient.DiskClient.UpdateDiskLabel(ctx, config.ProjectID, zone, diskName, "migration", "error-recreation-failed")
 			if labelErr != nil {
 				logrus.WithFields(logFields).Warnf("Failed to apply error label to original disk %s: %v", diskName, labelErr)
 			}

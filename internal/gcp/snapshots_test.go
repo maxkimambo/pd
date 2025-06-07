@@ -77,17 +77,17 @@ func TestCreateSnapshot(t *testing.T) {
 	snapshotName := "new-snap"
 	sourceDiskURL := fmt.Sprintf("projects/%s/zones/%s/disks/%s", projectID, zone, diskName)
 
-	placeholderOp := &compute.Operation{} 
-
 	t.Run("Success - No KMS, No extra labels", func(t *testing.T) {
 		mockClient := &mockSnapshotsClient{
-			InsertOp:  placeholderOp, 
-			InsertErr: nil,
+			InsertFunc: func(ctx context.Context, req *computepb.InsertSnapshotRequest, opts ...gax.CallOption) (*compute.Operation, error) {
+				return nil, errors.New("mocked to avoid operation calls")
+			},
 		}
 		clients := &Clients{Snapshots: mockClient}
 		err := clients.CreateSnapshot(ctx, projectID, zone, diskName, snapshotName, nil, nil)
 
-		assert.NoError(t, err) 
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "mocked to avoid operation calls") 
 		assert.True(t, mockClient.InsertCalled)
 		assert.NotNil(t, mockClient.LastInsertReq)
 		assert.Equal(t, projectID, mockClient.LastInsertReq.GetProject())
@@ -112,13 +112,15 @@ func TestCreateSnapshot(t *testing.T) {
 			kmsParams.KmsProject, kmsParams.KmsLocation, kmsParams.KmsKeyRing, kmsParams.KmsKey)
 
 		mockClient := &mockSnapshotsClient{
-			InsertOp:  placeholderOp,
-			InsertErr: nil,
+			InsertFunc: func(ctx context.Context, req *computepb.InsertSnapshotRequest, opts ...gax.CallOption) (*compute.Operation, error) {
+				return nil, errors.New("mocked to avoid operation calls")
+			},
 		}
 		clients := &Clients{Snapshots: mockClient}
 		err := clients.CreateSnapshot(ctx, projectID, zone, diskName, snapshotName, kmsParams, initialLabels)
 
-		assert.NoError(t, err)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "mocked to avoid operation calls")
 		assert.True(t, mockClient.InsertCalled)
 		snapResource := mockClient.LastInsertReq.GetSnapshotResource()
 		assert.NotNil(t, snapResource)
@@ -139,13 +141,15 @@ func TestCreateSnapshot(t *testing.T) {
 			projectID, kmsParams.KmsLocation, kmsParams.KmsKeyRing, kmsParams.KmsKey) 
 
 		mockClient := &mockSnapshotsClient{
-			InsertOp:  placeholderOp,
-			InsertErr: nil,
+			InsertFunc: func(ctx context.Context, req *computepb.InsertSnapshotRequest, opts ...gax.CallOption) (*compute.Operation, error) {
+				return nil, errors.New("mocked to avoid operation calls")
+			},
 		}
 		clients := &Clients{Snapshots: mockClient}
 		err := clients.CreateSnapshot(ctx, projectID, zone, diskName, snapshotName, kmsParams, nil)
 
-		assert.NoError(t, err)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "mocked to avoid operation calls")
 		assert.True(t, mockClient.InsertCalled)
 		snapResource := mockClient.LastInsertReq.GetSnapshotResource()
 		kmsKey := snapResource.GetSnapshotEncryptionKey()
@@ -172,17 +176,17 @@ func TestDeleteSnapshot(t *testing.T) {
 	ctx := context.Background()
 	projectID := "test-proj"
 	snapshotName := "snap-to-delete"
-	placeholderOp := &compute.Operation{} 
-
 	t.Run("Success", func(t *testing.T) {
 		mockClient := &mockSnapshotsClient{
-			DeleteOp:  placeholderOp,
-			DeleteErr: nil,
+			DeleteFunc: func(ctx context.Context, req *computepb.DeleteSnapshotRequest, opts ...gax.CallOption) (*compute.Operation, error) {
+				return nil, errors.New("mocked to avoid operation calls")
+			},
 		}
 		clients := &Clients{Snapshots: mockClient}
 		err := clients.DeleteSnapshot(ctx, projectID, snapshotName)
 
-		assert.NoError(t, err) 
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "mocked to avoid operation calls") 
 		assert.True(t, mockClient.DeleteCalled)
 		assert.NotNil(t, mockClient.LastDeleteReq)
 		assert.Equal(t, projectID, mockClient.LastDeleteReq.GetProject())

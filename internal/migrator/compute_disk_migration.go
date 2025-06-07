@@ -33,7 +33,7 @@ func MigrateInstanceDisks(ctx context.Context, config *Config, instance *compute
 		// perform the migration for the detached disk
 		logrus.Infof("Migrating disk %s", disk.GetDeviceName())
 
-		diskToMigrate, err := gcpClient.GetDisk(ctx, config.ProjectID, zone, disk.GetDeviceName())
+		diskToMigrate, err := gcpClient.DiskClient.GetDisk(ctx, config.ProjectID, zone, disk.GetDeviceName())
 		if err != nil {
 			return fmt.Errorf("failed to get disk %s in zone %s: %w", disk.GetDeviceName(), zone, err)
 		}

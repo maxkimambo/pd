@@ -80,7 +80,7 @@ func (dc *DiskClient) ListDetachedDisks(
 	}
 
 	it := dc.client.AggregatedList(ctx, req)
-	var disks []*computepb.Disk
+	disks := make([]*computepb.Disk, 0)
 	if it == nil {
 		logrus.WithFields(logFields).Warn("AggregatedList returned a nil iterator. Returning empty disk list.")
 		return disks, nil

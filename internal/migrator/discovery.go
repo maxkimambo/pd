@@ -24,7 +24,7 @@ func DiscoverDisks(ctx context.Context, config *Config, gcpClient *gcp.Clients) 
 		logrus.Infof("Applying label filter: %s", config.LabelFilter)
 	}
 
-	disksToMigrate, err := gcpClient.ListDetachedDisks(ctx, config.ProjectID, location, config.LabelFilter)
+	disksToMigrate, err := gcpClient.DiskClient.ListDetachedDisks(ctx, config.ProjectID, location, config.LabelFilter)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list detached disks: %w", err)
 	}

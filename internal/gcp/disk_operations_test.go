@@ -133,12 +133,12 @@ func TestListDetachedDisks(t *testing.T) {
 		diskClient := NewDiskClient(mockDiskClient)
 		clients := &Clients{Disks: mockDiskClient, DiskClient: diskClient}
 
-		disks, err := clients.ListDetachedDisks(ctx, projectID, zone, "")
+		disks, err := clients.DiskClient.ListDetachedDisks(ctx, projectID, zone, "")
 
 		assert.NoError(t, err)
 		assert.NotNil(t, disks)
 
-		disks, err = clients.ListDetachedDisks(ctx, projectID, fullZonePath, "")
+		disks, err = clients.DiskClient.ListDetachedDisks(ctx, projectID, fullZonePath, "")
 
 		assert.True(t, mockDiskClient.AggregatedListCalled)
 
@@ -157,7 +157,7 @@ func TestListDetachedDisks(t *testing.T) {
 		diskClient := NewDiskClient(mockDiskClient)
 		clients := &Clients{Disks: mockDiskClient, DiskClient: diskClient}
 
-		disks, err := clients.ListDetachedDisks(ctx, projectID, fullZonePath, "")
+		disks, err := clients.DiskClient.ListDetachedDisks(ctx, projectID, fullZonePath, "")
 
 		assert.True(t, mockDiskClient.AggregatedListCalled)
 		assert.NoError(t, err)
@@ -174,7 +174,7 @@ func TestListDetachedDisks(t *testing.T) {
 		diskClient := NewDiskClient(mockDiskClient)
 		clients := &Clients{Disks: mockDiskClient, DiskClient: diskClient}
 
-		disks, err := clients.ListDetachedDisks(ctx, projectID, fullZonePath, "")
+		disks, err := clients.DiskClient.ListDetachedDisks(ctx, projectID, fullZonePath, "")
 
 		assert.True(t, mockDiskClient.AggregatedListCalled)
 		assert.NoError(t, err)
@@ -204,7 +204,7 @@ func TestCreateNewDiskFromSnapshot(t *testing.T) {
 		}
 		diskClient := NewDiskClient(mockDiskClient)
 		clients := &Clients{Disks: mockDiskClient, DiskClient: diskClient}
-		err := clients.CreateNewDiskFromSnapshot(ctx, projectID, zone, newDiskName, targetDiskType, snapshotName, labels, 0, 0, storagePoolUrl)
+		err := clients.DiskClient.CreateNewDiskFromSnapshot(ctx, projectID, zone, newDiskName, targetDiskType, snapshotName, labels, 0, 0, storagePoolUrl)
 
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "mocked to avoid operation calls")
@@ -226,7 +226,7 @@ func TestCreateNewDiskFromSnapshot(t *testing.T) {
 		diskClient := NewDiskClient(mockDiskClient)
 		clients := &Clients{Disks: mockDiskClient, DiskClient: diskClient}
 
-		err := clients.CreateNewDiskFromSnapshot(ctx, projectID, zone, newDiskName, targetDiskType, snapshotName, labels, 0, 0, storagePoolUrl)
+		err := clients.DiskClient.CreateNewDiskFromSnapshot(ctx, projectID, zone, newDiskName, targetDiskType, snapshotName, labels, 0, 0, storagePoolUrl)
 
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), expectedErr.Error())
@@ -259,7 +259,7 @@ func TestUpdateDiskLabel(t *testing.T) {
 		}
 		diskClient := NewDiskClient(mockDiskClient)
 		clients := &Clients{Disks: mockDiskClient, DiskClient: diskClient}
-		err := clients.UpdateDiskLabel(ctx, projectID, zone, diskName, labelKey, labelValue)
+		err := clients.DiskClient.UpdateDiskLabel(ctx, projectID, zone, diskName, labelKey, labelValue)
 
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "mocked to avoid operation calls")
@@ -289,7 +289,7 @@ func TestUpdateDiskLabel(t *testing.T) {
 		}
 		diskClient := NewDiskClient(mockDiskClient)
 		clients := &Clients{Disks: mockDiskClient, DiskClient: diskClient}
-		err := clients.UpdateDiskLabel(ctx, projectID, zone, diskName, labelKey, labelValue)
+		err := clients.DiskClient.UpdateDiskLabel(ctx, projectID, zone, diskName, labelKey, labelValue)
 
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "mocked to avoid operation calls")
@@ -307,7 +307,7 @@ func TestUpdateDiskLabel(t *testing.T) {
 		}
 		diskClient := NewDiskClient(mockDiskClient)
 		clients := &Clients{Disks: mockDiskClient, DiskClient: diskClient}
-		err := clients.UpdateDiskLabel(ctx, projectID, zone, diskName, labelKey, labelValue)
+		err := clients.DiskClient.UpdateDiskLabel(ctx, projectID, zone, diskName, labelKey, labelValue)
 
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), expectedErr.Error())
@@ -328,7 +328,7 @@ func TestUpdateDiskLabel(t *testing.T) {
 		}
 		diskClient := NewDiskClient(mockDiskClient)
 		clients := &Clients{Disks: mockDiskClient, DiskClient: diskClient}
-		err := clients.UpdateDiskLabel(ctx, projectID, zone, diskName, labelKey, labelValue)
+		err := clients.DiskClient.UpdateDiskLabel(ctx, projectID, zone, diskName, labelKey, labelValue)
 
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), expectedErr.Error())
@@ -352,7 +352,7 @@ func TestDeleteDisk(t *testing.T) {
 		}
 		diskClient := NewDiskClient(mockDiskClient)
 		clients := &Clients{Disks: mockDiskClient, DiskClient: diskClient}
-		err := clients.DeleteDisk(ctx, projectID, zone, diskName)
+		err := clients.DiskClient.DeleteDisk(ctx, projectID, zone, diskName)
 
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "mocked to avoid operation calls")
@@ -370,7 +370,7 @@ func TestDeleteDisk(t *testing.T) {
 		}
 		diskClient := NewDiskClient(mockDiskClient)
 		clients := &Clients{Disks: mockDiskClient, DiskClient: diskClient}
-		err := clients.DeleteDisk(ctx, projectID, zone, diskName)
+		err := clients.DiskClient.DeleteDisk(ctx, projectID, zone, diskName)
 
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), expectedErr.Error())

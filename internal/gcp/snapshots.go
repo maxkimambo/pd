@@ -118,7 +118,7 @@ func (c *Clients) DeleteSnapshot(ctx context.Context, projectID, snapshotName st
 }
 
 func (c *Clients) ListSnapshotsByLabel(ctx context.Context, projectID, labelKey, labelValue string) ([]*computepb.Snapshot, error) {
-	var snapshots []*computepb.Snapshot
+	snapshots := make([]*computepb.Snapshot, 0)
 	filter := fmt.Sprintf("labels.%s = %s", labelKey, labelValue)
 	logFields := logrus.Fields{
 		"project": projectID,
@@ -132,6 +132,11 @@ func (c *Clients) ListSnapshotsByLabel(ctx context.Context, projectID, labelKey,
 	}
 
 	it := c.Snapshots.List(ctx, req)
+	if it == nil {
+		logrus.WithFields(logFields).Warn("List returned a nil iterator. Returning empty snapshot list.")
+		return snapshots, nil
+	}
+
 	for {
 		snapshot, err := it.Next()
 		if err == iterator.Done {
