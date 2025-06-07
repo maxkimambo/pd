@@ -8,6 +8,9 @@ import (
 var (
 	projectID string
 	debug     bool
+	verbose   bool
+	jsonLogs  bool
+	quiet     bool
 	version   = "v0.1.0"
 
 	rootCmd = &cobra.Command{
@@ -35,6 +38,9 @@ func Execute() error {
 func init() {
 	rootCmd.Version = version
 	rootCmd.PersistentFlags().BoolVar(&debug, "debug", false, "Enable debug logging")
+	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "Enable verbose logging")
+	rootCmd.PersistentFlags().BoolVar(&jsonLogs, "json", false, "Output logs in JSON format")
+	rootCmd.PersistentFlags().BoolVarP(&quiet, "quiet", "q", false, "Suppress non-error output")
 
 	rootCmd.AddCommand(migrateCmd)
 }

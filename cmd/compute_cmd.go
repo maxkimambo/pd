@@ -107,9 +107,13 @@ func validateComputeCmdFlags(cmd *cobra.Command, args []string) error {
 }
 
 func runGceConvert(cmd *cobra.Command, args []string) error {
-	logger.Setup(debug) // debug is from root persistent flag
+	// Set verbose to true if debug is enabled for backward compatibility
+	if debug {
+		verbose = true
+	}
+	logger.Setup(verbose, jsonLogs, quiet)
 
-	logrus.Info("Starting disk conversion process...")
+	logger.UserLog.Info("Starting disk conversion process...")
 
 	config := migrator.Config{
 		ProjectID:      projectID,
