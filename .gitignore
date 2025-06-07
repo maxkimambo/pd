@@ -2,6 +2,7 @@ prompt.md
 PLAN.md
 pd 
 key.json
+test-infra/
 bin/*
 # Binaries for programs and plugins
 *.exe
