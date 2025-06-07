@@ -18,7 +18,7 @@ func CleanupSnapshots(ctx context.Context, config *Config, gcpClient *gcp.Client
 	logrus.Infof("Searching for snapshots with label '%s=%s' in project %s for cleanup...",
 		snapshotCleanupLabelKey, snapshotCleanupLabelValue, config.ProjectID)
 
-	snapshotsToDelete, err := gcpClient.ListSnapshotsByLabel(ctx, config.ProjectID, snapshotCleanupLabelKey, snapshotCleanupLabelValue)
+	snapshotsToDelete, err := gcpClient.SnapshotClient.ListSnapshotsByLabel(ctx, config.ProjectID, snapshotCleanupLabelKey, snapshotCleanupLabelValue)
 	if err != nil {
 		return fmt.Errorf("failed to list snapshots for cleanup: %w", err)
 	}
@@ -56,7 +56,7 @@ func CleanupSnapshots(ctx context.Context, config *Config, gcpClient *gcp.Client
 
 			logFields := logrus.Fields{"snapshot": snapshotName, "project": config.ProjectID}
 			logrus.WithFields(logFields).Info("Attempting to delete snapshot...")
-			err := gcpClient.DeleteSnapshot(ctx, config.ProjectID, snapshotName)
+			err := gcpClient.SnapshotClient.DeleteSnapshot(ctx, config.ProjectID, snapshotName)
 			if err != nil {
 				logrus.WithFields(logFields).WithError(err).Warn("Failed to delete snapshot during cleanup")
 				deleteErrors.Store(snapshotName, err)

@@ -104,7 +104,7 @@ func MigrateSingleDisk(ctx context.Context, config *Config, gcpClient *gcp.Clien
 	}).Info("initiating snapshot creation")
 
 	kmsParams := config.PopulateKmsParams()
-	err := gcpClient.CreateSnapshot(ctx, config.ProjectID, zone, diskName, snapshotName, kmsParams, disk.GetLabels())
+	err := gcpClient.SnapshotClient.CreateSnapshot(ctx, config.ProjectID, zone, diskName, snapshotName, kmsParams, disk.GetLabels())
 	if err != nil {
 		errMsg := fmt.Sprintf("Failed to create snapshot: %v", err)
 		logger.User.Errorf("%s snapshot failed", diskName)
@@ -155,7 +155,7 @@ func MigrateSingleDisk(ctx context.Context, config *Config, gcpClient *gcp.Clien
 				"snapshot": snapshotName,
 				"reason":   "disk_deletion_failed",
 			}).Info("attempting snapshot cleanup")
-			cleanupErr := gcpClient.DeleteSnapshot(ctx, config.ProjectID, snapshotName)
+			cleanupErr := gcpClient.SnapshotClient.DeleteSnapshot(ctx, config.ProjectID, snapshotName)
 			if cleanupErr != nil {
 				logger.Op.WithFields(map[string]interface{}{
 					"snapshot": snapshotName,

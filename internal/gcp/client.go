@@ -57,12 +57,14 @@ type DiskOperationsInterface interface {
 }
 
 type Clients struct {
-	Disks        DiskClientInterface
-	DiskClient   DiskOperationsInterface
-	Snapshots    SnapshotClientInterface
-	Zones        ZoneClientInterface
-	Regions      RegionClientInterface
-	Gce          GceClientInterface
+	Disks          DiskClientInterface
+	DiskClient     DiskOperationsInterface
+	Snapshots      SnapshotClientInterface
+	SnapshotClient SnapshotOperationsInterface
+	Zones          ZoneClientInterface
+	Regions        RegionClientInterface
+	Gce            GceClientInterface
+	InstanceClient InstanceOperationsInterface
 }
 
 func NewClients(ctx context.Context) (*Clients, error) {
@@ -110,17 +112,21 @@ func NewClients(ctx context.Context) (*Clients, error) {
 	}
 	logrus.Debug("GCE client initialized.")
 
-	// Create the high-level disk client
+	// Create the high-level clients
 	diskClient := NewDiskClient(disksClient)
+	snapshotClient := NewSnapshotClient(snapshotsClient)
+	instanceClient := NewInstanceClient(gceClient)
 
 	logrus.Info("Successfully initialized GCP Compute API clients.")
 	return &Clients{
-		Disks:      disksClient,
-		DiskClient: diskClient,
-		Snapshots:  snapshotsClient,
-		Zones:      zonesClient,
-		Regions:    regionsClient,
-		Gce:        gceClient,
+		Disks:          disksClient,
+		DiskClient:     diskClient,
+		Snapshots:      snapshotsClient,
+		SnapshotClient: snapshotClient,
+		Zones:          zonesClient,
+		Regions:        regionsClient,
+		Gce:            gceClient,
+		InstanceClient: instanceClient,
 	}, nil
 }
 

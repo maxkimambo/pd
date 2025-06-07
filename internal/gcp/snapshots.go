@@ -10,7 +10,6 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-
 type SnapshotKmsParams struct {
 	KmsKey      string
 	KmsKeyRing  string
@@ -18,7 +17,26 @@ type SnapshotKmsParams struct {
 	KmsProject  string
 }
 
-func (c *Clients) CreateSnapshot(ctx context.Context, projectID, zone, diskName, snapshotName string, kmsParams *SnapshotKmsParams, labels map[string]string) error {
+// SnapshotOperationsInterface defines the high-level snapshot operations interface
+type SnapshotOperationsInterface interface {
+	CreateSnapshot(ctx context.Context, projectID, zone, diskName, snapshotName string, kmsParams *SnapshotKmsParams, labels map[string]string) error
+	DeleteSnapshot(ctx context.Context, projectID, snapshotName string) error
+	ListSnapshotsByLabel(ctx context.Context, projectID, labelKey, labelValue string) ([]*computepb.Snapshot, error)
+}
+
+// SnapshotClient wraps the GCP snapshot client and provides snapshot operation methods
+type SnapshotClient struct {
+	client SnapshotClientInterface
+}
+
+// NewSnapshotClient creates a new SnapshotClient with the provided SnapshotClientInterface
+func NewSnapshotClient(client SnapshotClientInterface) *SnapshotClient {
+	return &SnapshotClient{
+		client: client,
+	}
+}
+
+func (sc *SnapshotClient) CreateSnapshot(ctx context.Context, projectID, zone, diskName, snapshotName string, kmsParams *SnapshotKmsParams, labels map[string]string) error {
 	logFields := logrus.Fields{
 		"project":      projectID,
 		"zone":         zone,
@@ -59,7 +77,7 @@ func (c *Clients) CreateSnapshot(ctx context.Context, projectID, zone, diskName,
 		SnapshotResource: snapshotResource,
 	}
 
-	op, err := c.Snapshots.Insert(ctx, req) 
+	op, err := sc.client.Insert(ctx, req) 
 	if err != nil {
 		logrus.WithFields(logFields).WithError(err).Error("Failed to initiate snapshot creation")
 		return fmt.Errorf("failed to initiate snapshot creation for disk %s: %w", diskName, err)
@@ -82,7 +100,7 @@ func (c *Clients) CreateSnapshot(ctx context.Context, projectID, zone, diskName,
 	return nil
 }
 
-func (c *Clients) DeleteSnapshot(ctx context.Context, projectID, snapshotName string) error {
+func (sc *SnapshotClient) DeleteSnapshot(ctx context.Context, projectID, snapshotName string) error {
 	logFields := logrus.Fields{
 		"project":      projectID,
 		"snapshotName": snapshotName,
@@ -94,7 +112,7 @@ func (c *Clients) DeleteSnapshot(ctx context.Context, projectID, snapshotName st
 		Snapshot: snapshotName,
 	}
 
-	op, err := c.Snapshots.Delete(ctx, req)
+	op, err := sc.client.Delete(ctx, req)
 	if err != nil {
 		logrus.WithFields(logFields).WithError(err).Error("Failed to initiate snapshot deletion")
 		return fmt.Errorf("failed to initiate deletion for snapshot %s: %w", snapshotName, err)
@@ -117,7 +135,7 @@ func (c *Clients) DeleteSnapshot(ctx context.Context, projectID, snapshotName st
 	return nil
 }
 
-func (c *Clients) ListSnapshotsByLabel(ctx context.Context, projectID, labelKey, labelValue string) ([]*computepb.Snapshot, error) {
+func (sc *SnapshotClient) ListSnapshotsByLabel(ctx context.Context, projectID, labelKey, labelValue string) ([]*computepb.Snapshot, error) {
 	snapshots := make([]*computepb.Snapshot, 0)
 	filter := fmt.Sprintf("labels.%s = %s", labelKey, labelValue)
 	logFields := logrus.Fields{
@@ -131,7 +149,7 @@ func (c *Clients) ListSnapshotsByLabel(ctx context.Context, projectID, labelKey,
 		Filter:  proto.String(filter),
 	}
 
-	it := c.Snapshots.List(ctx, req)
+	it := sc.client.List(ctx, req)
 	if it == nil {
 		logrus.WithFields(logFields).Warn("List returned a nil iterator. Returning empty snapshot list.")
 		return snapshots, nil

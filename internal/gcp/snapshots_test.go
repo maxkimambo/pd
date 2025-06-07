@@ -83,8 +83,8 @@ func TestCreateSnapshot(t *testing.T) {
 				return nil, errors.New("mocked to avoid operation calls")
 			},
 		}
-		clients := &Clients{Snapshots: mockClient}
-		err := clients.CreateSnapshot(ctx, projectID, zone, diskName, snapshotName, nil, nil)
+		clients := &Clients{Snapshots: mockClient, SnapshotClient: NewSnapshotClient(mockClient)}
+		err := clients.SnapshotClient.CreateSnapshot(ctx, projectID, zone, diskName, snapshotName, nil, nil)
 
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "mocked to avoid operation calls") 
@@ -116,8 +116,8 @@ func TestCreateSnapshot(t *testing.T) {
 				return nil, errors.New("mocked to avoid operation calls")
 			},
 		}
-		clients := &Clients{Snapshots: mockClient}
-		err := clients.CreateSnapshot(ctx, projectID, zone, diskName, snapshotName, kmsParams, initialLabels)
+		clients := &Clients{Snapshots: mockClient, SnapshotClient: NewSnapshotClient(mockClient)}
+		err := clients.SnapshotClient.CreateSnapshot(ctx, projectID, zone, diskName, snapshotName, kmsParams, initialLabels)
 
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "mocked to avoid operation calls")
@@ -145,8 +145,8 @@ func TestCreateSnapshot(t *testing.T) {
 				return nil, errors.New("mocked to avoid operation calls")
 			},
 		}
-		clients := &Clients{Snapshots: mockClient}
-		err := clients.CreateSnapshot(ctx, projectID, zone, diskName, snapshotName, kmsParams, nil)
+		clients := &Clients{Snapshots: mockClient, SnapshotClient: NewSnapshotClient(mockClient)}
+		err := clients.SnapshotClient.CreateSnapshot(ctx, projectID, zone, diskName, snapshotName, kmsParams, nil)
 
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "mocked to avoid operation calls")
@@ -162,8 +162,8 @@ func TestCreateSnapshot(t *testing.T) {
 		mockClient := &mockSnapshotsClient{
 			InsertErr: expectedErr,
 		}
-		clients := &Clients{Snapshots: mockClient}
-		err := clients.CreateSnapshot(ctx, projectID, zone, diskName, snapshotName, nil, nil)
+		clients := &Clients{Snapshots: mockClient, SnapshotClient: NewSnapshotClient(mockClient)}
+		err := clients.SnapshotClient.CreateSnapshot(ctx, projectID, zone, diskName, snapshotName, nil, nil)
 
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), expectedErr.Error())
@@ -182,8 +182,8 @@ func TestDeleteSnapshot(t *testing.T) {
 				return nil, errors.New("mocked to avoid operation calls")
 			},
 		}
-		clients := &Clients{Snapshots: mockClient}
-		err := clients.DeleteSnapshot(ctx, projectID, snapshotName)
+		clients := &Clients{Snapshots: mockClient, SnapshotClient: NewSnapshotClient(mockClient)}
+		err := clients.SnapshotClient.DeleteSnapshot(ctx, projectID, snapshotName)
 
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "mocked to avoid operation calls") 
@@ -198,8 +198,8 @@ func TestDeleteSnapshot(t *testing.T) {
 		mockClient := &mockSnapshotsClient{
 			DeleteErr: expectedErr,
 		}
-		clients := &Clients{Snapshots: mockClient}
-		err := clients.DeleteSnapshot(ctx, projectID, snapshotName)
+		clients := &Clients{Snapshots: mockClient, SnapshotClient: NewSnapshotClient(mockClient)}
+		err := clients.SnapshotClient.DeleteSnapshot(ctx, projectID, snapshotName)
 
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), expectedErr.Error())
@@ -222,8 +222,8 @@ func TestListSnapshotsByLabel(t *testing.T) {
 				return nil 
 			},
 		}
-		clients := &Clients{Snapshots: mockClient}
-		snapshots, err := clients.ListSnapshotsByLabel(ctx, projectID, labelKey, labelValue)
+		clients := &Clients{Snapshots: mockClient, SnapshotClient: NewSnapshotClient(mockClient)}
+		snapshots, err := clients.SnapshotClient.ListSnapshotsByLabel(ctx, projectID, labelKey, labelValue)
 
 		assert.True(t, mockClient.ListCalled) 
 		assert.NotNil(t, mockClient.LastListReq)
@@ -241,8 +241,8 @@ func TestListSnapshotsByLabel(t *testing.T) {
 				return nil
 			},
 		}
-		clients := &Clients{Snapshots: mockClient}
-		snapshots, err := clients.ListSnapshotsByLabel(ctx, projectID, labelKey, labelValue)
+		clients := &Clients{Snapshots: mockClient, SnapshotClient: NewSnapshotClient(mockClient)}
+		snapshots, err := clients.SnapshotClient.ListSnapshotsByLabel(ctx, projectID, labelKey, labelValue)
 
 		assert.NoError(t, err)
 		assert.True(t, mockClient.ListCalled)
@@ -257,8 +257,8 @@ func TestListSnapshotsByLabel(t *testing.T) {
 				return nil
 			},
 		}
-		clients := &Clients{Snapshots: mockClient}
-		snapshots, err := clients.ListSnapshotsByLabel(ctx, projectID, labelKey, labelValue)
+		clients := &Clients{Snapshots: mockClient, SnapshotClient: NewSnapshotClient(mockClient)}
+		snapshots, err := clients.SnapshotClient.ListSnapshotsByLabel(ctx, projectID, labelKey, labelValue)
 
 		assert.NoError(t, err) 
 		assert.True(t, mockClient.ListCalled)
@@ -272,8 +272,8 @@ func TestListSnapshotsByLabel(t *testing.T) {
 				return nil
 			},
 		}
-		clients := &Clients{Snapshots: mockClient}
-		snapshots, err := clients.ListSnapshotsByLabel(ctx, projectID, labelKey, labelValue)
+		clients := &Clients{Snapshots: mockClient, SnapshotClient: NewSnapshotClient(mockClient)}
+		snapshots, err := clients.SnapshotClient.ListSnapshotsByLabel(ctx, projectID, labelKey, labelValue)
 
 		assert.NoError(t, err)
 		assert.True(t, mockClient.ListCalled)
