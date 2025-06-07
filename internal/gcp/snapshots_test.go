@@ -9,6 +9,7 @@ import (
 	compute "cloud.google.com/go/compute/apiv1"
 	computepb "cloud.google.com/go/compute/apiv1/computepb"
 	"github.com/googleapis/gax-go/v2"
+	"github.com/maxkimambo/pd/internal/logger"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -70,6 +71,9 @@ func (m *mockSnapshotsClient) Close() error {
 
 
 func TestCreateSnapshot(t *testing.T) {
+	// Setup logger for tests
+	logger.Setup(false, false, false)
+	
 	ctx := context.Background()
 	projectID := "test-proj"
 	zone := "us-west1-a"
@@ -77,17 +81,17 @@ func TestCreateSnapshot(t *testing.T) {
 	snapshotName := "new-snap"
 	sourceDiskURL := fmt.Sprintf("projects/%s/zones/%s/disks/%s", projectID, zone, diskName)
 
-	placeholderOp := &compute.Operation{} 
-
 	t.Run("Success - No KMS, No extra labels", func(t *testing.T) {
 		mockClient := &mockSnapshotsClient{
-			InsertOp:  placeholderOp, 
-			InsertErr: nil,
+			InsertFunc: func(ctx context.Context, req *computepb.InsertSnapshotRequest, opts ...gax.CallOption) (*compute.Operation, error) {
+				return nil, errors.New("mocked to avoid operation calls")
+			},
 		}
-		clients := &Clients{Snapshots: mockClient}
-		err := clients.CreateSnapshot(ctx, projectID, zone, diskName, snapshotName, nil, nil)
+		clients := &Clients{Snapshots: mockClient, SnapshotClient: NewSnapshotClient(mockClient)}
+		err := clients.SnapshotClient.CreateSnapshot(ctx, projectID, zone, diskName, snapshotName, nil, nil)
 
-		assert.NoError(t, err) 
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "mocked to avoid operation calls") 
 		assert.True(t, mockClient.InsertCalled)
 		assert.NotNil(t, mockClient.LastInsertReq)
 		assert.Equal(t, projectID, mockClient.LastInsertReq.GetProject())
@@ -112,13 +116,15 @@ func TestCreateSnapshot(t *testing.T) {
 			kmsParams.KmsProject, kmsParams.KmsLocation, kmsParams.KmsKeyRing, kmsParams.KmsKey)
 
 		mockClient := &mockSnapshotsClient{
-			InsertOp:  placeholderOp,
-			InsertErr: nil,
+			InsertFunc: func(ctx context.Context, req *computepb.InsertSnapshotRequest, opts ...gax.CallOption) (*compute.Operation, error) {
+				return nil, errors.New("mocked to avoid operation calls")
+			},
 		}
-		clients := &Clients{Snapshots: mockClient}
-		err := clients.CreateSnapshot(ctx, projectID, zone, diskName, snapshotName, kmsParams, initialLabels)
+		clients := &Clients{Snapshots: mockClient, SnapshotClient: NewSnapshotClient(mockClient)}
+		err := clients.SnapshotClient.CreateSnapshot(ctx, projectID, zone, diskName, snapshotName, kmsParams, initialLabels)
 
-		assert.NoError(t, err)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "mocked to avoid operation calls")
 		assert.True(t, mockClient.InsertCalled)
 		snapResource := mockClient.LastInsertReq.GetSnapshotResource()
 		assert.NotNil(t, snapResource)
@@ -139,13 +145,15 @@ func TestCreateSnapshot(t *testing.T) {
 			projectID, kmsParams.KmsLocation, kmsParams.KmsKeyRing, kmsParams.KmsKey) 
 
 		mockClient := &mockSnapshotsClient{
-			InsertOp:  placeholderOp,
-			InsertErr: nil,
+			InsertFunc: func(ctx context.Context, req *computepb.InsertSnapshotRequest, opts ...gax.CallOption) (*compute.Operation, error) {
+				return nil, errors.New("mocked to avoid operation calls")
+			},
 		}
-		clients := &Clients{Snapshots: mockClient}
-		err := clients.CreateSnapshot(ctx, projectID, zone, diskName, snapshotName, kmsParams, nil)
+		clients := &Clients{Snapshots: mockClient, SnapshotClient: NewSnapshotClient(mockClient)}
+		err := clients.SnapshotClient.CreateSnapshot(ctx, projectID, zone, diskName, snapshotName, kmsParams, nil)
 
-		assert.NoError(t, err)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "mocked to avoid operation calls")
 		assert.True(t, mockClient.InsertCalled)
 		snapResource := mockClient.LastInsertReq.GetSnapshotResource()
 		kmsKey := snapResource.GetSnapshotEncryptionKey()
@@ -158,8 +166,8 @@ func TestCreateSnapshot(t *testing.T) {
 		mockClient := &mockSnapshotsClient{
 			InsertErr: expectedErr,
 		}
-		clients := &Clients{Snapshots: mockClient}
-		err := clients.CreateSnapshot(ctx, projectID, zone, diskName, snapshotName, nil, nil)
+		clients := &Clients{Snapshots: mockClient, SnapshotClient: NewSnapshotClient(mockClient)}
+		err := clients.SnapshotClient.CreateSnapshot(ctx, projectID, zone, diskName, snapshotName, nil, nil)
 
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), expectedErr.Error())
@@ -169,20 +177,23 @@ func TestCreateSnapshot(t *testing.T) {
 }
 
 func TestDeleteSnapshot(t *testing.T) {
+	// Setup logger for tests
+	logger.Setup(false, false, false)
+	
 	ctx := context.Background()
 	projectID := "test-proj"
 	snapshotName := "snap-to-delete"
-	placeholderOp := &compute.Operation{} 
-
 	t.Run("Success", func(t *testing.T) {
 		mockClient := &mockSnapshotsClient{
-			DeleteOp:  placeholderOp,
-			DeleteErr: nil,
+			DeleteFunc: func(ctx context.Context, req *computepb.DeleteSnapshotRequest, opts ...gax.CallOption) (*compute.Operation, error) {
+				return nil, errors.New("mocked to avoid operation calls")
+			},
 		}
-		clients := &Clients{Snapshots: mockClient}
-		err := clients.DeleteSnapshot(ctx, projectID, snapshotName)
+		clients := &Clients{Snapshots: mockClient, SnapshotClient: NewSnapshotClient(mockClient)}
+		err := clients.SnapshotClient.DeleteSnapshot(ctx, projectID, snapshotName)
 
-		assert.NoError(t, err) 
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "mocked to avoid operation calls") 
 		assert.True(t, mockClient.DeleteCalled)
 		assert.NotNil(t, mockClient.LastDeleteReq)
 		assert.Equal(t, projectID, mockClient.LastDeleteReq.GetProject())
@@ -194,8 +205,8 @@ func TestDeleteSnapshot(t *testing.T) {
 		mockClient := &mockSnapshotsClient{
 			DeleteErr: expectedErr,
 		}
-		clients := &Clients{Snapshots: mockClient}
-		err := clients.DeleteSnapshot(ctx, projectID, snapshotName)
+		clients := &Clients{Snapshots: mockClient, SnapshotClient: NewSnapshotClient(mockClient)}
+		err := clients.SnapshotClient.DeleteSnapshot(ctx, projectID, snapshotName)
 
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), expectedErr.Error())
@@ -205,6 +216,9 @@ func TestDeleteSnapshot(t *testing.T) {
 }
 
 func TestListSnapshotsByLabel(t *testing.T) {
+	// Setup logger for tests
+	logger.Setup(false, false, false)
+	
 	ctx := context.Background()
 	projectID := "test-proj"
 	labelKey := "env"
@@ -218,8 +232,8 @@ func TestListSnapshotsByLabel(t *testing.T) {
 				return nil 
 			},
 		}
-		clients := &Clients{Snapshots: mockClient}
-		snapshots, err := clients.ListSnapshotsByLabel(ctx, projectID, labelKey, labelValue)
+		clients := &Clients{Snapshots: mockClient, SnapshotClient: NewSnapshotClient(mockClient)}
+		snapshots, err := clients.SnapshotClient.ListSnapshotsByLabel(ctx, projectID, labelKey, labelValue)
 
 		assert.True(t, mockClient.ListCalled) 
 		assert.NotNil(t, mockClient.LastListReq)
@@ -237,8 +251,8 @@ func TestListSnapshotsByLabel(t *testing.T) {
 				return nil
 			},
 		}
-		clients := &Clients{Snapshots: mockClient}
-		snapshots, err := clients.ListSnapshotsByLabel(ctx, projectID, labelKey, labelValue)
+		clients := &Clients{Snapshots: mockClient, SnapshotClient: NewSnapshotClient(mockClient)}
+		snapshots, err := clients.SnapshotClient.ListSnapshotsByLabel(ctx, projectID, labelKey, labelValue)
 
 		assert.NoError(t, err)
 		assert.True(t, mockClient.ListCalled)
@@ -253,8 +267,8 @@ func TestListSnapshotsByLabel(t *testing.T) {
 				return nil
 			},
 		}
-		clients := &Clients{Snapshots: mockClient}
-		snapshots, err := clients.ListSnapshotsByLabel(ctx, projectID, labelKey, labelValue)
+		clients := &Clients{Snapshots: mockClient, SnapshotClient: NewSnapshotClient(mockClient)}
+		snapshots, err := clients.SnapshotClient.ListSnapshotsByLabel(ctx, projectID, labelKey, labelValue)
 
 		assert.NoError(t, err) 
 		assert.True(t, mockClient.ListCalled)
@@ -268,8 +282,8 @@ func TestListSnapshotsByLabel(t *testing.T) {
 				return nil
 			},
 		}
-		clients := &Clients{Snapshots: mockClient}
-		snapshots, err := clients.ListSnapshotsByLabel(ctx, projectID, labelKey, labelValue)
+		clients := &Clients{Snapshots: mockClient, SnapshotClient: NewSnapshotClient(mockClient)}
+		snapshots, err := clients.SnapshotClient.ListSnapshotsByLabel(ctx, projectID, labelKey, labelValue)
 
 		assert.NoError(t, err)
 		assert.True(t, mockClient.ListCalled)

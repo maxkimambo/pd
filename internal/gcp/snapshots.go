@@ -5,11 +5,10 @@ import (
 	"fmt"
 
 	computepb "cloud.google.com/go/compute/apiv1/computepb"
-	"github.com/sirupsen/logrus"
+	"github.com/maxkimambo/pd/internal/logger"
 	"google.golang.org/api/iterator"
 	"google.golang.org/protobuf/proto"
 )
-
 
 type SnapshotKmsParams struct {
 	KmsKey      string
@@ -18,14 +17,33 @@ type SnapshotKmsParams struct {
 	KmsProject  string
 }
 
-func (c *Clients) CreateSnapshot(ctx context.Context, projectID, zone, diskName, snapshotName string, kmsParams *SnapshotKmsParams, labels map[string]string) error {
-	logFields := logrus.Fields{
+// SnapshotOperationsInterface defines the high-level snapshot operations interface
+type SnapshotOperationsInterface interface {
+	CreateSnapshot(ctx context.Context, projectID, zone, diskName, snapshotName string, kmsParams *SnapshotKmsParams, labels map[string]string) error
+	DeleteSnapshot(ctx context.Context, projectID, snapshotName string) error
+	ListSnapshotsByLabel(ctx context.Context, projectID, labelKey, labelValue string) ([]*computepb.Snapshot, error)
+}
+
+// SnapshotClient wraps the GCP snapshot client and provides snapshot operation methods
+type SnapshotClient struct {
+	client SnapshotClientInterface
+}
+
+// NewSnapshotClient creates a new SnapshotClient with the provided SnapshotClientInterface
+func NewSnapshotClient(client SnapshotClientInterface) *SnapshotClient {
+	return &SnapshotClient{
+		client: client,
+	}
+}
+
+func (sc *SnapshotClient) CreateSnapshot(ctx context.Context, projectID, zone, diskName, snapshotName string, kmsParams *SnapshotKmsParams, labels map[string]string) error {
+	logFields := map[string]interface{}{
 		"project":      projectID,
 		"zone":         zone,
 		"disk":         diskName,
 		"snapshotName": snapshotName,
 	}
-	logrus.WithFields(logFields).Info("Initiating snapshot creation...")
+	logger.Op.WithFields(logFields).Info("Initiating snapshot creation...")
 
 	if labels == nil {
 		labels = make(map[string]string)
@@ -51,7 +69,7 @@ func (c *Clients) CreateSnapshot(ctx context.Context, projectID, zone, diskName,
 		snapshotResource.SnapshotEncryptionKey = &computepb.CustomerEncryptionKey{
 			KmsKeyName: proto.String(kmsKeyName),
 		}
-		logrus.WithFields(logFields).Info("Applying KMS encryption to snapshot")
+		logger.Op.WithFields(logFields).Info("Applying KMS encryption to snapshot")
 	}
 
 	req := &computepb.InsertSnapshotRequest{
@@ -59,79 +77,84 @@ func (c *Clients) CreateSnapshot(ctx context.Context, projectID, zone, diskName,
 		SnapshotResource: snapshotResource,
 	}
 
-	op, err := c.Snapshots.Insert(ctx, req) 
+	op, err := sc.client.Insert(ctx, req) 
 	if err != nil {
-		logrus.WithFields(logFields).WithError(err).Error("Failed to initiate snapshot creation")
+		logger.Op.WithFields(logFields).WithError(err).Error("Failed to initiate snapshot creation")
 		return fmt.Errorf("failed to initiate snapshot creation for disk %s: %w", diskName, err)
 	}
 
 	opName := op.Name()
-	logrus.WithFields(logFields).Infof("Waiting for snapshot creation operation %s to complete...", opName)
+	logger.Op.WithFields(logFields).Infof("Waiting for snapshot creation operation %s to complete...", opName)
 
 	opCtx, cancel := context.WithTimeout(ctx, defaultOpTimeout) 
 	defer cancel()
 
 	err = op.Wait(opCtx) 
 	if err != nil {
-		logrus.WithFields(logFields).WithError(err).Errorf("Waiting for snapshot creation operation %s failed", opName)
+		logger.Op.WithFields(logFields).WithError(err).Errorf("Waiting for snapshot creation operation %s failed", opName)
 		return fmt.Errorf("waiting for snapshot %s creation failed: %w", snapshotName, err)
 	}
 
 
-	logrus.WithFields(logFields).Info("Snapshot created successfully.")
+	logger.Op.WithFields(logFields).Info("Snapshot created successfully.")
 	return nil
 }
 
-func (c *Clients) DeleteSnapshot(ctx context.Context, projectID, snapshotName string) error {
-	logFields := logrus.Fields{
+func (sc *SnapshotClient) DeleteSnapshot(ctx context.Context, projectID, snapshotName string) error {
+	logFields := map[string]interface{}{
 		"project":      projectID,
 		"snapshotName": snapshotName,
 	}
-	logrus.WithFields(logFields).Info("Initiating deletion of snapshot...")
+	logger.Op.WithFields(logFields).Info("Initiating deletion of snapshot...")
 
 	req := &computepb.DeleteSnapshotRequest{
 		Project:  projectID,
 		Snapshot: snapshotName,
 	}
 
-	op, err := c.Snapshots.Delete(ctx, req)
+	op, err := sc.client.Delete(ctx, req)
 	if err != nil {
-		logrus.WithFields(logFields).WithError(err).Error("Failed to initiate snapshot deletion")
+		logger.Op.WithFields(logFields).WithError(err).Error("Failed to initiate snapshot deletion")
 		return fmt.Errorf("failed to initiate deletion for snapshot %s: %w", snapshotName, err)
 	}
 
 	opName := op.Name()
-	logrus.WithFields(logFields).Infof("Waiting for snapshot deletion operation %s to complete...", opName)
+	logger.Op.WithFields(logFields).Infof("Waiting for snapshot deletion operation %s to complete...", opName)
 
 	opCtx, cancel := context.WithTimeout(ctx, defaultOpTimeout)
 	defer cancel()
 
 	err = op.Wait(opCtx) 
 	if err != nil {
-		logrus.WithFields(logFields).WithError(err).Errorf("Waiting for snapshot deletion operation %s failed", opName)
+		logger.Op.WithFields(logFields).WithError(err).Errorf("Waiting for snapshot deletion operation %s failed", opName)
 		return fmt.Errorf("waiting for snapshot %s deletion failed: %w", snapshotName, err)
 	}
 
 
-	logrus.WithFields(logFields).Info("Snapshot deleted successfully.")
+	logger.Op.WithFields(logFields).Info("Snapshot deleted successfully.")
 	return nil
 }
 
-func (c *Clients) ListSnapshotsByLabel(ctx context.Context, projectID, labelKey, labelValue string) ([]*computepb.Snapshot, error) {
-	var snapshots []*computepb.Snapshot
+func (sc *SnapshotClient) ListSnapshotsByLabel(ctx context.Context, projectID, labelKey, labelValue string) ([]*computepb.Snapshot, error) {
+	snapshots := make([]*computepb.Snapshot, 0)
 	filter := fmt.Sprintf("labels.%s = %s", labelKey, labelValue)
-	logFields := logrus.Fields{
+	logFields := map[string]interface{}{
 		"project": projectID,
 		"filter":  filter,
 	}
-	logrus.WithFields(logFields).Info("Listing snapshots by label...")
+	logger.Op.WithFields(logFields).Info("Listing snapshots by label...")
 
 	req := &computepb.ListSnapshotsRequest{
 		Project: projectID,
 		Filter:  proto.String(filter),
 	}
 
-	it := c.Snapshots.List(ctx, req)
+	it := sc.client.List(ctx, req)
+	if it == nil {
+		logger.Op.WithFields(logFields).Warn("List returned a nil iterator. Returning empty snapshot list.")
+		return snapshots, nil
+	}
+
 	for {
 		snapshot, err := it.Next()
 		if err == iterator.Done {
@@ -143,7 +166,7 @@ func (c *Clients) ListSnapshotsByLabel(ctx context.Context, projectID, labelKey,
 		snapshots = append(snapshots, snapshot)
 	}
 
-	logrus.WithFields(logFields).Infof("Found %d snapshots matching label.", len(snapshots))
+	logger.Op.WithFields(logFields).Infof("Found %d snapshots matching label.", len(snapshots))
 	return snapshots, nil
 }
 

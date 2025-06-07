@@ -8,15 +8,15 @@ import (
 	"text/tabwriter"
 	"time"
 
-	"github.com/sirupsen/logrus"
+	"github.com/maxkimambo/pd/internal/logger"
 )
 
 func GenerateReports(results []MigrationResult) {
-	logrus.Info("--- Phase 4: Reporting ---")
+	logger.User.Info("--- Phase 4: Reporting ---")
 
 	if len(results) == 0 {
-		logrus.Info("No migration results to report.")
-		logrus.Info("--- Reporting Phase Complete ---")
+		logger.User.Info("No migration results to report.")
+		logger.User.Info("--- Reporting Phase Complete ---")
 		return
 	}
 
@@ -27,7 +27,7 @@ func GenerateReports(results []MigrationResult) {
 	printSummaryReport(results)
 	printDetailedReport(results) 
 
-	logrus.Info("--- Reporting Phase Complete ---")
+	logger.User.Info("--- Reporting Phase Complete ---")
 }
 
 func printSummaryReport(results []MigrationResult) {

@@ -9,9 +9,6 @@ import (
 	"github.com/maxkimambo/pd/internal/gcp"
 	"github.com/maxkimambo/pd/internal/logger"
 	"github.com/maxkimambo/pd/internal/migrator"
-
-	// "github.com/maxkimambo/pd/internal/migrator" // Placeholder for future GCE migrator logic
-	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
 
@@ -107,9 +104,13 @@ func validateComputeCmdFlags(cmd *cobra.Command, args []string) error {
 }
 
 func runGceConvert(cmd *cobra.Command, args []string) error {
-	logger.Setup(debug) // debug is from root persistent flag
+	// Set verbose to true if debug is enabled for backward compatibility
+	if debug {
+		verbose = true
+	}
+	logger.Setup(verbose, jsonLogs, quiet)
 
-	logrus.Info("Starting disk conversion process...")
+	logger.User.Starting("Starting disk conversion process...")
 
 	config := migrator.Config{
 		ProjectID:      projectID,
@@ -127,19 +128,19 @@ func runGceConvert(cmd *cobra.Command, args []string) error {
 		Debug:          debug,
 		Instances:      gceInstances,
 	}
-	logrus.Debugf("Configuration: %+v", config)
-	logrus.Infof("Project: %s", projectID)
+	logger.Op.Debugf("Configuration: %+v", config)
+	logger.User.Infof("Project: %s", projectID)
 	if gceZone != "" {
-		logrus.Infof("Zone: %s", gceZone)
+		logger.User.Infof("Zone: %s", gceZone)
 	} else {
-		logrus.Infof("Region: %s", gceRegion)
+		logger.User.Infof("Region: %s", gceRegion)
 	}
 	if gceInstances[0] == "*" {
-		logrus.Infof("Target: All instances in scope (%s)", config.Location())
+		logger.User.Infof("Target: All instances in scope (%s)", config.Location())
 	} else {
-		logrus.Infof("Target: %s", strings.Join(gceInstances, ", "))
+		logger.User.Infof("Target: %s", strings.Join(gceInstances, ", "))
 	}
-	logrus.Infof("Target disk type: %s", gceTargetDiskType)
+	logger.User.Infof("Target disk type: %s", gceTargetDiskType)
 
 	ctx := context.Background()
 	gcpClient, err := gcp.NewClients(ctx)
@@ -152,11 +153,11 @@ func runGceConvert(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("failed to discover GCE instances: %w", err)
 	}
-	logrus.Infof("Discovered %d instance(s) for migration.", len(discoveredInstances))
-	logrus.Info("--- Phase 2: Migration (GCE Attached Disks) ---")
+	logger.User.Infof("Discovered %d instance(s) for migration.", len(discoveredInstances))
+	logger.User.Info("--- Phase 2: Migration (GCE Attached Disks) ---")
 
 	for _, instance := range discoveredInstances {
-		logrus.Infof("Processing instance: %s", *instance.Name)
+		logger.User.Infof("Processing instance: %s", *instance.Name)
 		migrator.MigrateInstanceDisks(ctx, &config, instance, gcpClient)
 	}
 
@@ -168,19 +169,19 @@ func runGceConvert(cmd *cobra.Command, args []string) error {
 	//  e. Create new disk from snapshot with target type.
 	//  f. Attach new disk.
 	//  g. Start instance (if stopped).
-	logrus.Warn("Migration logic for GCE attached disks is not yet implemented.")
+	logger.User.Warn("Migration logic for GCE attached disks is not yet implemented.")
 	// migrationResults := []migrator.MigrationResult{} // Placeholder
 
 	// --- Placeholder for Cleanup Phase ---
-	logrus.Info("--- Phase 3: Cleanup (Snapshots) ---")
+	logger.User.Info("--- Phase 3: Cleanup (Snapshots) ---")
 	// Similar to existing snapshot cleanup, but based on snapshots created during this process.
-	logrus.Warn("Snapshot cleanup logic for GCE conversion is not yet implemented.")
+	logger.User.Warn("Snapshot cleanup logic for GCE conversion is not yet implemented.")
 
 	// --- Placeholder for Reporting Phase ---
-	logrus.Info("--- Reporting ---")
+	logger.User.Info("--- Reporting ---")
 	// Generate a summary of actions taken, successes, failures.
-	logrus.Warn("Reporting for GCE conversion is not yet implemented.")
+	logger.User.Warn("Reporting for GCE conversion is not yet implemented.")
 
-	logrus.Info("GCE attached disk conversion process command structure is set up. Core logic pending implementation.")
+	logger.User.Info("GCE attached disk conversion process command structure is set up. Core logic pending implementation.")
 	return nil
 }
