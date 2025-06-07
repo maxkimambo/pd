@@ -21,7 +21,6 @@ var (
 	kmsProject     string
 	region         string
 	zone           string
-	yes            bool
 	autoApprove    bool
 	concurrency    int
 	retainName     bool

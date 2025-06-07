@@ -95,7 +95,7 @@ func MigrateSingleDisk(ctx context.Context, config *Config, gcpClient *gcp.Clien
 
 	snapshotName := fmt.Sprintf("pd-migrate-%s-%d", diskName, time.Now().Unix())
 	result.SnapshotName = snapshotName
-	
+
 	logger.User.Snapshotf("Creating snapshot for %s", diskName)
 	logger.Op.WithFields(map[string]interface{}{
 		"disk":     diskName,
