@@ -47,12 +47,22 @@ type GceClientInterface interface {
 	Close() error
 }
 
+// DiskOperationsInterface defines the high-level disk operations interface
+type DiskOperationsInterface interface {
+	GetDisk(ctx context.Context, projectID, zone, diskName string) (*computepb.Disk, error)
+	ListDetachedDisks(ctx context.Context, projectID string, location string, labelFilter string) ([]*computepb.Disk, error)
+	CreateNewDiskFromSnapshot(ctx context.Context, projectID string, zone string, newDiskName string, targetDiskType string, snapshotSource string, labels map[string]string, iops int64, throughput int64, storagePoolID string) error
+	UpdateDiskLabel(ctx context.Context, projectID string, zone string, diskName string, labelKey string, labelValue string) error
+	DeleteDisk(ctx context.Context, projectID, zone, diskName string) error
+}
+
 type Clients struct {
-	Disks     DiskClientInterface
-	Snapshots SnapshotClientInterface
-	Zones     ZoneClientInterface
-	Regions   RegionClientInterface
-	Gce       GceClientInterface
+	Disks        DiskClientInterface
+	DiskClient   DiskOperationsInterface
+	Snapshots    SnapshotClientInterface
+	Zones        ZoneClientInterface
+	Regions      RegionClientInterface
+	Gce          GceClientInterface
 }
 
 func NewClients(ctx context.Context) (*Clients, error) {
@@ -100,13 +110,17 @@ func NewClients(ctx context.Context) (*Clients, error) {
 	}
 	logrus.Debug("GCE client initialized.")
 
+	// Create the high-level disk client
+	diskClient := NewDiskClient(disksClient)
+
 	logrus.Info("Successfully initialized GCP Compute API clients.")
 	return &Clients{
-		Disks:     disksClient,
-		Snapshots: snapshotsClient,
-		Zones:     zonesClient,
-		Regions:   regionsClient,
-		Gce:       gceClient,
+		Disks:      disksClient,
+		DiskClient: diskClient,
+		Snapshots:  snapshotsClient,
+		Zones:      zonesClient,
+		Regions:    regionsClient,
+		Gce:        gceClient,
 	}, nil
 }
 
