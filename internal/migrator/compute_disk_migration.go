@@ -6,8 +6,8 @@ import (
 
 	computepb "cloud.google.com/go/compute/apiv1/computepb"
 	"github.com/maxkimambo/pd/internal/gcp"
+	"github.com/maxkimambo/pd/internal/logger"
 	"github.com/maxkimambo/pd/internal/utils"
-	"github.com/sirupsen/logrus"
 )
 
 func MigrateInstanceDisks(ctx context.Context, config *Config, instance *computepb.Instance, gcpClient *gcp.Clients) error {
@@ -19,7 +19,7 @@ func MigrateInstanceDisks(ctx context.Context, config *Config, instance *compute
 	attachedDisks := instance.GetDisks()
 	zone := utils.ExtractZoneName(instance.GetZone())
 	if isRunning {
-		logrus.Infof("Instance %s in zone %s is running, stopping it before migration", instance.GetName(), instance.GetZone())
+		logger.User.Infof("Instance %s in zone %s is running, stopping it before migration", instance.GetName(), instance.GetZone())
 		if err := gcpClient.InstanceClient.StopInstance(ctx, config.ProjectID, zone, instance.GetName()); err != nil {
 			return fmt.Errorf("failed to stop instance %s in zone %s: %w", instance.GetName(), instance.GetZone(), err)
 		}
@@ -31,7 +31,7 @@ func MigrateInstanceDisks(ctx context.Context, config *Config, instance *compute
 			return fmt.Errorf("failed to detach disk %s from instance %s in zone %s: %w", disk.GetDeviceName(), instance.GetName(), zone, err)
 		}
 		// perform the migration for the detached disk
-		logrus.Infof("Migrating disk %s", disk.GetDeviceName())
+		logger.User.Infof("Migrating disk %s", disk.GetDeviceName())
 
 		diskToMigrate, err := gcpClient.DiskClient.GetDisk(ctx, config.ProjectID, zone, disk.GetDeviceName())
 		if err != nil {
@@ -58,7 +58,7 @@ func MigrateInstanceDisks(ctx context.Context, config *Config, instance *compute
 }
 
 func IncrementalSnapshotDisk(ctx context.Context, config *Config, disk *computepb.Disk, gcpClient *gcp.Clients) error {
-	logrus.Infof("Creating incremental snapshot for disk %s in zone %s", disk.GetName(), disk.GetZone())
+	logger.User.Infof("Creating incremental snapshot for disk %s in zone %s", disk.GetName(), disk.GetZone())
 
 	snapshotName := fmt.Sprintf("%s-snapshot", utils.AddSuffix(disk.GetName(), 3))
 	kmsParams := &gcp.SnapshotKmsParams{
@@ -72,6 +72,6 @@ func IncrementalSnapshotDisk(ctx context.Context, config *Config, disk *computep
 		return fmt.Errorf("failed to create incremental snapshot for disk %s: %w", disk.GetName(), err)
 	}
 
-	logrus.Infof("Incremental snapshot %s created successfully for disk %s", snapshotName, disk.GetName())
+	logger.User.Infof("Incremental snapshot %s created successfully for disk %s", snapshotName, disk.GetName())
 	return nil
 }

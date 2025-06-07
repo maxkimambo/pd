@@ -8,20 +8,20 @@ import (
 	"strings"
 
 	"github.com/maxkimambo/pd/internal/gcp"
+	"github.com/maxkimambo/pd/internal/logger"
 	"github.com/maxkimambo/pd/internal/utils"
 
 	computepb "cloud.google.com/go/compute/apiv1/computepb"
-	"github.com/sirupsen/logrus"
 )
 
 // DiscoverDisks discovers GCP Compute Engine persistent disks based on the migration configuration.
 func DiscoverDisks(ctx context.Context, config *Config, gcpClient *gcp.Clients) ([]*computepb.Disk, error) {
-	logrus.Info("--- Phase 1: Discovery ---")
+	logger.User.Info("--- Phase 1: Discovery ---")
 
 	location := config.Location()
-	logrus.Infof("Listing detached disks in %s (Project: %s)", location, config.ProjectID)
+	logger.User.Infof("Listing detached disks in %s (Project: %s)", location, config.ProjectID)
 	if config.LabelFilter != "" {
-		logrus.Infof("Applying label filter: %s", config.LabelFilter)
+		logger.User.Infof("Applying label filter: %s", config.LabelFilter)
 	}
 
 	disksToMigrate, err := gcpClient.DiskClient.ListDetachedDisks(ctx, config.ProjectID, location, config.LabelFilter)
@@ -30,11 +30,11 @@ func DiscoverDisks(ctx context.Context, config *Config, gcpClient *gcp.Clients) 
 	}
 
 	if len(disksToMigrate) == 0 {
-		logrus.Info("No detached disks found matching the criteria.")
+		logger.User.Info("No detached disks found matching the criteria.")
 		return []*computepb.Disk{}, nil
 	}
 
-	logrus.Infof("Found %d detached disk(s) matching criteria:", len(disksToMigrate))
+	logger.User.Infof("Found %d detached disk(s) matching criteria:", len(disksToMigrate))
 	var sb strings.Builder
 	for i, disk := range disksToMigrate {
 		zone := "unknown"
@@ -50,7 +50,7 @@ func DiscoverDisks(ctx context.Context, config *Config, gcpClient *gcp.Clients) 
 		sb.WriteString("----------------------\n")
 	}
 
-	logrus.Info(sb.String())
+	logger.User.Info(sb.String())
 
 	if !config.AutoApproveAll {
 		fmt.Printf("\nProceed with migrating these %d disk(s) to type '%s'? (yes/no): ", len(disksToMigrate), config.TargetDiskType)
@@ -61,15 +61,15 @@ func DiscoverDisks(ctx context.Context, config *Config, gcpClient *gcp.Clients) 
 		}
 		input = strings.ToLower(strings.TrimSpace(input))
 		if input != "yes" {
-			logrus.Info("Migration cancelled by user.")
+			logger.User.Info("Migration cancelled by user.")
 			return []*computepb.Disk{}, nil
 		}
-		logrus.Info("User confirmed. Proceeding with migration.")
+		logger.User.Info("User confirmed. Proceeding with migration.")
 	} else {
-		logrus.Info("Skipping user confirmation due to --auto-approve flag.")
+		logger.User.Info("Skipping user confirmation due to --auto-approve flag.")
 	}
 
-	logrus.Info("--- Discovery Phase Complete ---")
+	logger.User.Info("--- Discovery Phase Complete ---")
 	return disksToMigrate, nil
 }
 
@@ -82,14 +82,14 @@ func getShortDiskTypeName(typeURL string) string {
 }
 
 func DiscoverInstances(ctx context.Context, config *Config, gcpClient *gcp.Clients) ([]*computepb.Instance, error) {
-	logrus.Info("--- Phase 1: Discovering Instances ---")
+	logger.User.Info("--- Phase 1: Discovering Instances ---")
 
 	var discoveredInstances []*computepb.Instance
 	var err error
 	if len(config.Instances) > 0 && config.Instances[0] != "*" {
 		// get instances by names
 		for _, instanceName := range config.Instances {
-			logrus.Infof("Getting compute instance %s", instanceName)
+			logger.User.Infof("Getting compute instance %s", instanceName)
 			instance, err := gcpClient.InstanceClient.GetInstance(ctx, config.ProjectID, config.Zone, instanceName)
 			if err != nil {
 				return nil, fmt.Errorf("failed to get instance %s in zone %s: %w", instanceName, config.Zone, err)
@@ -97,17 +97,17 @@ func DiscoverInstances(ctx context.Context, config *Config, gcpClient *gcp.Clien
 			if instance != nil {
 				discoveredInstances = append(discoveredInstances, instance)
 			} else {
-				logrus.Warnf("Instance %s not found in zone %s", instanceName, config.Zone)
+				logger.User.Warnf("Instance %s not found in zone %s", instanceName, config.Zone)
 			}
 		}
 	} else if config.Zone != "" {
-		logrus.Infof("Listing instances in zone %s", config.Zone)
+		logger.User.Infof("Listing instances in zone %s", config.Zone)
 		discoveredInstances, err = listInstancesInZone(ctx, config.ProjectID, config.Zone, gcpClient)
 		if err != nil {
 			return nil, fmt.Errorf("failed to discover instances in zone %s: %w", config.Zone, err)
 		}
 	} else if config.Region != "" {
-		logrus.Infof("Listing instances in region %s", config.Region)
+		logger.User.Infof("Listing instances in region %s", config.Region)
 		discoveredInstances, err = listInstancesInRegion(ctx, config.ProjectID, config.Region, gcpClient)
 		if err != nil {
 			return nil, fmt.Errorf("failed to discover instances in region %s: %w", config.Region, err)
@@ -117,13 +117,13 @@ func DiscoverInstances(ctx context.Context, config *Config, gcpClient *gcp.Clien
 	}
 
 	if len(discoveredInstances) == 0 {
-		logrus.Info("No instances found matching the specified location.")
+		logger.User.Info("No instances found matching the specified location.")
 		return []*computepb.Instance{}, nil
 	}
 	var sb strings.Builder
 	sb.WriteString("\n")
 	for _, instance := range discoveredInstances {
-		logrus.Infof("\t %s (Zone: %s)", instance.GetName(), utils.ExtractZoneName(instance.GetZone()))
+		logger.User.Infof("\t %s (Zone: %s)", instance.GetName(), utils.ExtractZoneName(instance.GetZone()))
 	}
 	return discoveredInstances, nil
 }

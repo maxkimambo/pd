@@ -9,8 +9,6 @@ import (
 	"github.com/maxkimambo/pd/internal/gcp"
 	"github.com/maxkimambo/pd/internal/logger"
 	"github.com/maxkimambo/pd/internal/migrator"
-
-	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
 
@@ -133,7 +131,7 @@ func runConvert(cmd *cobra.Command, args []string) error {
 		RetainName:     retainName,
 		Debug:          debug,
 	}
-	logrus.Debugf("Configuration: %+v", config)
+	logger.Op.Debugf("Configuration: %+v", config)
 	ctx := context.Background()
 
 	gcpClient, err := gcp.NewClients(ctx)
@@ -147,22 +145,22 @@ func runConvert(cmd *cobra.Command, args []string) error {
 		return err
 	}
 	if len(discoveredDisks) == 0 {
-		logrus.Info("No disks to migrate. Exiting.")
+		logger.User.Info("No disks to migrate. Exiting.")
 		return nil
 	}
 
 	migrationResults, err := migrator.MigrateDisks(ctx, &config, gcpClient, discoveredDisks)
 	if err != nil {
-		logrus.Errorf("Migration phase encountered errors: %v", err)
+		logger.User.Errorf("Migration phase encountered errors: %v", err)
 	}
 
 	err = migrator.CleanupSnapshots(ctx, &config, gcpClient, migrationResults)
 	if err != nil {
-		logrus.Warnf("Cleanup phase encountered errors: %v", err)
+		logger.User.Warnf("Cleanup phase encountered errors: %v", err)
 	}
 
 	migrator.GenerateReports(migrationResults)
 
-	logrus.Info("Disk conversion process finished.")
+	logger.User.Success("Disk conversion process finished.")
 	return nil
 }

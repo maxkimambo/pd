@@ -8,6 +8,7 @@ import (
 	compute "cloud.google.com/go/compute/apiv1"
 	computepb "cloud.google.com/go/compute/apiv1/computepb"
 	"github.com/googleapis/gax-go/v2"
+	"github.com/maxkimambo/pd/internal/logger"
 	"github.com/stretchr/testify/assert"
 
 	"google.golang.org/protobuf/proto"
@@ -116,6 +117,9 @@ func (m *mockDisksClient) Close() error {
 }
 
 func TestListDetachedDisks(t *testing.T) {
+	// Setup logger for tests
+	logger.Setup(false, false, false)
+	
 	ctx := context.Background()
 	projectID := "test-project"
 	zone := "us-central1-a"
@@ -184,6 +188,9 @@ func TestListDetachedDisks(t *testing.T) {
 }
 
 func TestCreateNewDiskFromSnapshot(t *testing.T) {
+	// Setup logger for tests
+	logger.Setup(false, false, false)
+	
 	ctx := context.Background()
 	projectID := "test-project"
 	zone := "us-central1-a"
@@ -236,6 +243,9 @@ func TestCreateNewDiskFromSnapshot(t *testing.T) {
 }
 
 func TestUpdateDiskLabel(t *testing.T) {
+	// Setup logger for tests
+	logger.Setup(false, false, false)
+	
 	ctx := context.Background()
 	projectID := "test-project"
 	zone := "us-central1-a"
@@ -338,6 +348,9 @@ func TestUpdateDiskLabel(t *testing.T) {
 }
 
 func TestDeleteDisk(t *testing.T) {
+	// Setup logger for tests
+	logger.Setup(false, false, false)
+	
 	ctx := context.Background()
 	projectID := "test-project"
 	zone := "us-central1-a"

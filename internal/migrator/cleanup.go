@@ -6,16 +6,15 @@ import (
 	"sync"
 
 	"github.com/maxkimambo/pd/internal/gcp"
-
-	"github.com/sirupsen/logrus"
+	"github.com/maxkimambo/pd/internal/logger"
 )
 
 const snapshotCleanupLabelKey = "managed-by"
 const snapshotCleanupLabelValue = "pd-migrate"
 
 func CleanupSnapshots(ctx context.Context, config *Config, gcpClient *gcp.Clients, results []MigrationResult) error {
-	logrus.Info("--- Phase 3: Cleanup ---")
-	logrus.Infof("Searching for snapshots with label '%s=%s' in project %s for cleanup...",
+	logger.User.Info("--- Phase 3: Cleanup ---")
+	logger.User.Infof("Searching for snapshots with label '%s=%s' in project %s for cleanup...",
 		snapshotCleanupLabelKey, snapshotCleanupLabelValue, config.ProjectID)
 
 	snapshotsToDelete, err := gcpClient.SnapshotClient.ListSnapshotsByLabel(ctx, config.ProjectID, snapshotCleanupLabelKey, snapshotCleanupLabelValue)
@@ -24,15 +23,15 @@ func CleanupSnapshots(ctx context.Context, config *Config, gcpClient *gcp.Client
 	}
 
 	if len(snapshotsToDelete) == 0 {
-		logrus.Info("No snapshots found with the cleanup label.")
-		logrus.Info("--- Cleanup Phase Complete ---")
+		logger.User.Info("No snapshots found with the cleanup label.")
+		logger.User.Info("--- Cleanup Phase Complete ---")
 		return nil
 	}
 
-	logrus.Infof("Found %d snapshot(s) to cleanup:", len(snapshotsToDelete))
+	logger.User.Infof("Found %d snapshot(s) to cleanup:", len(snapshotsToDelete))
 	snapshotMap := make(map[string]bool)
 	for _, snap := range snapshotsToDelete {
-		logrus.Infof("  - %s", snap.GetName())
+		logger.User.Infof("  - %s", snap.GetName())
 		snapshotMap[snap.GetName()] = false
 	}
 
@@ -44,7 +43,7 @@ func CleanupSnapshots(ctx context.Context, config *Config, gcpClient *gcp.Client
 	semaphore := make(chan struct{}, concurrencyLimit)
 	deleteErrors := &sync.Map{}
 
-	logrus.Infof("Starting cleanup for %d snapshot(s) with concurrency limit of %d...", len(snapshotsToDelete), concurrencyLimit)
+	logger.User.Infof("Starting cleanup for %d snapshot(s) with concurrency limit of %d...", len(snapshotsToDelete), concurrencyLimit)
 
 	for _, snap := range snapshotsToDelete {
 		wg.Add(1)
@@ -54,14 +53,14 @@ func CleanupSnapshots(ctx context.Context, config *Config, gcpClient *gcp.Client
 			defer wg.Done()
 			defer func() { <-semaphore }()
 
-			logFields := logrus.Fields{"snapshot": snapshotName, "project": config.ProjectID}
-			logrus.WithFields(logFields).Info("Attempting to delete snapshot...")
+			logFields := map[string]interface{}{"snapshot": snapshotName, "project": config.ProjectID}
+			logger.Op.WithFields(logFields).Info("Attempting to delete snapshot...")
 			err := gcpClient.SnapshotClient.DeleteSnapshot(ctx, config.ProjectID, snapshotName)
 			if err != nil {
-				logrus.WithFields(logFields).WithError(err).Warn("Failed to delete snapshot during cleanup")
+				logger.Op.WithFields(logFields).WithError(err).Warn("Failed to delete snapshot during cleanup")
 				deleteErrors.Store(snapshotName, err)
 			} else {
-				logrus.WithFields(logFields).Info("Snapshot deleted successfully during cleanup.")
+				logger.Op.WithFields(logFields).Info("Snapshot deleted successfully during cleanup.")
 				snapshotMap[snapshotName] = true
 			}
 		}(snap.GetName())
@@ -85,11 +84,11 @@ func CleanupSnapshots(ctx context.Context, config *Config, gcpClient *gcp.Client
 	}
 
 	if cleanupFailedCount > 0 {
-		logrus.Warnf("%d snapshot(s) failed to delete during cleanup. Manual cleanup may be required.", cleanupFailedCount)
+		logger.User.Warnf("%d snapshot(s) failed to delete during cleanup. Manual cleanup may be required.", cleanupFailedCount)
 	} else {
-		logrus.Info("Snapshot cleanup completed successfully.")
+		logger.User.Info("Snapshot cleanup completed successfully.")
 	}
 
-	logrus.Info("--- Cleanup Phase Complete ---")
+	logger.User.Info("--- Cleanup Phase Complete ---")
 	return nil
 }

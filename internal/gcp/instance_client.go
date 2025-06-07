@@ -5,8 +5,8 @@ import (
 	"fmt"
 
 	computepb "cloud.google.com/go/compute/apiv1/computepb"
+	"github.com/maxkimambo/pd/internal/logger"
 	"github.com/maxkimambo/pd/internal/utils"
-	"github.com/sirupsen/logrus"
 	"google.golang.org/api/iterator"
 )
 
@@ -37,12 +37,12 @@ func NewInstanceClient(client GceClientInterface) *InstanceClient {
 }
 
 func (ic *InstanceClient) StartInstance(ctx context.Context, projectID, zone, instanceName string) error {
-	logFields := logrus.Fields{
+	logFields := map[string]interface{}{
 		"project":  projectID,
 		"zone":     zone,
 		"instance": instanceName,
 	}
-	logrus.WithFields(logFields).Info("Starting instance")
+	logger.Op.WithFields(logFields).Info("Starting instance")
 
 	req := &computepb.StartInstanceRequest{
 		Project:  projectID,
@@ -53,28 +53,28 @@ func (ic *InstanceClient) StartInstance(ctx context.Context, projectID, zone, in
 	op, err := ic.client.Start(ctx, req)
 
 	if err != nil {
-		logrus.WithFields(logFields).WithError(err).Error("Failed to start instance")
+		logger.Op.WithFields(logFields).WithError(err).Error("Failed to start instance")
 		return fmt.Errorf("failed to start instance %s in zone %s: %w", instanceName, zone, err)
 	}
 	opCtx, cancel := context.WithTimeout(ctx, defaultOpTimeout)
 	defer cancel()
 	err = op.Wait(opCtx)
 	if err != nil {
-		logrus.WithFields(logFields).WithError(err).Errorf("Waiting for operation %s failed", op.Name())
+		logger.Op.WithFields(logFields).WithError(err).Errorf("Waiting for operation %s failed", op.Name())
 		return fmt.Errorf("waiting for instance %s start operation failed: %w", instanceName, err)
 	}
 
-	logrus.WithFields(logFields).Info("Instance started successfully.")
+	logger.Op.WithFields(logFields).Info("Instance started successfully.")
 	return nil
 }
 
 func (ic *InstanceClient) StopInstance(ctx context.Context, projectID, zone, instanceName string) error {
-	logFields := logrus.Fields{
+	logFields := map[string]interface{}{
 		"project":  projectID,
 		"zone":     zone,
 		"instance": instanceName,
 	}
-	logrus.WithFields(logFields).Info("Stopping instance")
+	logger.Op.WithFields(logFields).Info("Stopping instance")
 	zone = utils.ExtractZoneName(zone)
 	req := &computepb.StopInstanceRequest{
 		Project:  projectID,
@@ -84,20 +84,20 @@ func (ic *InstanceClient) StopInstance(ctx context.Context, projectID, zone, ins
 
 	op, err := ic.client.Stop(ctx, req)
 	if err != nil {
-		logrus.WithFields(logFields).WithError(err).Error("Failed to initiate instance stop operation")
+		logger.Op.WithFields(logFields).WithError(err).Error("Failed to initiate instance stop operation")
 		return fmt.Errorf("failed to stop instance %s in zone %s: %w", instanceName, zone, err)
 	}
 
-	logrus.WithFields(logFields).Infof("Waiting for instance stop operation %s to complete...", op.Name())
+	logger.Op.WithFields(logFields).Infof("Waiting for instance stop operation %s to complete...", op.Name())
 	opCtx, cancel := context.WithTimeout(ctx, defaultOpTimeout)
 	defer cancel()
 	err = op.Wait(opCtx)
 	if err != nil {
-		logrus.WithFields(logFields).WithError(err).Errorf("Waiting for instance stop operation %s failed", op.Name())
+		logger.Op.WithFields(logFields).WithError(err).Errorf("Waiting for instance stop operation %s failed", op.Name())
 		return fmt.Errorf("waiting for instance %s stop operation failed: %w", instanceName, err)
 	}
 
-	logrus.WithFields(logFields).Info("Instance stopped successfully.")
+	logger.Op.WithFields(logFields).Info("Instance stopped successfully.")
 	return nil
 }
 
@@ -119,7 +119,7 @@ func (ic *InstanceClient) ListInstancesInZone(ctx context.Context, projectID, zo
 		}
 		instances = append(instances, instance)
 	}
-	logrus.WithFields(logrus.Fields{
+	logger.Op.WithFields(map[string]interface{}{
 		"project":  projectID,
 		"zone":     zone,
 		"instaces": len(instances),
@@ -128,7 +128,7 @@ func (ic *InstanceClient) ListInstancesInZone(ctx context.Context, projectID, zo
 }
 
 func (ic *InstanceClient) AggregatedListInstances(ctx context.Context, projectID string) ([]*computepb.Instance, error) {
-	logrus.WithFields(logrus.Fields{
+	logger.Op.WithFields(map[string]interface{}{
 		"project": projectID,
 	}).Info("Listing all compute instances in project (aggregated list)")
 
@@ -149,7 +149,7 @@ func (ic *InstanceClient) AggregatedListInstances(ctx context.Context, projectID
 			instances = append(instances, pair.Value.Instances...)
 		}
 	}
-	logrus.WithFields(logrus.Fields{
+	logger.Op.WithFields(map[string]interface{}{
 		"project": projectID,
 		"count":   len(instances),
 	}).Info("Successfully listed all instances in project.")
@@ -157,7 +157,7 @@ func (ic *InstanceClient) AggregatedListInstances(ctx context.Context, projectID
 }
 
 func (ic *InstanceClient) GetInstance(ctx context.Context, projectID, zone, instanceName string) (*computepb.Instance, error) {
-	logrus.WithFields(logrus.Fields{
+	logger.Op.WithFields(map[string]interface{}{
 		"project":  projectID,
 		"zone":     zone,
 		"instance": instanceName,
@@ -182,7 +182,7 @@ func (ic *InstanceClient) InstanceIsRunning(ctx context.Context, instance *compu
 }
 
 func (ic *InstanceClient) GetInstanceDisks(ctx context.Context, projectID, zone, instanceName string) ([]*computepb.AttachedDisk, error) {
-	logrus.WithFields(logrus.Fields{
+	logger.Op.WithFields(map[string]interface{}{
 		"project":  projectID,
 		"zone":     zone,
 		"instance": instanceName,
@@ -201,12 +201,12 @@ func (ic *InstanceClient) GetInstanceDisks(ctx context.Context, projectID, zone,
 }
 
 func (ic *InstanceClient) DeleteInstance(ctx context.Context, projectID, zone, instanceName string) error {
-	logFields := logrus.Fields{
+	logFields := map[string]interface{}{
 		"project":  projectID,
 		"zone":     zone,
 		"instance": instanceName,
 	}
-	logrus.WithFields(logFields).Info("Deleting instance")
+	logger.Op.WithFields(logFields).Info("Deleting instance")
 
 	req := &computepb.DeleteInstanceRequest{
 		Project:  projectID,
@@ -216,30 +216,30 @@ func (ic *InstanceClient) DeleteInstance(ctx context.Context, projectID, zone, i
 
 	op, err := ic.client.Delete(ctx, req)
 	if err != nil {
-		logrus.WithFields(logFields).WithError(err).Error("Failed to initiate instance delete operation")
+		logger.Op.WithFields(logFields).WithError(err).Error("Failed to initiate instance delete operation")
 		return fmt.Errorf("failed to delete instance %s in zone %s: %w", instanceName, zone, err)
 	}
 
-	logrus.WithFields(logFields).Infof("Waiting for instance delete operation %s to complete...", op.Name())
+	logger.Op.WithFields(logFields).Infof("Waiting for instance delete operation %s to complete...", op.Name())
 	opCtx, cancel := context.WithTimeout(ctx, defaultOpTimeout)
 	defer cancel()
 	err = op.Wait(opCtx)
 	if err != nil {
-		logrus.WithFields(logFields).WithError(err).Errorf("Waiting for instance delete operation %s failed", op.Name())
+		logger.Op.WithFields(logFields).WithError(err).Errorf("Waiting for instance delete operation %s failed", op.Name())
 		return fmt.Errorf("waiting for instance %s delete operation failed: %w", instanceName, err)
 	}
-	logrus.WithFields(logFields).Info("Instance deleted successfully.")
+	logger.Op.WithFields(logFields).Info("Instance deleted successfully.")
 	return nil
 }
 
 func (ic *InstanceClient) AttachDisk(ctx context.Context, projectID, zone, instanceName string, attachedDiskResource *computepb.AttachedDisk) error {
-	logFields := logrus.Fields{
+	logFields := map[string]interface{}{
 		"project":  projectID,
 		"zone":     zone,
 		"instance": instanceName,
 		"disk":     attachedDiskResource.GetSource(),
 	}
-	logrus.WithFields(logFields).Info("Attaching disk to instance")
+	logger.Op.WithFields(logFields).Info("Attaching disk to instance")
 
 	req := &computepb.AttachDiskInstanceRequest{
 		Project:              projectID,
@@ -250,32 +250,32 @@ func (ic *InstanceClient) AttachDisk(ctx context.Context, projectID, zone, insta
 
 	op, err := ic.client.AttachDisk(ctx, req)
 	if err != nil {
-		logrus.WithFields(logFields).WithError(err).Error("Failed to initiate attach disk operation")
+		logger.Op.WithFields(logFields).WithError(err).Error("Failed to initiate attach disk operation")
 		return fmt.Errorf("failed to attach disk to instance %s in zone %s: %w", instanceName, zone, err)
 	}
 
-	logrus.WithFields(logFields).Infof("Waiting for attach disk operation %s to complete...", op.Name())
+	logger.Op.WithFields(logFields).Infof("Waiting for attach disk operation %s to complete...", op.Name())
 	opCtx, cancel := context.WithTimeout(ctx, defaultOpTimeout)
 	defer cancel()
 	err = op.Wait(opCtx)
 	if err != nil {
-		logrus.WithFields(logFields).WithError(err).Errorf("Waiting for attach disk operation %s failed", op.Name())
+		logger.Op.WithFields(logFields).WithError(err).Errorf("Waiting for attach disk operation %s failed", op.Name())
 		return fmt.Errorf("waiting for attach disk to instance %s operation failed: %w", instanceName, err)
 	}
 
-	logrus.WithFields(logFields).Info("Disk attached successfully to instance.")
+	logger.Op.WithFields(logFields).Info("Disk attached successfully to instance.")
 	return nil
 }
 
 // DetachDisk detaches a disk from a GCE instance.
 func (ic *InstanceClient) DetachDisk(ctx context.Context, projectID, zone, instanceName, deviceName string) error {
-	logFields := logrus.Fields{
+	logFields := map[string]interface{}{
 		"project":    projectID,
 		"zone":       zone,
 		"instance":   instanceName,
 		"deviceName": deviceName,
 	}
-	logrus.WithFields(logFields).Info("Detaching disk from instance")
+	logger.Op.WithFields(logFields).Info("Detaching disk from instance")
 
 	req := &computepb.DetachDiskInstanceRequest{
 		Project:    projectID,
@@ -286,18 +286,18 @@ func (ic *InstanceClient) DetachDisk(ctx context.Context, projectID, zone, insta
 
 	op, err := ic.client.DetachDisk(ctx, req)
 	if err != nil {
-		logrus.WithFields(logFields).WithError(err).Error("Failed to initiate detach disk operation")
+		logger.Op.WithFields(logFields).WithError(err).Error("Failed to initiate detach disk operation")
 		return fmt.Errorf("failed to detach disk %s from instance %s in zone %s: %w", deviceName, instanceName, zone, err)
 	}
-	logrus.WithFields(logFields).Infof("Waiting for detach disk operation %s to complete...", op.Name())
+	logger.Op.WithFields(logFields).Infof("Waiting for detach disk operation %s to complete...", op.Name())
 	opCtx, cancel := context.WithTimeout(ctx, defaultOpTimeout)
 	defer cancel()
 	err = op.Wait(opCtx)
 	if err != nil {
-		logrus.WithFields(logFields).WithError(err).Errorf("Waiting for detach disk operation %s failed", op.Name())
+		logger.Op.WithFields(logFields).WithError(err).Errorf("Waiting for detach disk operation %s failed", op.Name())
 		return fmt.Errorf("waiting for detach disk %s from instance %s operation failed: %w", deviceName, instanceName, err)
 	}
 
-	logrus.WithFields(logFields).Info("Disk detached successfully from instance.")
+	logger.Op.WithFields(logFields).Info("Disk detached successfully from instance.")
 	return nil
 }

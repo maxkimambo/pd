@@ -9,6 +9,7 @@ import (
 	compute "cloud.google.com/go/compute/apiv1"
 	computepb "cloud.google.com/go/compute/apiv1/computepb"
 	"github.com/googleapis/gax-go/v2"
+	"github.com/maxkimambo/pd/internal/logger"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -70,6 +71,9 @@ func (m *mockSnapshotsClient) Close() error {
 
 
 func TestCreateSnapshot(t *testing.T) {
+	// Setup logger for tests
+	logger.Setup(false, false, false)
+	
 	ctx := context.Background()
 	projectID := "test-proj"
 	zone := "us-west1-a"
@@ -173,6 +177,9 @@ func TestCreateSnapshot(t *testing.T) {
 }
 
 func TestDeleteSnapshot(t *testing.T) {
+	// Setup logger for tests
+	logger.Setup(false, false, false)
+	
 	ctx := context.Background()
 	projectID := "test-proj"
 	snapshotName := "snap-to-delete"
@@ -209,6 +216,9 @@ func TestDeleteSnapshot(t *testing.T) {
 }
 
 func TestListSnapshotsByLabel(t *testing.T) {
+	// Setup logger for tests
+	logger.Setup(false, false, false)
+	
 	ctx := context.Background()
 	projectID := "test-proj"
 	labelKey := "env"
