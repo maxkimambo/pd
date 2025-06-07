@@ -27,9 +27,9 @@ type MigrationResult struct {
 }
 
 func MigrateDisks(ctx context.Context, config *Config, gcpClient *gcp.Clients, disksToMigrate []*computepb.Disk) ([]MigrationResult, error) {
-	logger.UserLog.Info("🚀 Starting disk migration...")
+	logger.User.Starting("Starting disk migration...")
 	if len(disksToMigrate) == 0 {
-		logger.UserLog.Info("No disks to migrate")
+		logger.User.Info("No disks to migrate")
 		return []MigrationResult{}, nil
 	}
 
@@ -38,8 +38,8 @@ func MigrateDisks(ctx context.Context, config *Config, gcpClient *gcp.Clients, d
 	concurrencyLimit := config.Concurrency
 	semaphore := make(chan struct{}, concurrencyLimit)
 
-	logger.UserLog.Infof("Migrating %d disks (concurrency: %d)", len(disksToMigrate), concurrencyLimit)
-	logger.OpLog.WithFields(map[string]interface{}{
+	logger.User.Infof("Migrating %d disks (concurrency: %d)", len(disksToMigrate), concurrencyLimit)
+	logger.Op.WithFields(map[string]interface{}{
 		"count":       len(disksToMigrate),
 		"concurrency": concurrencyLimit,
 	}).Info("migration phase started")
@@ -65,8 +65,8 @@ func MigrateDisks(ctx context.Context, config *Config, gcpClient *gcp.Clients, d
 		allResults = append(allResults, res)
 	}
 
-	logger.UserLog.Info("✅ Migration phase complete")
-	logger.OpLog.WithFields(map[string]interface{}{
+	logger.User.Success("Migration phase complete")
+	logger.Op.WithFields(map[string]interface{}{
 		"total_disks": len(allResults),
 	}).Info("migration phase completed")
 	return allResults, nil
@@ -81,7 +81,7 @@ func MigrateSingleDisk(ctx context.Context, config *Config, gcpClient *gcp.Clien
 		zone = parts[len(parts)-1]
 	}
 
-	logger.OpLog.WithFields(map[string]interface{}{
+	logger.Op.WithFields(map[string]interface{}{
 		"disk": diskName,
 		"zone": zone,
 	}).Debug("starting disk migration worker")
@@ -96,8 +96,8 @@ func MigrateSingleDisk(ctx context.Context, config *Config, gcpClient *gcp.Clien
 	snapshotName := fmt.Sprintf("pd-migrate-%s-%d", diskName, time.Now().Unix())
 	result.SnapshotName = snapshotName
 	
-	logger.UserLog.Infof("📸 Creating snapshot for %s", diskName)
-	logger.OpLog.WithFields(map[string]interface{}{
+	logger.User.Snapshotf("Creating snapshot for %s", diskName)
+	logger.Op.WithFields(map[string]interface{}{
 		"disk":     diskName,
 		"zone":     zone,
 		"snapshot": snapshotName,
@@ -107,8 +107,8 @@ func MigrateSingleDisk(ctx context.Context, config *Config, gcpClient *gcp.Clien
 	err := gcpClient.CreateSnapshot(ctx, config.ProjectID, zone, diskName, snapshotName, kmsParams, disk.GetLabels())
 	if err != nil {
 		errMsg := fmt.Sprintf("Failed to create snapshot: %v", err)
-		logger.UserLog.Errorf("❌ %s snapshot failed", diskName)
-		logger.OpLog.WithFields(map[string]interface{}{
+		logger.User.Errorf("%s snapshot failed", diskName)
+		logger.Op.WithFields(map[string]interface{}{
 			"disk":  diskName,
 			"zone":  zone,
 			"error": err.Error(),
@@ -117,7 +117,7 @@ func MigrateSingleDisk(ctx context.Context, config *Config, gcpClient *gcp.Clien
 		result.ErrorMessage = errMsg
 		labelErr := gcpClient.DiskClient.UpdateDiskLabel(ctx, config.ProjectID, zone, diskName, "migration", "error")
 		if labelErr != nil {
-			logger.OpLog.WithFields(map[string]interface{}{
+			logger.Op.WithFields(map[string]interface{}{
 				"disk":  diskName,
 				"zone":  zone,
 				"error": labelErr.Error(),
@@ -126,15 +126,15 @@ func MigrateSingleDisk(ctx context.Context, config *Config, gcpClient *gcp.Clien
 		result.Duration = time.Since(startTime)
 		return result
 	}
-	logger.OpLog.WithFields(map[string]interface{}{
+	logger.Op.WithFields(map[string]interface{}{
 		"disk":     diskName,
 		"zone":     zone,
 		"snapshot": snapshotName,
 	}).Info("snapshot creation completed")
 
 	if config.RetainName {
-		logger.UserLog.Infof("🗑️ Deleting original disk %s", diskName)
-		logger.OpLog.WithFields(map[string]interface{}{
+		logger.User.Deletef("Deleting original disk %s", diskName)
+		logger.Op.WithFields(map[string]interface{}{
 			"disk":        diskName,
 			"zone":        zone,
 			"retain_name": true,
@@ -142,28 +142,28 @@ func MigrateSingleDisk(ctx context.Context, config *Config, gcpClient *gcp.Clien
 		err = gcpClient.DiskClient.DeleteDisk(ctx, config.ProjectID, zone, diskName)
 		if err != nil {
 			errMsg := fmt.Sprintf("Failed to delete original disk: %v", err)
-			logger.UserLog.Errorf("❌ %s deletion failed", diskName)
-			logger.OpLog.WithFields(map[string]interface{}{
+			logger.User.Errorf("%s deletion failed", diskName)
+			logger.Op.WithFields(map[string]interface{}{
 				"disk":  diskName,
 				"zone":  zone,
 				"error": err.Error(),
 			}).Error("disk deletion failed")
 			result.Status = "Failed: Disk Deletion"
 			result.ErrorMessage = errMsg
-			logger.UserLog.Infof("🧹 Cleaning up snapshot %s", snapshotName)
-			logger.OpLog.WithFields(map[string]interface{}{
+			logger.User.Cleanupf("Cleaning up snapshot %s", snapshotName)
+			logger.Op.WithFields(map[string]interface{}{
 				"snapshot": snapshotName,
 				"reason":   "disk_deletion_failed",
 			}).Info("attempting snapshot cleanup")
 			cleanupErr := gcpClient.DeleteSnapshot(ctx, config.ProjectID, snapshotName)
 			if cleanupErr != nil {
-				logger.OpLog.WithFields(map[string]interface{}{
+				logger.Op.WithFields(map[string]interface{}{
 					"snapshot": snapshotName,
 					"error":    cleanupErr.Error(),
 				}).Error("snapshot cleanup failed")
 				result.ErrorMessage += fmt.Sprintf("Snapshot cleanup failed: %v", cleanupErr)
 			} else {
-				logger.OpLog.WithFields(map[string]interface{}{
+				logger.Op.WithFields(map[string]interface{}{
 					"snapshot": snapshotName,
 				}).Info("snapshot cleanup successful")
 				result.SnapshotCleaned = true
@@ -171,12 +171,12 @@ func MigrateSingleDisk(ctx context.Context, config *Config, gcpClient *gcp.Clien
 			result.Duration = time.Since(startTime)
 			return result
 		}
-		logger.OpLog.WithFields(map[string]interface{}{
+		logger.Op.WithFields(map[string]interface{}{
 			"disk": diskName,
 			"zone": zone,
 		}).Info("original disk deleted successfully")
 	} else {
-		logger.OpLog.WithFields(map[string]interface{}{
+		logger.Op.WithFields(map[string]interface{}{
 			"disk":        diskName,
 			"zone":        zone,
 			"retain_name": false,
@@ -186,15 +186,15 @@ func MigrateSingleDisk(ctx context.Context, config *Config, gcpClient *gcp.Clien
 	newDiskName := diskName
 	if !config.RetainName {
 		newDiskName = utils.AddSuffix(diskName, 4)
-		logger.OpLog.WithFields(map[string]interface{}{
+		logger.Op.WithFields(map[string]interface{}{
 			"original_disk": diskName,
 			"new_disk":      newDiskName,
 		}).Debug("generated new disk name")
 	}
 	result.NewDiskName = newDiskName
 
-	logger.UserLog.Infof("💾 Creating %s disk %s", config.TargetDiskType, newDiskName)
-	logger.OpLog.WithFields(map[string]interface{}{
+	logger.User.Createf("Creating %s disk %s", config.TargetDiskType, newDiskName)
+	logger.Op.WithFields(map[string]interface{}{
 		"disk":      diskName,
 		"new_disk":  newDiskName,
 		"zone":      zone,
@@ -211,8 +211,8 @@ func MigrateSingleDisk(ctx context.Context, config *Config, gcpClient *gcp.Clien
 	err = gcpClient.DiskClient.CreateNewDiskFromSnapshot(ctx, config.ProjectID, zone, newDiskName, config.TargetDiskType, snapshotName, newDiskLabels, config.Iops, config.Throughput, storagePoolUrl)
 	if err != nil {
 		errMsg := fmt.Sprintf("Failed to recreate disk from snapshot: %v", err)
-		logger.UserLog.Errorf("❌ %s recreation failed", newDiskName)
-		logger.OpLog.WithFields(map[string]interface{}{
+		logger.User.Errorf("%s recreation failed", newDiskName)
+		logger.Op.WithFields(map[string]interface{}{
 			"disk":     diskName,
 			"new_disk": newDiskName,
 			"zone":     zone,
@@ -223,14 +223,14 @@ func MigrateSingleDisk(ctx context.Context, config *Config, gcpClient *gcp.Clien
 		if !config.RetainName {
 			labelErr := gcpClient.DiskClient.UpdateDiskLabel(ctx, config.ProjectID, zone, diskName, "migration", "error-recreation-failed")
 			if labelErr != nil {
-				logger.OpLog.WithFields(map[string]interface{}{
+				logger.Op.WithFields(map[string]interface{}{
 					"disk":  diskName,
 					"zone":  zone,
 					"error": labelErr.Error(),
 				}).Warn("failed to apply error label to original disk")
 			}
 		}
-		logger.OpLog.WithFields(map[string]interface{}{
+		logger.Op.WithFields(map[string]interface{}{
 			"snapshot":      snapshotName,
 			"action_needed": "manual_cleanup",
 		}).Warn("snapshot requires manual cleanup")
@@ -238,8 +238,8 @@ func MigrateSingleDisk(ctx context.Context, config *Config, gcpClient *gcp.Clien
 		return result
 	}
 
-	logger.UserLog.Infof("✅ %s migrated successfully", diskName)
-	logger.OpLog.WithFields(map[string]interface{}{
+	logger.User.Successf("%s migrated successfully", diskName)
+	logger.Op.WithFields(map[string]interface{}{
 		"disk":     diskName,
 		"new_disk": newDiskName,
 		"zone":     zone,

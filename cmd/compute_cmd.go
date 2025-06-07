@@ -113,7 +113,7 @@ func runGceConvert(cmd *cobra.Command, args []string) error {
 	}
 	logger.Setup(verbose, jsonLogs, quiet)
 
-	logger.UserLog.Info("Starting disk conversion process...")
+	logger.User.Starting("Starting disk conversion process...")
 
 	config := migrator.Config{
 		ProjectID:      projectID,
