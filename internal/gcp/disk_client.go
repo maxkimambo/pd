@@ -8,6 +8,7 @@ import (
 
 	"slices"
 
+	compute "cloud.google.com/go/compute/apiv1"
 	computepb "cloud.google.com/go/compute/apiv1/computepb"
 	"github.com/maxkimambo/pd/internal/logger"
 	"github.com/maxkimambo/pd/internal/utils"
@@ -27,13 +28,20 @@ func supportsIopsAndThroughput(diskType string) bool {
 	return slices.Contains(supportedTypes, diskType)
 }
 
-// DiskClient wraps the GCP disk client and provides disk operation methods
-type DiskClient struct {
-	client DiskClientInterface
+type DiskClientInterface interface {
+	GetDisk(ctx context.Context, projectID, zone, diskName string) (*computepb.Disk, error)
+	ListDetachedDisks(ctx context.Context, projectID string, location string, labelFilter string) ([]*computepb.Disk, error)
+	CreateNewDiskFromSnapshot(ctx context.Context, projectID string, zone string, newDiskName string, targetDiskType string, snapshotSource string, labels map[string]string, iops int64, throughput int64, storagePoolID string) error
+	UpdateDiskLabel(ctx context.Context, projectID string, zone string, diskName string, labelKey string, labelValue string) error
+	DeleteDisk(ctx context.Context, projectID, zone, diskName string) error
+	Close() error
 }
 
-// NewDiskClient creates a new DiskClient with the provided DiskClientInterface
-func NewDiskClient(client DiskClientInterface) *DiskClient {
+type DiskClient struct {
+	client *compute.DisksClient
+}
+
+func NewDiskClient(client *compute.DisksClient) *DiskClient {
 	return &DiskClient{
 		client: client,
 	}
@@ -286,4 +294,8 @@ func (dc *DiskClient) DeleteDisk(ctx context.Context, projectID, zone, diskName 
 
 	logger.Op.WithFields(logFields).Info("Disk deleted successfully.")
 	return nil
+}
+
+func (dc *DiskClient) Close() error {
+	return dc.client.Close()
 }

@@ -14,20 +14,20 @@ func MigrateInstanceDisks(ctx context.Context, config *Config, instance *compute
 	// coordinate the disk migration process for the given instance
 
 	// check instance state
-	isRunning := gcpClient.InstanceClient.InstanceIsRunning(ctx, instance)
+	isRunning := gcpClient.ComputeClient.InstanceIsRunning(ctx, instance)
 
 	attachedDisks := instance.GetDisks()
 	zone := utils.ExtractZoneName(instance.GetZone())
 	if isRunning {
 		logger.User.Infof("Instance %s in zone %s is running, stopping it before migration", instance.GetName(), instance.GetZone())
-		if err := gcpClient.InstanceClient.StopInstance(ctx, config.ProjectID, zone, instance.GetName()); err != nil {
+		if err := gcpClient.ComputeClient.StopInstance(ctx, config.ProjectID, zone, instance.GetName()); err != nil {
 			return fmt.Errorf("failed to stop instance %s in zone %s: %w", instance.GetName(), instance.GetZone(), err)
 		}
 	}
 
 	// start incremental snapshots
 	for _, disk := range attachedDisks {
-		if err := gcpClient.InstanceClient.DetachDisk(ctx, config.ProjectID, zone, instance.GetName(), disk.GetDeviceName()); err != nil {
+		if err := gcpClient.ComputeClient.DetachDisk(ctx, config.ProjectID, zone, instance.GetName(), disk.GetDeviceName()); err != nil {
 			return fmt.Errorf("failed to detach disk %s from instance %s in zone %s: %w", disk.GetDeviceName(), instance.GetName(), zone, err)
 		}
 		// perform the migration for the detached disk
@@ -42,14 +42,14 @@ func MigrateInstanceDisks(ctx context.Context, config *Config, instance *compute
 			MigrateSingleDisk(ctx, config, gcpClient, diskToMigrate)
 		}
 		// reattach the disks to the instance
-		if err := gcpClient.InstanceClient.AttachDisk(ctx, config.ProjectID, instance.GetZone(), instance.GetName(), disk); err != nil {
+		if err := gcpClient.ComputeClient.AttachDisk(ctx, config.ProjectID, instance.GetZone(), instance.GetName(), disk); err != nil {
 			return fmt.Errorf("failed to reattach disk %s to instance %s in zone %s: %w", disk.GetDeviceName(), instance.GetName(), instance.GetZone(), err)
 		}
 	}
 
 	// start the instance if it was initially running
 	if isRunning {
-		if err := gcpClient.InstanceClient.StartInstance(ctx, config.ProjectID, instance.GetZone(), instance.GetName()); err != nil {
+		if err := gcpClient.ComputeClient.StartInstance(ctx, config.ProjectID, instance.GetZone(), instance.GetName()); err != nil {
 			return fmt.Errorf("failed to start instance %s in zone %s: %w", instance.GetName(), instance.GetZone(), err)
 		}
 	}

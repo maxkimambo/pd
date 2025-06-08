@@ -139,14 +139,14 @@ type CLIFormatter struct {
 
 func (f *CLIFormatter) Format(entry *logrus.Entry) ([]byte, error) {
 	var b bytes.Buffer
-	
+
 	// Simple clean format: just the message for user-facing logs
 	if f.DisableLevel && f.DisableTimestamp {
 		b.WriteString(entry.Message)
 		b.WriteByte('\n')
 		return b.Bytes(), nil
 	}
-	
+
 	// Include level for operational logs
 	if !f.DisableLevel {
 		levelColor := ""
@@ -164,15 +164,15 @@ func (f *CLIFormatter) Format(entry *logrus.Entry) ([]byte, error) {
 			}
 			resetColor = "\033[0m"
 		}
-		
+
 		b.WriteString(levelColor)
 		b.WriteString(strings.ToUpper(entry.Level.String()))
 		b.WriteString(resetColor)
 		b.WriteString(": ")
 	}
-	
+
 	b.WriteString(entry.Message)
-	
+
 	// Add fields if present
 	if len(entry.Data) > 0 {
 		b.WriteString(" ")
@@ -180,7 +180,7 @@ func (f *CLIFormatter) Format(entry *logrus.Entry) ([]byte, error) {
 			b.WriteString(fmt.Sprintf("%s=%v ", k, v))
 		}
 	}
-	
+
 	b.WriteByte('\n')
 	return b.Bytes(), nil
 }
@@ -194,7 +194,7 @@ func Setup(verbose bool, jsonLogs bool, quiet bool) {
 		DisableLevel:     true,
 		DisableColors:    false,
 	})
-	
+
 	if quiet {
 		userLog.SetLevel(logrus.ErrorLevel)
 	} else {
@@ -202,11 +202,11 @@ func Setup(verbose bool, jsonLogs bool, quiet bool) {
 	}
 
 	User = &UserLogger{logger: userLog}
-	
+
 	// Operational logger (detailed output to stderr)
 	opLog := logrus.New()
 	opLog.SetOutput(os.Stderr)
-	
+
 	if jsonLogs {
 		opLog.SetFormatter(&logrus.JSONFormatter{})
 		if verbose {
