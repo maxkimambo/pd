@@ -4,14 +4,15 @@ import (
 	"context"
 	"fmt"
 
+	compute "cloud.google.com/go/compute/apiv1"
 	computepb "cloud.google.com/go/compute/apiv1/computepb"
 	"github.com/maxkimambo/pd/internal/logger"
 	"github.com/maxkimambo/pd/internal/utils"
 	"google.golang.org/api/iterator"
 )
 
-// InstanceOperationsInterface defines the high-level instance operations interface
-type InstanceOperationsInterface interface {
+// ComputeClientInterface defines the high-level compute instance operations interface
+type ComputeClientInterface interface {
 	StartInstance(ctx context.Context, projectID, zone, instanceName string) error
 	StopInstance(ctx context.Context, projectID, zone, instanceName string) error
 	ListInstancesInZone(ctx context.Context, projectID, zone string) ([]*computepb.Instance, error)
@@ -22,21 +23,22 @@ type InstanceOperationsInterface interface {
 	DeleteInstance(ctx context.Context, projectID, zone, instanceName string) error
 	AttachDisk(ctx context.Context, projectID, zone, instanceName string, attachedDiskResource *computepb.AttachedDisk) error
 	DetachDisk(ctx context.Context, projectID, zone, instanceName, deviceName string) error
+	Close() error
 }
 
-// InstanceClient wraps the GCP instances client and provides instance operation methods
-type InstanceClient struct {
-	client GceClientInterface
+// ComputeClient wraps the GCP instances client and provides instance operation methods
+type ComputeClient struct {
+	client *compute.InstancesClient
 }
 
-// NewInstanceClient creates a new InstanceClient with the provided GceClientInterface
-func NewInstanceClient(client GceClientInterface) *InstanceClient {
-	return &InstanceClient{
+// NewComputeClient creates a new ComputeClient with the provided *compute.InstancesClient
+func NewComputeClient(client *compute.InstancesClient) *ComputeClient {
+	return &ComputeClient{
 		client: client,
 	}
 }
 
-func (ic *InstanceClient) StartInstance(ctx context.Context, projectID, zone, instanceName string) error {
+func (cc *ComputeClient) StartInstance(ctx context.Context, projectID, zone, instanceName string) error {
 	logFields := map[string]interface{}{
 		"project":  projectID,
 		"zone":     zone,
@@ -50,7 +52,7 @@ func (ic *InstanceClient) StartInstance(ctx context.Context, projectID, zone, in
 		Instance: instanceName,
 	}
 
-	op, err := ic.client.Start(ctx, req)
+	op, err := cc.client.Start(ctx, req)
 
 	if err != nil {
 		logger.Op.WithFields(logFields).WithError(err).Error("Failed to start instance")
@@ -68,7 +70,7 @@ func (ic *InstanceClient) StartInstance(ctx context.Context, projectID, zone, in
 	return nil
 }
 
-func (ic *InstanceClient) StopInstance(ctx context.Context, projectID, zone, instanceName string) error {
+func (cc *ComputeClient) StopInstance(ctx context.Context, projectID, zone, instanceName string) error {
 	logFields := map[string]interface{}{
 		"project":  projectID,
 		"zone":     zone,
@@ -82,7 +84,7 @@ func (ic *InstanceClient) StopInstance(ctx context.Context, projectID, zone, ins
 		Instance: instanceName,
 	}
 
-	op, err := ic.client.Stop(ctx, req)
+	op, err := cc.client.Stop(ctx, req)
 	if err != nil {
 		logger.Op.WithFields(logFields).WithError(err).Error("Failed to initiate instance stop operation")
 		return fmt.Errorf("failed to stop instance %s in zone %s: %w", instanceName, zone, err)
@@ -101,13 +103,13 @@ func (ic *InstanceClient) StopInstance(ctx context.Context, projectID, zone, ins
 	return nil
 }
 
-func (ic *InstanceClient) ListInstancesInZone(ctx context.Context, projectID, zone string) ([]*computepb.Instance, error) {
+func (cc *ComputeClient) ListInstancesInZone(ctx context.Context, projectID, zone string) ([]*computepb.Instance, error) {
 
 	req := &computepb.ListInstancesRequest{
 		Project: projectID,
 		Zone:    zone,
 	}
-	it := ic.client.List(ctx, req)
+	it := cc.client.List(ctx, req)
 	var instances []*computepb.Instance
 	for {
 		instance, err := it.Next()
@@ -127,7 +129,7 @@ func (ic *InstanceClient) ListInstancesInZone(ctx context.Context, projectID, zo
 	return instances, nil
 }
 
-func (ic *InstanceClient) AggregatedListInstances(ctx context.Context, projectID string) ([]*computepb.Instance, error) {
+func (cc *ComputeClient) AggregatedListInstances(ctx context.Context, projectID string) ([]*computepb.Instance, error) {
 	logger.Op.WithFields(map[string]interface{}{
 		"project": projectID,
 	}).Info("Listing all compute instances in project (aggregated list)")
@@ -135,7 +137,7 @@ func (ic *InstanceClient) AggregatedListInstances(ctx context.Context, projectID
 	req := &computepb.AggregatedListInstancesRequest{
 		Project: projectID,
 	}
-	it := ic.client.AggregatedList(ctx, req)
+	it := cc.client.AggregatedList(ctx, req)
 	var instances []*computepb.Instance
 	for {
 		pair, err := it.Next()
@@ -156,7 +158,7 @@ func (ic *InstanceClient) AggregatedListInstances(ctx context.Context, projectID
 	return instances, nil
 }
 
-func (ic *InstanceClient) GetInstance(ctx context.Context, projectID, zone, instanceName string) (*computepb.Instance, error) {
+func (cc *ComputeClient) GetInstance(ctx context.Context, projectID, zone, instanceName string) (*computepb.Instance, error) {
 	logger.Op.WithFields(map[string]interface{}{
 		"project":  projectID,
 		"zone":     zone,
@@ -169,26 +171,26 @@ func (ic *InstanceClient) GetInstance(ctx context.Context, projectID, zone, inst
 		Instance: instanceName,
 	}
 
-	instance, err := ic.client.Get(ctx, req)
+	instance, err := cc.client.Get(ctx, req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get instance %s in zone %s: %w", instanceName, zone, err)
 	}
 	return instance, nil
 }
 
-func (ic *InstanceClient) InstanceIsRunning(ctx context.Context, instance *computepb.Instance) bool {
+func (cc *ComputeClient) InstanceIsRunning(ctx context.Context, instance *computepb.Instance) bool {
 
 	return *instance.Status == "RUNNING"
 }
 
-func (ic *InstanceClient) GetInstanceDisks(ctx context.Context, projectID, zone, instanceName string) ([]*computepb.AttachedDisk, error) {
+func (cc *ComputeClient) GetInstanceDisks(ctx context.Context, projectID, zone, instanceName string) ([]*computepb.AttachedDisk, error) {
 	logger.Op.WithFields(map[string]interface{}{
 		"project":  projectID,
 		"zone":     zone,
 		"instance": instanceName,
 	}).Info("Getting attached disks for instance")
 
-	instance, err := ic.GetInstance(ctx, projectID, zone, instanceName)
+	instance, err := cc.GetInstance(ctx, projectID, zone, instanceName)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get instance %s in zone %s: %w", instanceName, zone, err)
 	}
@@ -200,7 +202,7 @@ func (ic *InstanceClient) GetInstanceDisks(ctx context.Context, projectID, zone,
 	return instance.Disks, nil
 }
 
-func (ic *InstanceClient) DeleteInstance(ctx context.Context, projectID, zone, instanceName string) error {
+func (cc *ComputeClient) DeleteInstance(ctx context.Context, projectID, zone, instanceName string) error {
 	logFields := map[string]interface{}{
 		"project":  projectID,
 		"zone":     zone,
@@ -214,7 +216,7 @@ func (ic *InstanceClient) DeleteInstance(ctx context.Context, projectID, zone, i
 		Instance: instanceName,
 	}
 
-	op, err := ic.client.Delete(ctx, req)
+	op, err := cc.client.Delete(ctx, req)
 	if err != nil {
 		logger.Op.WithFields(logFields).WithError(err).Error("Failed to initiate instance delete operation")
 		return fmt.Errorf("failed to delete instance %s in zone %s: %w", instanceName, zone, err)
@@ -232,7 +234,7 @@ func (ic *InstanceClient) DeleteInstance(ctx context.Context, projectID, zone, i
 	return nil
 }
 
-func (ic *InstanceClient) AttachDisk(ctx context.Context, projectID, zone, instanceName string, attachedDiskResource *computepb.AttachedDisk) error {
+func (cc *ComputeClient) AttachDisk(ctx context.Context, projectID, zone, instanceName string, attachedDiskResource *computepb.AttachedDisk) error {
 	logFields := map[string]interface{}{
 		"project":  projectID,
 		"zone":     zone,
@@ -248,7 +250,7 @@ func (ic *InstanceClient) AttachDisk(ctx context.Context, projectID, zone, insta
 		AttachedDiskResource: attachedDiskResource,
 	}
 
-	op, err := ic.client.AttachDisk(ctx, req)
+	op, err := cc.client.AttachDisk(ctx, req)
 	if err != nil {
 		logger.Op.WithFields(logFields).WithError(err).Error("Failed to initiate attach disk operation")
 		return fmt.Errorf("failed to attach disk to instance %s in zone %s: %w", instanceName, zone, err)
@@ -268,7 +270,7 @@ func (ic *InstanceClient) AttachDisk(ctx context.Context, projectID, zone, insta
 }
 
 // DetachDisk detaches a disk from a GCE instance.
-func (ic *InstanceClient) DetachDisk(ctx context.Context, projectID, zone, instanceName, deviceName string) error {
+func (cc *ComputeClient) DetachDisk(ctx context.Context, projectID, zone, instanceName, deviceName string) error {
 	logFields := map[string]interface{}{
 		"project":    projectID,
 		"zone":       zone,
@@ -284,7 +286,7 @@ func (ic *InstanceClient) DetachDisk(ctx context.Context, projectID, zone, insta
 		DeviceName: deviceName,
 	}
 
-	op, err := ic.client.DetachDisk(ctx, req)
+	op, err := cc.client.DetachDisk(ctx, req)
 	if err != nil {
 		logger.Op.WithFields(logFields).WithError(err).Error("Failed to initiate detach disk operation")
 		return fmt.Errorf("failed to detach disk %s from instance %s in zone %s: %w", deviceName, instanceName, zone, err)
@@ -300,4 +302,8 @@ func (ic *InstanceClient) DetachDisk(ctx context.Context, projectID, zone, insta
 
 	logger.Op.WithFields(logFields).Info("Disk detached successfully from instance.")
 	return nil
+}
+
+func (cc *ComputeClient) Close() error {
+	return cc.client.Close()
 }

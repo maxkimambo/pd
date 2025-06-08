@@ -25,7 +25,7 @@ func GenerateReports(results []MigrationResult) {
 	})
 
 	printSummaryReport(results)
-	printDetailedReport(results) 
+	printDetailedReport(results)
 
 	logger.User.Info("--- Reporting Phase Complete ---")
 }
@@ -33,7 +33,7 @@ func GenerateReports(results []MigrationResult) {
 func printSummaryReport(results []MigrationResult) {
 	fmt.Println("\n--- Migration Summary Report ---")
 
-	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0) 
+	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
 	fmt.Fprintln(w, "Original Disk\tNew Disk\tZone\tStatus\tDuration\tSnapshot\tCleaned Up\tError")
 	fmt.Fprintln(w, "-------------\t--------\t----\t------\t--------\t--------\t----------\t-----")
 
@@ -57,8 +57,8 @@ func printSummaryReport(results []MigrationResult) {
 
 		cleanedUp := fmt.Sprintf("%t", res.SnapshotCleaned)
 		if status == "Success" && !res.SnapshotCleaned {
-			cleanedUp += " (!)" 
-			if errorMsg == "" { 
+			cleanedUp += " (!)"
+			if errorMsg == "" {
 				errorMsg = "Snapshot cleanup failed"
 			}
 		}
@@ -68,7 +68,7 @@ func printSummaryReport(results []MigrationResult) {
 			res.NewDiskName,
 			res.Zone,
 			status,
-			res.Duration.Round(time.Millisecond).String(), 
+			res.Duration.Round(time.Millisecond).String(),
 			res.SnapshotName,
 			cleanedUp,
 			errorMsg,
@@ -76,7 +76,7 @@ func printSummaryReport(results []MigrationResult) {
 		totalDuration += res.Duration
 	}
 
-	w.Flush() 
+	w.Flush()
 
 	fmt.Printf("\n--- Overall Stats ---\n")
 	fmt.Printf("Total Disks Processed: %d\n", len(results))

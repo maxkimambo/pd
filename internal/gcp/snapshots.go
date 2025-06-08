@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	compute "cloud.google.com/go/compute/apiv1"
 	computepb "cloud.google.com/go/compute/apiv1/computepb"
 	"github.com/maxkimambo/pd/internal/logger"
 	"google.golang.org/api/iterator"
@@ -17,20 +18,21 @@ type SnapshotKmsParams struct {
 	KmsProject  string
 }
 
-// SnapshotOperationsInterface defines the high-level snapshot operations interface
-type SnapshotOperationsInterface interface {
+// SnapshotClientInterface defines the high-level snapshot operations interface
+type SnapshotClientInterface interface {
 	CreateSnapshot(ctx context.Context, projectID, zone, diskName, snapshotName string, kmsParams *SnapshotKmsParams, labels map[string]string) error
 	DeleteSnapshot(ctx context.Context, projectID, snapshotName string) error
 	ListSnapshotsByLabel(ctx context.Context, projectID, labelKey, labelValue string) ([]*computepb.Snapshot, error)
+	Close() error
 }
 
 // SnapshotClient wraps the GCP snapshot client and provides snapshot operation methods
 type SnapshotClient struct {
-	client SnapshotClientInterface
+	client *compute.SnapshotsClient
 }
 
-// NewSnapshotClient creates a new SnapshotClient with the provided SnapshotClientInterface
-func NewSnapshotClient(client SnapshotClientInterface) *SnapshotClient {
+// NewSnapshotClient creates a new SnapshotClient with the provided *compute.SnapshotsClient
+func NewSnapshotClient(client *compute.SnapshotsClient) *SnapshotClient {
 	return &SnapshotClient{
 		client: client,
 	}
@@ -48,21 +50,21 @@ func (sc *SnapshotClient) CreateSnapshot(ctx context.Context, projectID, zone, d
 	if labels == nil {
 		labels = make(map[string]string)
 	}
-	labels["managed-by"] = "pd-migrate" 
+	labels["managed-by"] = "pd-migrate"
 
 	sourceDiskURL := fmt.Sprintf("projects/%s/zones/%s/disks/%s", projectID, zone, diskName)
 
 	snapshotResource := &computepb.Snapshot{
 		Name:       proto.String(snapshotName),
 		Labels:     labels,
-		SourceDisk: proto.String(sourceDiskURL), 
+		SourceDisk: proto.String(sourceDiskURL),
 	}
 
 	if kmsParams != nil && kmsParams.KmsKey != "" {
 		logFields["kmsKey"] = kmsParams.KmsKey
 		kmsProject := kmsParams.KmsProject
 		if kmsProject == "" {
-			kmsProject = projectID 
+			kmsProject = projectID
 		}
 		kmsKeyName := fmt.Sprintf("projects/%s/locations/%s/keyRings/%s/cryptoKeys/%s",
 			kmsProject, kmsParams.KmsLocation, kmsParams.KmsKeyRing, kmsParams.KmsKey)
@@ -73,11 +75,11 @@ func (sc *SnapshotClient) CreateSnapshot(ctx context.Context, projectID, zone, d
 	}
 
 	req := &computepb.InsertSnapshotRequest{
-		Project: projectID,
+		Project:          projectID,
 		SnapshotResource: snapshotResource,
 	}
 
-	op, err := sc.client.Insert(ctx, req) 
+	op, err := sc.client.Insert(ctx, req)
 	if err != nil {
 		logger.Op.WithFields(logFields).WithError(err).Error("Failed to initiate snapshot creation")
 		return fmt.Errorf("failed to initiate snapshot creation for disk %s: %w", diskName, err)
@@ -86,15 +88,14 @@ func (sc *SnapshotClient) CreateSnapshot(ctx context.Context, projectID, zone, d
 	opName := op.Name()
 	logger.Op.WithFields(logFields).Infof("Waiting for snapshot creation operation %s to complete...", opName)
 
-	opCtx, cancel := context.WithTimeout(ctx, defaultOpTimeout) 
+	opCtx, cancel := context.WithTimeout(ctx, defaultOpTimeout)
 	defer cancel()
 
-	err = op.Wait(opCtx) 
+	err = op.Wait(opCtx)
 	if err != nil {
 		logger.Op.WithFields(logFields).WithError(err).Errorf("Waiting for snapshot creation operation %s failed", opName)
 		return fmt.Errorf("waiting for snapshot %s creation failed: %w", snapshotName, err)
 	}
-
 
 	logger.Op.WithFields(logFields).Info("Snapshot created successfully.")
 	return nil
@@ -124,12 +125,11 @@ func (sc *SnapshotClient) DeleteSnapshot(ctx context.Context, projectID, snapsho
 	opCtx, cancel := context.WithTimeout(ctx, defaultOpTimeout)
 	defer cancel()
 
-	err = op.Wait(opCtx) 
+	err = op.Wait(opCtx)
 	if err != nil {
 		logger.Op.WithFields(logFields).WithError(err).Errorf("Waiting for snapshot deletion operation %s failed", opName)
 		return fmt.Errorf("waiting for snapshot %s deletion failed: %w", snapshotName, err)
 	}
-
 
 	logger.Op.WithFields(logFields).Info("Snapshot deleted successfully.")
 	return nil
@@ -170,3 +170,6 @@ func (sc *SnapshotClient) ListSnapshotsByLabel(ctx context.Context, projectID, l
 	return snapshots, nil
 }
 
+func (sc *SnapshotClient) Close() error {
+	return sc.client.Close()
+}

@@ -90,7 +90,7 @@ func DiscoverInstances(ctx context.Context, config *Config, gcpClient *gcp.Clien
 		// get instances by names
 		for _, instanceName := range config.Instances {
 			logger.User.Infof("Getting compute instance %s", instanceName)
-			instance, err := gcpClient.InstanceClient.GetInstance(ctx, config.ProjectID, config.Zone, instanceName)
+			instance, err := gcpClient.ComputeClient.GetInstance(ctx, config.ProjectID, config.Zone, instanceName)
 			if err != nil {
 				return nil, fmt.Errorf("failed to get instance %s in zone %s: %w", instanceName, config.Zone, err)
 			}
@@ -130,7 +130,7 @@ func DiscoverInstances(ctx context.Context, config *Config, gcpClient *gcp.Clien
 
 func listInstancesInZone(ctx context.Context, projectID, zone string, gcpClient *gcp.Clients) ([]*computepb.Instance, error) {
 
-	instances, err := gcpClient.InstanceClient.ListInstancesInZone(ctx, projectID, zone)
+	instances, err := gcpClient.ComputeClient.ListInstancesInZone(ctx, projectID, zone)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list instances in zone %s: %w", zone, err)
 	}
@@ -138,7 +138,7 @@ func listInstancesInZone(ctx context.Context, projectID, zone string, gcpClient 
 }
 
 func listInstancesInRegion(ctx context.Context, projectID, region string, gcpClient *gcp.Clients) ([]*computepb.Instance, error) {
-	allInstances, err := gcpClient.InstanceClient.AggregatedListInstances(ctx, projectID)
+	allInstances, err := gcpClient.ComputeClient.AggregatedListInstances(ctx, projectID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve aggregated instances list for project %s: %w", projectID, err)
 	}
