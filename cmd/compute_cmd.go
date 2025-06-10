@@ -61,7 +61,7 @@ func init() {
 	computeCmd.Flags().StringVar(&gceKmsProject, "kms-project", "", "KMS Project ID (defaults to --project if not set, required if kms-key is set)")
 	computeCmd.Flags().StringVar(&gceRegion, "region", "", "GCP region (required if zone is not set)")
 	computeCmd.Flags().StringVar(&gceZone, "zone", "", "GCP zone (required if region is not set)")
-	computeCmd.Flags().StringArrayP("instances", "i", nil, "Comma-separated list of instance names, or '*' for all instances in the scope (required)")
+	computeCmd.Flags().StringSliceVar(&gceInstances, "instances", nil, "Comma-separated list of instance names, or '*' for all instances in the scope (required)")
 	computeCmd.Flags().BoolVar(&gceAutoApprove, "auto-approve", false, "Skip all interactive prompts")
 	computeCmd.Flags().IntVar(&gceMaxConcurrency, "max-concurrency", 5, "Maximum number of disks/instances to process concurrently (1-50)")
 	computeCmd.Flags().BoolVar(&gceRetainName, "retain-name", true, "Reuse original disk name. If false, keep original and suffix new name.")
@@ -71,6 +71,7 @@ func init() {
 }
 
 func validateComputeCmdFlags(cmd *cobra.Command, args []string) error {
+
 	if projectID == "" { // projectID is from root persistent flag
 		return errors.New("required flag --project not set")
 	}
@@ -95,7 +96,7 @@ func validateComputeCmdFlags(cmd *cobra.Command, args []string) error {
 	if gceMaxConcurrency < 1 || gceMaxConcurrency > 50 { // Adjusted max concurrency for instance operations
 		return fmt.Errorf("--max-concurrency must be between 1 and 50, got %d", gceMaxConcurrency)
 	}
-	gceInstances, _ = cmd.Flags().GetStringArray("instances")
+
 	if len(gceInstances) == 0 {
 		return errors.New("required flag --instances not set")
 	}
