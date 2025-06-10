@@ -10,7 +10,7 @@ import (
 	"google.golang.org/api/option"
 )
 
-const defaultOpTimeout = 5 * time.Minute
+const defaultOpTimeout = 10 * time.Minute
 
 type ZoneClientInterface interface {
 	Close() error
