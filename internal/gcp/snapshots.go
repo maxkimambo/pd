@@ -11,6 +11,11 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
+const (
+	MANAGED_BY_KEY   = "managed-by"
+	MANAGED_BY_VALUE = "pd-migrate"
+)
+
 type SnapshotKmsParams struct {
 	KmsKey      string
 	KmsKeyRing  string
@@ -50,7 +55,7 @@ func (sc *SnapshotClient) CreateSnapshot(ctx context.Context, projectID, zone, d
 	if labels == nil {
 		labels = make(map[string]string)
 	}
-	labels["managed-by"] = "pd-migrate"
+	labels[MANAGED_BY_KEY] = MANAGED_BY_VALUE
 
 	sourceDiskURL := fmt.Sprintf("projects/%s/zones/%s/disks/%s", projectID, zone, diskName)
 
