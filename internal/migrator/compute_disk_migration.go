@@ -167,15 +167,14 @@ func MigrateInstanceNonBootDisks(ctx context.Context, config *Config, instance *
 	return results, nil
 }
 
-// For each disk:
-//
-//	a. Stop instance (optional, confirm with user).
-//	b. Detach disk.
-//	c. Create snapshot.
-//	d. Delete old disk (if retainName).
-//	e. Create new disk from snapshot with target type.
-//	f. Attach new disk.
-//	g. Start instance (if stopped).
+// HandleInstanceDiskMigration coordinates the migration of non-boot disks for a given instance.
+// For each instance:
+//  1. Check the instance state (running or stopped).
+//  2. If running, stop the instance.
+//  3. Create an incremental snapshot of all disks attached to the instance.
+//  4. Migrate non-boot disks:
+//  5. If the instance was running, start it again after migration.
+
 func HandleInstanceDiskMigration(ctx context.Context, config *Config, instance *computepb.Instance, gcpClient *gcp.Clients) error {
 	// coordinate the disk migration process for the given instance
 	defer removeInstanceState(instance)
