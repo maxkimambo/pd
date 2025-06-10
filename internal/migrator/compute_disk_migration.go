@@ -14,6 +14,8 @@ import (
 var (
 	instanceStateMap = make(map[string]string)
 	stateMapMutex    sync.RWMutex
+	RUNNING_STATE    = "RUNNING"
+	STOPPED_STATE    = "STOPPED"
 )
 
 func GetInstanceState(ctx context.Context, instance *computepb.Instance, gcpClient *gcp.Clients) (string, error) {
@@ -30,9 +32,9 @@ func GetInstanceState(ctx context.Context, instance *computepb.Instance, gcpClie
 
 	var state string
 	if isRunning {
-		state = "RUNNING"
+		state = RUNNING_STATE
 	} else {
-		state = "STOPPED"
+		state = STOPPED_STATE
 	}
 
 	stateMapMutex.Lock()
@@ -183,10 +185,10 @@ func HandleInstanceDiskMigration(ctx context.Context, config *Config, instance *
 	if err != nil {
 		return fmt.Errorf("failed to get instance state: %w", err)
 	}
-	isRunning := state == "RUNNING"
+	isRunning := state == RUNNING_STATE
 
 	zone := utils.ExtractZoneName(instance.GetZone())
-
+	// Perform incremental snapshot before migration
 	err = SnapshotInstanceDisks(ctx, config, instance, gcpClient)
 	if err != nil {
 		return fmt.Errorf("failed to create snapshot for instance %s in zone %s: %w", instance.GetName(), zone, err)
@@ -203,8 +205,12 @@ func HandleInstanceDiskMigration(ctx context.Context, config *Config, instance *
 	if err != nil {
 		return fmt.Errorf("failed to create final snapshot for instance %s in zone %s: %w", instance.GetName(), zone, err)
 	}
+
 	migrationResult, err := MigrateInstanceNonBootDisks(ctx, config, instance, gcpClient)
-	// start incremental snapshots
+
+	if err != nil {
+		return fmt.Errorf("failed to migrate non-boot disks for instance %s in zone %s: %w", instance.GetName(), zone, err)
+	}
 
 	for _, result := range migrationResult {
 		if result.ErrorMessage != "" {
@@ -212,7 +218,7 @@ func HandleInstanceDiskMigration(ctx context.Context, config *Config, instance *
 		}
 	}
 	previousInstanceState, err := GetInstanceState(ctx, instance, gcpClient)
-	if previousInstanceState == "RUNNING" && err == nil {
+	if previousInstanceState == RUNNING_STATE && err == nil {
 		logger.User.Infof("Instance %s in zone %s was running, starting it after migration", instance.GetName(), zone)
 		if err := gcpClient.ComputeClient.StartInstance(ctx, config.ProjectID, zone, instance.GetName()); err != nil {
 			return fmt.Errorf("failed to start instance %s in zone %s: %w", instance.GetName(), zone, err)
