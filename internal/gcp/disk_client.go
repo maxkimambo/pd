@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"strings"
-	"time"
 
 	"slices"
 
@@ -15,8 +14,6 @@ import (
 	"google.golang.org/api/iterator"
 	"google.golang.org/protobuf/proto"
 )
-
-const defaultOpTimeout = 5 * time.Minute
 
 func supportsIopsAndThroughput(diskType string) bool {
 	supportedTypes := []string{

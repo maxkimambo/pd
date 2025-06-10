@@ -158,19 +158,8 @@ func runGceConvert(cmd *cobra.Command, args []string) error {
 
 	for _, instance := range discoveredInstances {
 		logger.User.Infof("Processing instance: %s", *instance.Name)
-		migrator.MigrateInstanceDisks(ctx, &config, instance, gcpClient)
+		migrator.HandleInstanceDiskMigration(ctx, &config, instance, gcpClient)
 	}
-
-	// For each disk:
-	//  a. Stop instance (optional, confirm with user).
-	//  b. Detach disk.
-	//  c. Create snapshot.
-	//  d. Delete old disk (if retainName).
-	//  e. Create new disk from snapshot with target type.
-	//  f. Attach new disk.
-	//  g. Start instance (if stopped).
-	logger.User.Warn("Migration logic for GCE attached disks is not yet implemented.")
-	// migrationResults := []migrator.MigrationResult{} // Placeholder
 
 	// --- Placeholder for Cleanup Phase ---
 	logger.User.Info("--- Phase 3: Cleanup (Snapshots) ---")

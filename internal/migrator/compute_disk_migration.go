@@ -103,7 +103,7 @@ func MigrateInstanceNonBootDisks(ctx context.Context, config *Config, instance *
 	attachedDisks := instance.GetDisks()
 	zone := utils.ExtractZoneName(instance.GetZone())
 
-	var nonBootDisks []*computepb.Disk
+	var nonBootDisks []*computepb.AttachedDisk
 	var results []MigrationResult
 
 	for _, attachedDisk := range attachedDisks {
@@ -111,54 +111,70 @@ func MigrateInstanceNonBootDisks(ctx context.Context, config *Config, instance *
 			logger.User.Infof("Skipping boot disk %s", attachedDisk.GetDeviceName())
 			continue
 		}
-
-		diskName := attachedDisk.GetDeviceName()
-		disk, err := gcpClient.DiskClient.GetDisk(ctx, config.ProjectID, zone, diskName)
-		if err != nil {
-			logger.User.Errorf("Failed to get disk %s: %v", diskName, err)
-			results = append(results, MigrationResult{
-				DiskName:     diskName,
-				Zone:         zone,
-				Status:       "Failed: Disk Retrieval",
-				ErrorMessage: fmt.Sprintf("Failed to get disk: %v", err),
-			})
-			continue
-		}
-
-		if disk == nil {
-			logger.User.Warnf("Disk %s not found, skipping", diskName)
-			continue
-		}
-
-		nonBootDisks = append(nonBootDisks, disk)
+		nonBootDisks = append(nonBootDisks, attachedDisk)
 	}
-
-	if len(nonBootDisks) == 0 {
-		logger.User.Info("No non-boot disks found to migrate")
-		return results, nil
-	}
-
-	logger.User.Infof("Found %d non-boot disks to migrate", len(nonBootDisks))
-
+	hasErrors := false
 	for _, disk := range nonBootDisks {
-		result := MigrateSingleDisk(ctx, config, gcpClient, disk)
-		results = append(results, result)
-	}
 
-	successCount := 0
-	for _, result := range results {
-		if result.Status == "Success" {
-			successCount++
+		if err := gcpClient.ComputeClient.DetachDisk(ctx, config.ProjectID, zone, instance.GetName(), disk.GetDeviceName()); err != nil {
+			return []MigrationResult{}, fmt.Errorf("failed to detach disk %s from instance %s in zone %s: %w", disk.GetDeviceName(), instance.GetName(), zone, err)
+		}
+		// perform the migration for the detached disk
+		logger.User.Infof("Migrating disk %s", disk.GetDeviceName())
+
+		diskToMigrate, err := gcpClient.DiskClient.GetDisk(ctx, config.ProjectID, zone, disk.GetDeviceName())
+		if err != nil {
+			// record the error and continue with the next disk
+			result := MigrationResult{
+				DiskName:     disk.GetDeviceName(),
+				Status:       "MigrationFailed",
+				ErrorMessage: err.Error(),
+			}
+			results = append(results, result)
+			logger.User.Errorf("Failed to migrate disk %s: %v  continuing with the next disk", disk.GetDeviceName(), err)
+			hasErrors = true
+			continue
+		}
+		var migrationResult MigrationResult
+		if diskToMigrate != nil {
+			migrationResult = MigrateSingleDisk(ctx, config, gcpClient, diskToMigrate)
+			results = append(results, migrationResult)
+		}
+		newDisk := migrationResult.NewDiskName
+		deviceName := disk.GetDeviceName()
+		// reattach the disks to the instance
+		if err := gcpClient.ComputeClient.AttachDisk(ctx, config.ProjectID, zone, instance.GetName(), newDisk, deviceName); err != nil {
+			logger.User.Errorf("failed to reattach disk %s to instance %s in zone %s: %w", disk.GetDeviceName(), instance.GetName(), zone, err)
+			// record the error and continue with the next disk
+			result := MigrationResult{
+				DiskName:     disk.GetDeviceName(),
+				Zone:         zone,
+				Status:       "Failed: Disk Attachment",
+				ErrorMessage: err.Error(),
+			}
+			results = append(results, result)
+			hasErrors = true
+			continue
 		}
 	}
 
-	logger.User.Successf("Migrated %d/%d non-boot disks successfully for instance %s",
-		successCount, len(results), instance.GetName())
+	if hasErrors {
+		logger.User.Errorf("Some disks failed to migrate for instance %s. Check the logs for details.", instance.GetName())
+	}
 
 	return results, nil
 }
 
-func MigrateInstanceDisks(ctx context.Context, config *Config, instance *computepb.Instance, gcpClient *gcp.Clients) error {
+// For each disk:
+//
+//	a. Stop instance (optional, confirm with user).
+//	b. Detach disk.
+//	c. Create snapshot.
+//	d. Delete old disk (if retainName).
+//	e. Create new disk from snapshot with target type.
+//	f. Attach new disk.
+//	g. Start instance (if stopped).
+func HandleInstanceDiskMigration(ctx context.Context, config *Config, instance *computepb.Instance, gcpClient *gcp.Clients) error {
 	// coordinate the disk migration process for the given instance
 	defer removeInstanceState(instance)
 
@@ -169,44 +185,40 @@ func MigrateInstanceDisks(ctx context.Context, config *Config, instance *compute
 	}
 	isRunning := state == "RUNNING"
 
-	attachedDisks := instance.GetDisks()
 	zone := utils.ExtractZoneName(instance.GetZone())
+
+	err = SnapshotInstanceDisks(ctx, config, instance, gcpClient)
+	if err != nil {
+		return fmt.Errorf("failed to create snapshot for instance %s in zone %s: %w", instance.GetName(), zone, err)
+	}
+
 	if isRunning {
 		logger.User.Infof("Instance %s in zone %s is running, stopping it before migration", instance.GetName(), zone)
 		if err := gcpClient.ComputeClient.StopInstance(ctx, config.ProjectID, zone, instance.GetName()); err != nil {
 			return fmt.Errorf("failed to stop instance %s in zone %s: %w", instance.GetName(), zone, err)
 		}
 	}
-
+	// Second snapshot before migration
+	err = SnapshotInstanceDisks(ctx, config, instance, gcpClient)
+	if err != nil {
+		return fmt.Errorf("failed to create final snapshot for instance %s in zone %s: %w", instance.GetName(), zone, err)
+	}
+	migrationResult, err := MigrateInstanceNonBootDisks(ctx, config, instance, gcpClient)
 	// start incremental snapshots
-	for _, disk := range attachedDisks {
-		if err := gcpClient.ComputeClient.DetachDisk(ctx, config.ProjectID, zone, instance.GetName(), disk.GetDeviceName()); err != nil {
-			return fmt.Errorf("failed to detach disk %s from instance %s in zone %s: %w", disk.GetDeviceName(), instance.GetName(), zone, err)
-		}
-		// perform the migration for the detached disk
-		logger.User.Infof("Migrating disk %s", disk.GetDeviceName())
 
-		diskToMigrate, err := gcpClient.DiskClient.GetDisk(ctx, config.ProjectID, zone, disk.GetDeviceName())
-		if err != nil {
-			return fmt.Errorf("failed to get disk %s in zone %s: %w", disk.GetDeviceName(), zone, err)
-		}
-
-		if diskToMigrate != nil {
-			MigrateSingleDisk(ctx, config, gcpClient, diskToMigrate)
-		}
-		// reattach the disks to the instance
-		if err := gcpClient.ComputeClient.AttachDisk(ctx, config.ProjectID, zone, instance.GetName(), disk); err != nil {
-			return fmt.Errorf("failed to reattach disk %s to instance %s in zone %s: %w", disk.GetDeviceName(), instance.GetName(), zone, err)
+	for _, result := range migrationResult {
+		if result.ErrorMessage != "" {
+			logger.User.Errorf("Failed to migrate disk %s: %v  continuing with the next disk", result.DiskName, result.ErrorMessage)
 		}
 	}
-
-	// start the instance if it was initially running
-	if isRunning {
+	previousInstanceState, err := GetInstanceState(ctx, instance, gcpClient)
+	if previousInstanceState == "RUNNING" && err == nil {
+		logger.User.Infof("Instance %s in zone %s was running, starting it after migration", instance.GetName(), zone)
 		if err := gcpClient.ComputeClient.StartInstance(ctx, config.ProjectID, zone, instance.GetName()); err != nil {
 			return fmt.Errorf("failed to start instance %s in zone %s: %w", instance.GetName(), zone, err)
 		}
 	}
-
+	logger.User.Successf("All disks migrated successfully for instance %s", instance.GetName())
 	return nil
 }
 

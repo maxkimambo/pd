@@ -25,11 +25,11 @@ type OpLogger struct {
 
 // UserLogger methods with emojis built-in
 func (u *UserLogger) Info(msg string) {
-	u.logger.Info("🚀 " + msg)
+	u.logger.Info(msg)
 }
 
 func (u *UserLogger) Infof(format string, args ...interface{}) {
-	u.logger.Infof("🚀 "+format, args...)
+	u.logger.Infof(format, args...)
 }
 
 func (u *UserLogger) Error(msg string) {
