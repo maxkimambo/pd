@@ -61,7 +61,7 @@ func init() {
 	computeCmd.Flags().StringVar(&gceKmsProject, "kms-project", "", "KMS Project ID (defaults to --project if not set, required if kms-key is set)")
 	computeCmd.Flags().StringVar(&gceRegion, "region", "", "GCP region (required if zone is not set)")
 	computeCmd.Flags().StringVar(&gceZone, "zone", "", "GCP zone (required if region is not set)")
-	computeCmd.Flags().StringArrayP("instances", "i", gceInstances, "Comma-separated list of instance names, or '*' for all instances in the scope (required)")
+	computeCmd.Flags().StringArrayP("instances", "i", nil, "Comma-separated list of instance names, or '*' for all instances in the scope (required)")
 	computeCmd.Flags().BoolVar(&gceAutoApprove, "auto-approve", false, "Skip all interactive prompts")
 	computeCmd.Flags().IntVar(&gceMaxConcurrency, "max-concurrency", 5, "Maximum number of disks/instances to process concurrently (1-50)")
 	computeCmd.Flags().BoolVar(&gceRetainName, "retain-name", true, "Reuse original disk name. If false, keep original and suffix new name.")
