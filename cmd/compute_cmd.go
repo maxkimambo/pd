@@ -175,6 +175,5 @@ func runGceConvert(cmd *cobra.Command, args []string) error {
 	// Generate a summary of actions taken, successes, failures.
 	logger.User.Warn("Reporting for GCE conversion is not yet implemented.")
 
-	logger.User.Info("GCE attached disk conversion process command structure is set up. Core logic pending implementation.")
 	return nil
 }

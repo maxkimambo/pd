@@ -68,7 +68,7 @@ func SnapshotInstanceDisks(ctx context.Context, config *Config, instance *comput
 
 		diskName := attachedDisk.GetDeviceName()
 
-		disk, err := gcpClient.DiskClient.GetDisk(ctx, config.ProjectID, zone, diskName)
+ 		disk, err := gcpClient.DiskClient.GetDisk(ctx, config.ProjectID, zone, diskName)
 		if err != nil {
 			logger.User.Errorf("Failed to get disk %s in zone %s: %v", diskName, zone, err)
 			// return fmt.Errorf("failed to get disk %s in zone %s: %w", diskName, zone, err)
