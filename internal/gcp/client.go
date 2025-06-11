@@ -3,11 +3,14 @@ package gcp
 import (
 	"context"
 	"fmt"
+	"time"
 
 	compute "cloud.google.com/go/compute/apiv1"
 	"github.com/maxkimambo/pd/internal/logger"
 	"google.golang.org/api/option"
 )
+
+const defaultOpTimeout = 10 * time.Minute
 
 type ZoneClientInterface interface {
 	Close() error
@@ -16,7 +19,6 @@ type ZoneClientInterface interface {
 type RegionClientInterface interface {
 	Close() error
 }
-
 
 type Clients struct {
 	DiskClient     DiskClientInterface
@@ -74,7 +76,7 @@ func NewClients(ctx context.Context) (*Clients, error) {
 	// Create the high-level clients
 	diskClient := NewDiskClient(disksClient)
 	snapshotClient := NewSnapshotClient(snapshotsClient)
-	computeClient := NewComputeClient(gceClient)
+	computeClient := NewComputeClient(gceClient, disksClient)
 
 	logger.Op.Info("Successfully initialized GCP Compute API clients.")
 	return &Clients{

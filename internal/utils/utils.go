@@ -33,11 +33,17 @@ func AddSuffix(name string, length int) string {
 }
 
 func GetStoragePoolURL(projectId, storagePoolId, zone string) string {
-	if storagePoolId == "" {
+	if projectId == "" || zone == "" || storagePoolId == "" {
 		return ""
 	}
-	if strings.Contains(storagePoolId, "/") {
-		return storagePoolId
-	}
+
 	return fmt.Sprintf("projects/%s/zones/%s/storagePools/%s", projectId, zone, storagePoolId)
+}
+
+func GetDiskUrl(projectId, zone, diskName string) string {
+	if projectId == "" || zone == "" || diskName == "" {
+		return ""
+	}
+
+	return fmt.Sprintf("projects/%s/zones/%s/disks/%s", projectId, zone, diskName)
 }

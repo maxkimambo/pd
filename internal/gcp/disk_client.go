@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"strings"
-	"time"
 
 	"slices"
 
@@ -15,8 +14,6 @@ import (
 	"google.golang.org/api/iterator"
 	"google.golang.org/protobuf/proto"
 )
-
-const defaultOpTimeout = 5 * time.Minute
 
 func supportsIopsAndThroughput(diskType string) bool {
 	supportedTypes := []string{
@@ -31,7 +28,7 @@ func supportsIopsAndThroughput(diskType string) bool {
 type DiskClientInterface interface {
 	GetDisk(ctx context.Context, projectID, zone, diskName string) (*computepb.Disk, error)
 	ListDetachedDisks(ctx context.Context, projectID string, location string, labelFilter string) ([]*computepb.Disk, error)
-	CreateNewDiskFromSnapshot(ctx context.Context, projectID string, zone string, newDiskName string, targetDiskType string, snapshotSource string, labels map[string]string, iops int64, throughput int64, storagePoolID string) error
+	CreateNewDiskFromSnapshot(ctx context.Context, projectID string, zone string, newDiskName string, targetDiskType string, snapshotSource string, labels map[string]string, size int64, iops int64, throughput int64, storagePoolID string) error
 	UpdateDiskLabel(ctx context.Context, projectID string, zone string, diskName string, labelKey string, labelValue string) error
 	DeleteDisk(ctx context.Context, projectID, zone, diskName string) error
 	Close() error
@@ -125,6 +122,7 @@ func (dc *DiskClient) CreateNewDiskFromSnapshot(
 	targetDiskType string,
 	snapshotSource string,
 	labels map[string]string,
+	size int64,
 	iops int64,
 	throughput int64,
 	storagePoolID string,
@@ -150,6 +148,7 @@ func (dc *DiskClient) CreateNewDiskFromSnapshot(
 			Type:           proto.String(targetDiskTypeURL),
 			SourceSnapshot: proto.String(snapshotSource),
 			Labels:         labels,
+			SizeGb:         proto.Int64(size),
 		}
 	} else {
 		disk = &computepb.Disk{
@@ -159,6 +158,7 @@ func (dc *DiskClient) CreateNewDiskFromSnapshot(
 			Labels:                labels,
 			ProvisionedIops:       proto.Int64(iops),
 			ProvisionedThroughput: proto.Int64(throughput),
+			SizeGb:                proto.Int64(size),
 		}
 	}
 	// If storagePoolID is provided, set it on the disk

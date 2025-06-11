@@ -9,15 +9,12 @@ import (
 	"github.com/maxkimambo/pd/internal/logger"
 )
 
-const snapshotCleanupLabelKey = "managed-by"
-const snapshotCleanupLabelValue = "pd-migrate"
-
 func CleanupSnapshots(ctx context.Context, config *Config, gcpClient *gcp.Clients, results []MigrationResult) error {
 	logger.User.Info("--- Phase 3: Cleanup ---")
 	logger.User.Infof("Searching for snapshots with label '%s=%s' in project %s for cleanup...",
-		snapshotCleanupLabelKey, snapshotCleanupLabelValue, config.ProjectID)
+		gcp.MANAGED_BY_KEY, gcp.MANAGED_BY_VALUE, config.ProjectID)
 
-	snapshotsToDelete, err := gcpClient.SnapshotClient.ListSnapshotsByLabel(ctx, config.ProjectID, snapshotCleanupLabelKey, snapshotCleanupLabelValue)
+	snapshotsToDelete, err := gcpClient.SnapshotClient.ListSnapshotsByLabel(ctx, config.ProjectID, gcp.MANAGED_BY_KEY, gcp.MANAGED_BY_VALUE)
 	if err != nil {
 		return fmt.Errorf("failed to list snapshots for cleanup: %w", err)
 	}

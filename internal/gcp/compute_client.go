@@ -21,20 +21,22 @@ type ComputeClientInterface interface {
 	InstanceIsRunning(ctx context.Context, instance *computepb.Instance) bool
 	GetInstanceDisks(ctx context.Context, projectID, zone, instanceName string) ([]*computepb.AttachedDisk, error)
 	DeleteInstance(ctx context.Context, projectID, zone, instanceName string) error
-	AttachDisk(ctx context.Context, projectID, zone, instanceName string, attachedDiskResource *computepb.AttachedDisk) error
+	AttachDisk(ctx context.Context, projectID, zone, instanceName, diskName, deviceName string) error
 	DetachDisk(ctx context.Context, projectID, zone, instanceName, deviceName string) error
 	Close() error
 }
 
 // ComputeClient wraps the GCP instances client and provides instance operation methods
 type ComputeClient struct {
-	client *compute.InstancesClient
+	client     *compute.InstancesClient
+	diskClient *compute.DisksClient
 }
 
 // NewComputeClient creates a new ComputeClient with the provided *compute.InstancesClient
-func NewComputeClient(client *compute.InstancesClient) *ComputeClient {
+func NewComputeClient(client *compute.InstancesClient, diskClient *compute.DisksClient) *ComputeClient {
 	return &ComputeClient{
-		client: client,
+		client:     client,
+		diskClient: diskClient,
 	}
 }
 
@@ -122,9 +124,9 @@ func (cc *ComputeClient) ListInstancesInZone(ctx context.Context, projectID, zon
 		instances = append(instances, instance)
 	}
 	logger.Op.WithFields(map[string]interface{}{
-		"project":  projectID,
-		"zone":     zone,
-		"instaces": len(instances),
+		"project":   projectID,
+		"zone":      zone,
+		"instances": len(instances),
 	}).Info("Instances found")
 	return instances, nil
 }
@@ -234,20 +236,25 @@ func (cc *ComputeClient) DeleteInstance(ctx context.Context, projectID, zone, in
 	return nil
 }
 
-func (cc *ComputeClient) AttachDisk(ctx context.Context, projectID, zone, instanceName string, attachedDiskResource *computepb.AttachedDisk) error {
+func (cc *ComputeClient) AttachDisk(ctx context.Context, projectID, zone, instanceName, diskName, deviceName string) error {
 	logFields := map[string]interface{}{
 		"project":  projectID,
 		"zone":     zone,
 		"instance": instanceName,
-		"disk":     attachedDiskResource.GetSource(),
+		"disk":     diskName,
 	}
 	logger.Op.WithFields(logFields).Info("Attaching disk to instance")
+	// ensure conformant urls
+	diskResourceUrl := utils.GetDiskUrl(projectID, zone, diskName)
 
 	req := &computepb.AttachDiskInstanceRequest{
-		Project:              projectID,
-		Zone:                 zone,
-		Instance:             instanceName,
-		AttachedDiskResource: attachedDiskResource,
+		Project:  projectID,
+		Zone:     zone,
+		Instance: instanceName,
+		AttachedDiskResource: &computepb.AttachedDisk{
+			Source:     &diskResourceUrl,
+			DeviceName: &deviceName,
+		},
 	}
 
 	op, err := cc.client.AttachDisk(ctx, req)
