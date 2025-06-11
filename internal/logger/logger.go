@@ -29,7 +29,7 @@ func (u *UserLogger) Info(msg string) {
 }
 
 func (u *UserLogger) Infof(format string, args ...interface{}) {
-	u.logger.Infof(format, args...)
+	u.logger.Infof("  "+format, args...)
 }
 
 func (u *UserLogger) Error(msg string) {
