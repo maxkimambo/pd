@@ -13,16 +13,27 @@ import (
 
 // ComputeClientInterface defines the high-level compute instance operations interface
 type ComputeClientInterface interface {
+	// StartInstance starts the specified instance
 	StartInstance(ctx context.Context, projectID, zone, instanceName string) error
+	// StopInstance stops the specified instance
 	StopInstance(ctx context.Context, projectID, zone, instanceName string) error
+	// ListInstancesInZone lists all instances in the specified zone
 	ListInstancesInZone(ctx context.Context, projectID, zone string) ([]*computepb.Instance, error)
+	// AggregatedListInstances lists all instances across all zones in the project
 	AggregatedListInstances(ctx context.Context, projectID string) ([]*computepb.Instance, error)
+	// GetInstance retrieves a specific instance by name and zone
 	GetInstance(ctx context.Context, projectID, zone, instanceName string) (*computepb.Instance, error)
+	// InstanceIsRunning checks if the given instance is currently running
 	InstanceIsRunning(ctx context.Context, instance *computepb.Instance) bool
+	// GetInstanceDisks retrieves the list of disks attached to the specified instance
 	GetInstanceDisks(ctx context.Context, projectID, zone, instanceName string) ([]*computepb.AttachedDisk, error)
+	// DeleteInstance deletes the specified instance
 	DeleteInstance(ctx context.Context, projectID, zone, instanceName string) error
+	// AttachDisk attaches a disk to an instance with the specified device name
 	AttachDisk(ctx context.Context, projectID, zone, instanceName, diskName, deviceName string) error
+	// DetachDisk detaches a disk from an instance by device name
 	DetachDisk(ctx context.Context, projectID, zone, instanceName, deviceName string) error
+	// Close closes the underlying client connections
 	Close() error
 }
 

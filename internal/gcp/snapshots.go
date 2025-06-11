@@ -25,9 +25,15 @@ type SnapshotKmsParams struct {
 
 // SnapshotClientInterface defines the high-level snapshot operations interface
 type SnapshotClientInterface interface {
+	// CreateSnapshot creates a new snapshot from the specified disk
 	CreateSnapshot(ctx context.Context, projectID, zone, diskName, snapshotName string, kmsParams *SnapshotKmsParams, labels map[string]string) error
+	// GetSnapshot retrieves a snapshot by name
+	GetSnapshot(ctx context.Context, projectID, snapshotName string) (*computepb.Snapshot, error)
+	// DeleteSnapshot deletes the specified snapshot
 	DeleteSnapshot(ctx context.Context, projectID, snapshotName string) error
+	// ListSnapshotsByLabel lists snapshots that match the specified label key-value pair
 	ListSnapshotsByLabel(ctx context.Context, projectID, labelKey, labelValue string) ([]*computepb.Snapshot, error)
+	// Close closes the underlying client connections
 	Close() error
 }
 
@@ -104,6 +110,29 @@ func (sc *SnapshotClient) CreateSnapshot(ctx context.Context, projectID, zone, d
 
 	logger.Op.WithFields(logFields).Info("Snapshot created successfully.")
 	return nil
+}
+
+// GetSnapshot retrieves a snapshot by name
+func (sc *SnapshotClient) GetSnapshot(ctx context.Context, projectID, snapshotName string) (*computepb.Snapshot, error) {
+	logFields := map[string]interface{}{
+		"project":      projectID,
+		"snapshotName": snapshotName,
+	}
+	logger.Op.WithFields(logFields).Debug("Getting snapshot...")
+
+	req := &computepb.GetSnapshotRequest{
+		Project:  projectID,
+		Snapshot: snapshotName,
+	}
+
+	snapshot, err := sc.client.Get(ctx, req)
+	if err != nil {
+		logger.Op.WithFields(logFields).WithError(err).Error("Failed to get snapshot")
+		return nil, fmt.Errorf("failed to get snapshot %s: %w", snapshotName, err)
+	}
+
+	logger.Op.WithFields(logFields).Debug("Snapshot retrieved successfully.")
+	return snapshot, nil
 }
 
 func (sc *SnapshotClient) DeleteSnapshot(ctx context.Context, projectID, snapshotName string) error {
