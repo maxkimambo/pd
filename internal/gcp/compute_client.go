@@ -244,13 +244,15 @@ func (cc *ComputeClient) AttachDisk(ctx context.Context, projectID, zone, instan
 		"disk":     diskName,
 	}
 	logger.Op.WithFields(logFields).Info("Attaching disk to instance")
+	// ensure conformant urls
+	diskResourceUrl := utils.GetDiskUrl(projectID, zone, diskName)
 
 	req := &computepb.AttachDiskInstanceRequest{
 		Project:  projectID,
 		Zone:     zone,
 		Instance: instanceName,
 		AttachedDiskResource: &computepb.AttachedDisk{
-			Source:     &diskName,
+			Source:     &diskResourceUrl,
 			DeviceName: &deviceName,
 		},
 	}

@@ -62,11 +62,17 @@ func SnapshotInstanceDisks(ctx context.Context, config *Config, instance *comput
 	zone := utils.ExtractZoneName(instance.GetZone())
 
 	for _, attachedDisk := range attachedDisks {
+		if attachedDisk.GetBoot() {
+			continue // Skip boot disks for snapshot creation
+		}
+
 		diskName := attachedDisk.GetDeviceName()
 
 		disk, err := gcpClient.DiskClient.GetDisk(ctx, config.ProjectID, zone, diskName)
 		if err != nil {
-			return fmt.Errorf("failed to get disk %s in zone %s: %w", diskName, zone, err)
+			logger.User.Errorf("Failed to get disk %s in zone %s: %v", diskName, zone, err)
+			// return fmt.Errorf("failed to get disk %s in zone %s: %w", diskName, zone, err)
+			continue
 		}
 
 		if disk == nil {
@@ -199,12 +205,6 @@ func HandleInstanceDiskMigration(ctx context.Context, config *Config, instance *
 			return fmt.Errorf("failed to stop instance %s in zone %s: %w", instance.GetName(), zone, err)
 		}
 	}
-	// Second snapshot before migration
-	err = SnapshotInstanceDisks(ctx, config, instance, gcpClient)
-	if err != nil {
-		return fmt.Errorf("failed to create final snapshot for instance %s in zone %s: %w", instance.GetName(), zone, err)
-	}
-
 	migrationResult, err := MigrateInstanceNonBootDisks(ctx, config, instance, gcpClient)
 
 	if err != nil {

@@ -139,7 +139,9 @@ func MigrateSingleDisk(ctx context.Context, config *Config, gcpClient *gcp.Clien
 			"zone":        zone,
 			"retain_name": true,
 		}).Info("deleting original disk")
+
 		err = gcpClient.DiskClient.DeleteDisk(ctx, config.ProjectID, zone, diskName)
+
 		if err != nil {
 			errMsg := fmt.Sprintf("Failed to delete original disk: %v", err)
 			logger.User.Errorf("%s deletion failed", diskName)
@@ -155,20 +157,23 @@ func MigrateSingleDisk(ctx context.Context, config *Config, gcpClient *gcp.Clien
 				"snapshot": snapshotName,
 				"reason":   "disk_deletion_failed",
 			}).Info("attempting snapshot cleanup")
-			cleanupErr := gcpClient.SnapshotClient.DeleteSnapshot(ctx, config.ProjectID, snapshotName)
-			if cleanupErr != nil {
-				logger.Op.WithFields(map[string]interface{}{
-					"snapshot": snapshotName,
-					"error":    cleanupErr.Error(),
-				}).Error("snapshot cleanup failed")
-				result.ErrorMessage += fmt.Sprintf("Snapshot cleanup failed: %v", cleanupErr)
-			} else {
-				logger.Op.WithFields(map[string]interface{}{
-					"snapshot": snapshotName,
-				}).Info("snapshot cleanup successful")
-				result.SnapshotCleaned = true
-			}
-			result.Duration = time.Since(startTime)
+
+			// TODO: decide if we really want to delete the snapshot here
+
+			// cleanupErr := gcpClient.SnapshotClient.DeleteSnapshot(ctx, config.ProjectID, snapshotName)
+			// if cleanupErr != nil {
+			// 	logger.Op.WithFields(map[string]interface{}{
+			// 		"snapshot": snapshotName,
+			// 		"error":    cleanupErr.Error(),
+			// 	}).Error("snapshot cleanup failed")
+			// 	result.ErrorMessage += fmt.Sprintf("Snapshot cleanup failed: %v", cleanupErr)
+			// } else {
+			// 	logger.Op.WithFields(map[string]interface{}{
+			// 		"snapshot": snapshotName,
+			// 	}).Info("snapshot cleanup successful")
+			// 	result.SnapshotCleaned = true
+			// }
+			// result.Duration = time.Since(startTime)
 			return result
 		}
 		logger.Op.WithFields(map[string]interface{}{
@@ -208,7 +213,7 @@ func MigrateSingleDisk(ctx context.Context, config *Config, gcpClient *gcp.Clien
 	}
 	newDiskLabels["migration"] = "success"
 	storagePoolUrl := utils.GetStoragePoolURL(config.StoragePoolId, config.ProjectID, zone)
-	err = gcpClient.DiskClient.CreateNewDiskFromSnapshot(ctx, config.ProjectID, zone, newDiskName, config.TargetDiskType, snapshotName, newDiskLabels, config.Iops, config.Throughput, storagePoolUrl)
+	err = gcpClient.DiskClient.CreateNewDiskFromSnapshot(ctx, config.ProjectID, zone, newDiskName, config.TargetDiskType, snapshotName, newDiskLabels, *disk.SizeGb, config.Iops, config.Throughput, storagePoolUrl)
 	if err != nil {
 		errMsg := fmt.Sprintf("Failed to recreate disk from snapshot: %v", err)
 		logger.User.Errorf("%s recreation failed", newDiskName)

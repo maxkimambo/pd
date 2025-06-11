@@ -16,7 +16,7 @@ type mockDiskClient struct {
 	DiskClientInterface
 	GetDiskFunc                   func(ctx context.Context, projectID, zone, diskName string) (*computepb.Disk, error)
 	ListDetachedDisksFunc         func(ctx context.Context, projectID string, location string, labelFilter string) ([]*computepb.Disk, error)
-	CreateNewDiskFromSnapshotFunc func(ctx context.Context, projectID string, zone string, newDiskName string, targetDiskType string, snapshotSource string, labels map[string]string, iops int64, throughput int64, storagePoolID string) error
+	CreateNewDiskFromSnapshotFunc func(ctx context.Context, projectID string, zone string, newDiskName string, targetDiskType string, snapshotSource string, labels map[string]string, size, iops int64, throughput int64, storagePoolID string) error
 	UpdateDiskLabelFunc           func(ctx context.Context, projectID string, zone string, diskName string, labelKey string, labelValue string) error
 	DeleteDiskFunc                func(ctx context.Context, projectID, zone, diskName string) error
 
@@ -51,10 +51,10 @@ func (m *mockDiskClient) ListDetachedDisks(ctx context.Context, projectID string
 	return m.ListDetachedDisksResp, m.ListDetachedDisksErr
 }
 
-func (m *mockDiskClient) CreateNewDiskFromSnapshot(ctx context.Context, projectID string, zone string, newDiskName string, targetDiskType string, snapshotSource string, labels map[string]string, iops int64, throughput int64, storagePoolID string) error {
+func (m *mockDiskClient) CreateNewDiskFromSnapshot(ctx context.Context, projectID string, zone string, newDiskName string, targetDiskType string, snapshotSource string, labels map[string]string, size, iops int64, throughput int64, storagePoolID string) error {
 	m.CreateDiskCalled = true
 	if m.CreateNewDiskFromSnapshotFunc != nil {
-		return m.CreateNewDiskFromSnapshotFunc(ctx, projectID, zone, newDiskName, targetDiskType, snapshotSource, labels, iops, throughput, storagePoolID)
+		return m.CreateNewDiskFromSnapshotFunc(ctx, projectID, zone, newDiskName, targetDiskType, snapshotSource, labels, size, iops, throughput, storagePoolID)
 	}
 	return m.CreateDiskErr
 }
@@ -216,7 +216,7 @@ func TestCreateNewDiskFromSnapshot(t *testing.T) {
 			CreateDiskErr: nil,
 		}
 
-		err := mockDiskClient.CreateNewDiskFromSnapshot(ctx, projectID, zone, newDiskName, targetDiskType, snapshotName, labels, 0, 0, storagePoolUrl)
+		err := mockDiskClient.CreateNewDiskFromSnapshot(ctx, projectID, zone, newDiskName, targetDiskType, snapshotName, labels, 0, 0, 0, storagePoolUrl)
 
 		assert.NoError(t, err)
 		assert.True(t, mockDiskClient.CreateDiskCalled)
@@ -228,7 +228,7 @@ func TestCreateNewDiskFromSnapshot(t *testing.T) {
 			CreateDiskErr: expectedErr,
 		}
 
-		err := mockDiskClient.CreateNewDiskFromSnapshot(ctx, projectID, zone, newDiskName, targetDiskType, snapshotName, labels, 0, 0, storagePoolUrl)
+		err := mockDiskClient.CreateNewDiskFromSnapshot(ctx, projectID, zone, newDiskName, targetDiskType, snapshotName, labels, 0, 0, 0, storagePoolUrl)
 
 		assert.Error(t, err)
 		assert.Equal(t, expectedErr, err)
