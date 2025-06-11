@@ -12,6 +12,11 @@ import (
 	computepb "cloud.google.com/go/compute/apiv1/computepb"
 )
 
+// DiskMigratorInterface defines the interface for disk migration operations
+type DiskMigratorInterface interface {
+	MigrateInstanceDisks(ctx context.Context, migration *InstanceMigration) error
+}
+
 // DiskMigrator handles the migration of disks
 type DiskMigrator struct {
 	computeClient  gcp.ComputeClientInterface
