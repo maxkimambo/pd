@@ -637,7 +637,7 @@ func (c *ParallelMigrationCoordinator) shutdown() {
 	close(c.shutdownCh)
 
 	if c.workerPool != nil && c.workerPool.IsStarted() {
-		c.workerPool.Shutdown(c.config.ShutdownTimeout)
+		_ = c.workerPool.Shutdown(c.config.ShutdownTimeout)
 	}
 
 	if c.jobQueue != nil {

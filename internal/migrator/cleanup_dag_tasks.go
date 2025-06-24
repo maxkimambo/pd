@@ -3,7 +3,6 @@ package migrator
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"github.com/maxkimambo/pd/internal/gcp"
 	"github.com/maxkimambo/pd/internal/logger"
@@ -477,9 +476,4 @@ func (executor *CleanupTaskExecutor) ExecuteEmergencyCleanup(ctx context.Context
 // GetCleanupManager returns the cleanup manager for external use
 func (executor *CleanupTaskExecutor) GetCleanupManager() *ResilientCleanupManager {
 	return executor.cleanupManager
-}
-
-// StartHealthMonitoring starts the health monitoring for the cleanup system
-func (executor *CleanupTaskExecutor) StartHealthMonitoring(ctx context.Context, interval time.Duration) {
-	executor.cleanupManager.StartHealthMonitoring(ctx, interval)
 }

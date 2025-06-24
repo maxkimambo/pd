@@ -43,12 +43,6 @@ func newMockNode(id string) *mockNode {
 	}
 }
 
-func newMockNodeWithTask(task Task) *mockNode {
-	return &mockNode{
-		BaseNode: NewBaseNode(task),
-	}
-}
-
 func TestNewDAG(t *testing.T) {
 	dag := NewDAG()
 	assert.NotNil(t, dag)

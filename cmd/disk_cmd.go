@@ -68,7 +68,7 @@ func init() {
 	diskCmd.Flags().Int64Var(&iops, "iops", 2000, "IOPS to set(optional, default: 2000 IOPS)")
 	diskCmd.Flags().StringVarP(&storagePoolId, "pool-id", "s", "", "Storage pool ID to use for the new disks (optional)")
 
-	diskCmd.MarkFlagRequired("target-disk-type")
+	_ = diskCmd.MarkFlagRequired("target-disk-type")
 }
 
 func validateDiskCmdFlags(cmd *cobra.Command, args []string) error {

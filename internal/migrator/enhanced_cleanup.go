@@ -83,7 +83,6 @@ type MultiLevelCleanupManager struct {
 	strategy        *CleanupStrategy
 	sessionID       string
 	activeSnapshots map[string]bool // tracks snapshots created in current session
-	monitor         *CleanupMonitor // monitoring and alerting
 	mu              sync.RWMutex
 }
 
@@ -93,16 +92,12 @@ func NewMultiLevelCleanupManager(config *Config, gcpClient *gcp.Clients, strateg
 		strategy = DefaultCleanupStrategy()
 	}
 
-	// Create monitoring with default health thresholds
-	monitor := NewCleanupMonitor(sessionID, DefaultHealthThresholds())
-
 	return &MultiLevelCleanupManager{
 		config:          config,
 		gcpClient:       gcpClient,
 		strategy:        strategy,
 		sessionID:       sessionID,
 		activeSnapshots: make(map[string]bool),
-		monitor:         monitor,
 	}
 }
 
@@ -190,9 +185,6 @@ func (m *MultiLevelCleanupManager) CleanupTaskSnapshot(ctx context.Context, task
 	}
 
 	result.Duration = time.Since(startTime)
-
-	// Record result in monitoring system
-	m.monitor.RecordCleanupResult(result)
 
 	return result
 }
@@ -319,9 +311,6 @@ func (m *MultiLevelCleanupManager) CleanupSessionSnapshots(ctx context.Context) 
 		logger.Op.WithFields(resultLogFields).Info("Session cleanup completed successfully")
 	}
 
-	// Record result in monitoring system
-	m.monitor.RecordCleanupResult(result)
-
 	return result
 }
 
@@ -443,9 +432,6 @@ func (m *MultiLevelCleanupManager) CleanupExpiredSnapshots(ctx context.Context) 
 		logger.Op.WithFields(resultLogFields).Info("Emergency cleanup completed successfully")
 	}
 
-	// Record result in monitoring system
-	m.monitor.RecordCleanupResult(result)
-
 	return result
 }
 
@@ -466,24 +452,4 @@ func (m *MultiLevelCleanupManager) GetActiveSnapshotCount() int {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	return len(m.activeSnapshots)
-}
-
-// GetMonitor returns the cleanup monitor for external access
-func (m *MultiLevelCleanupManager) GetMonitor() *CleanupMonitor {
-	return m.monitor
-}
-
-// GetCleanupMetrics returns current cleanup metrics
-func (m *MultiLevelCleanupManager) GetCleanupMetrics() CleanupMetrics {
-	return m.monitor.GetMetrics()
-}
-
-// GetHealthStatus returns current health status
-func (m *MultiLevelCleanupManager) GetHealthStatus() map[string]interface{} {
-	return m.monitor.GetHealthStatus()
-}
-
-// StartHealthMonitoring starts periodic health monitoring
-func (m *MultiLevelCleanupManager) StartHealthMonitoring(ctx context.Context, interval time.Duration) {
-	go m.monitor.StartPeriodicHealthCheck(ctx, interval)
 }

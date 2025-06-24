@@ -69,8 +69,8 @@ func init() {
 	computeCmdLegacy.Flags().BoolVar(&gceRetainNameLegacy, "retain-name", true, "Reuse original disk name. If false, keep original and suffix new name.")
 	computeCmdLegacy.Flags().Int64Var(&gceThroughputLegacy, "throughput", 150, "Throughput for the new disk in MiB/s (optional, default is 150)")
 	computeCmdLegacy.Flags().Int64Var(&gceIopsLegacy, "iops", 3000, "IOPS for the new disk (optional, default is 3000)")
-	computeCmdLegacy.MarkFlagRequired("target-disk-type")
-	computeCmdLegacy.MarkFlagRequired("instances")
+	_ = computeCmdLegacy.MarkFlagRequired("target-disk-type")
+	_ = computeCmdLegacy.MarkFlagRequired("instances")
 }
 
 func validateComputeCmdFlagsLegacy(cmd *cobra.Command, args []string) error {
@@ -168,7 +168,7 @@ func runGceConvertLegacy(cmd *cobra.Command, args []string) error {
 
 	for _, instance := range discoveredInstances {
 		logger.User.Infof("Processing instance: %s", *instance.Name)
-		migrator.HandleInstanceDiskMigration(ctx, &config, instance, gcpClient)
+		_ = migrator.HandleInstanceDiskMigration(ctx, &config, instance, gcpClient)
 	}
 
 	// --- Placeholder for Cleanup Phase ---

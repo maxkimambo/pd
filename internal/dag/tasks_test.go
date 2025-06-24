@@ -121,7 +121,7 @@ func TestTaskInterface(t *testing.T) {
 	}
 
 	// Test that all task types implement the Task interface
-	var tasks []Task = []Task{
+	tasks := []Task{
 		NewDiscoveryTask("disc-1", config, gcpClient, "disks"),
 		NewSnapshotTask("snap-1", "project", "zone", "disk", "snapshot", gcpClient, config),
 		NewInstanceStateTask("inst-1", "project", "zone", "instance", "stop", gcpClient),

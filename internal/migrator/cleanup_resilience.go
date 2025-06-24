@@ -395,12 +395,7 @@ func (rcm *ResilientCleanupManager) ResilientCleanupTaskSnapshot(ctx context.Con
 	// Record health check result
 	rcm.healthChecker.RecordResult(success, duration, err)
 
-	// Record retry attempts
-	if !success {
-		rcm.MultiLevelCleanupManager.monitor.metrics.RecordRetryAttempt(false)
-	} else {
-		rcm.MultiLevelCleanupManager.monitor.metrics.RecordRetryAttempt(true)
-	}
+	// Retry attempt logging removed - no longer tracking detailed metrics
 
 	// Record errors in history
 	if !success {

@@ -64,7 +64,7 @@ func init() {
 	diskCmdLegacy.Flags().Int64Var(&throughputLegacy, "throughput", 140, "Throughput in MB/s to set (optional, default: 140 MiB/s)")
 	diskCmdLegacy.Flags().Int64Var(&iopsLegacy, "iops", 2000, "IOPS to set(optional, default: 2000 IOPS)")
 	diskCmdLegacy.Flags().StringVarP(&storagePoolIdLegacy, "pool-id", "s", "", "Storage pool ID to use for the new disks (optional)")
-	diskCmdLegacy.MarkFlagRequired("target-disk-type")
+	_ = diskCmdLegacy.MarkFlagRequired("target-disk-type")
 }
 
 func validateDiskCmdFlagsLegacy(cmd *cobra.Command, args []string) error {

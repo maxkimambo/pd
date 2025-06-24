@@ -68,17 +68,16 @@ type NodeResult struct {
 
 // Executor handles the execution of a DAG
 type Executor struct {
-	dag             *DAG
-	config          *ExecutorConfig
-	workers         chan struct{}
-	results         map[string]*NodeResult
-	mutex           sync.RWMutex
-	ctx             context.Context
-	cancel          context.CancelFunc
-	wg              sync.WaitGroup
-	startTime       time.Time
-	finished        chan struct{}
-	lastProgressLog time.Time
+	dag       *DAG
+	config    *ExecutorConfig
+	workers   chan struct{}
+	results   map[string]*NodeResult
+	mutex     sync.RWMutex
+	ctx       context.Context
+	cancel    context.CancelFunc
+	wg        sync.WaitGroup
+	startTime time.Time
+	finished  chan struct{}
 }
 
 // NewExecutor creates a new DAG executor

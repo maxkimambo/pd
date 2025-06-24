@@ -395,7 +395,7 @@ func TestExecutor_GetProgress(t *testing.T) {
 
 	// Start execution in background
 	go func() {
-		executor.Execute(context.Background())
+		_, _ = executor.Execute(context.Background())
 	}()
 
 	// Give it time to initialize
@@ -454,7 +454,7 @@ func TestExecutor_IsRunning(t *testing.T) {
 	// Start execution
 	done := make(chan bool)
 	go func() {
-		executor.Execute(context.Background())
+		_, _ = executor.Execute(context.Background())
 		done <- true
 	}()
 

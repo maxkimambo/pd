@@ -220,8 +220,7 @@ func (co *CleanupOrchestrator) ScheduleCleanup(ctx context.Context, interval tim
 	}
 	logger.Op.WithFields(logFields).Info("Starting scheduled cleanup operations")
 
-	// Start health monitoring
-	co.cleanupExecutor.StartHealthMonitoring(ctx, 30*time.Second)
+	// Health monitoring removed - using simpler cleanup approach
 
 	// Run periodic cleanup checks
 	go func() {
@@ -246,25 +245,8 @@ func (co *CleanupOrchestrator) performScheduledMaintenance(ctx context.Context) 
 		"sessionID": co.sessionID,
 	}
 
-	// Check health status
-	healthy, circuitState, stats := co.cleanupExecutor.GetCleanupManager().GetHealthStatus()
-
-	healthFields := map[string]interface{}{
-		"sessionID":    co.sessionID,
-		"healthy":      healthy,
-		"circuitState": circuitState,
-	}
-
-	// Add stats to log fields
-	for k, v := range stats {
-		healthFields[k] = v
-	}
-
-	if !healthy {
-		logger.Op.WithFields(healthFields).Warn("Cleanup system health check indicates problems")
-	} else {
-		logger.Op.WithFields(healthFields).Debug("Cleanup system health check passed")
-	}
+	// Simple health check - just log that maintenance is running
+	logger.Op.WithFields(logFields).Debug("Performing scheduled cleanup maintenance")
 
 	// Run emergency cleanup if we have too many active snapshots
 	co.mu.RLock()
@@ -306,16 +288,6 @@ func (co *CleanupOrchestrator) GetTaskSnapshotCount(taskID string) int {
 		return len(snapshots)
 	}
 	return 0
-}
-
-// GetHealthStatus returns the current health status
-func (co *CleanupOrchestrator) GetHealthStatus() (bool, CircuitBreakerState, map[string]interface{}) {
-	return co.cleanupExecutor.GetCleanupManager().GetHealthStatus()
-}
-
-// GetCleanupMetrics returns current cleanup metrics
-func (co *CleanupOrchestrator) GetCleanupMetrics() CleanupMetrics {
-	return co.cleanupExecutor.GetCleanupManager().GetCleanupMetrics()
 }
 
 // Close performs cleanup of the orchestrator
@@ -378,7 +350,7 @@ func (omo *OrchestatedMigrationOrchestrator) MigrateInstanceWithCleanup(ctx cont
 	snapshotTracking := make(map[string]string) // snapshotName -> taskID
 
 	// Execute base migration
-	result := omo.MigrationOrchestrator.MigrateInstance(ctx, job)
+	result := omo.MigrateInstance(ctx, job)
 
 	// Extract snapshot information from migration results if available
 	if result.Migration != nil {
@@ -413,23 +385,10 @@ func (omo *OrchestatedMigrationOrchestrator) MigrateInstanceWithCleanup(ctx cont
 		}
 	}
 
-	// Add cleanup metrics to result if possible
-	if result.Migration != nil {
-		cleanupMetrics := omo.cleanupOrchestrator.GetCleanupMetrics()
-
-		// Store cleanup metrics in result details (if result has such field)
-		resultLogFields := map[string]interface{}{
-			"jobID":                      job.ID,
-			"instanceName":               job.Instance.GetName(),
-			"cleanupTotalSnapshots":      cleanupMetrics.TotalSnapshots,
-			"cleanupSnapshotsDeleted":    cleanupMetrics.SnapshotsDeleted,
-			"cleanupSnapshotsFailed":     cleanupMetrics.SnapshotsFailed,
-			"cleanupCircuitBreakerTrips": cleanupMetrics.CircuitBreakerTrips,
-			"cleanupRetryAttempts":       cleanupMetrics.RetryAttempts,
-		}
-
-		logger.Op.WithFields(resultLogFields).Info("Migration completed with cleanup metrics")
-	}
+	logger.Op.WithFields(map[string]interface{}{
+		"jobID":        job.ID,
+		"instanceName": job.Instance.GetName(),
+	}).Info("Migration completed successfully")
 
 	return result
 }

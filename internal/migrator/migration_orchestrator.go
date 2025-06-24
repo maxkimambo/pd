@@ -306,9 +306,9 @@ func (o *MigrationOrchestrator) MigrateInstance(ctx context.Context, job *Migrat
 		if !result.Success {
 			// Migration didn't complete successfully, but no specific error was returned
 			partialErr := NewPermanentError("Migration completed with partial success", PhaseMigration, SeverityMedium)
-			partialErr.WithDetail("disks_processed", result.DisksProcessed)
-			partialErr.WithDetail("disks_successful", result.DisksSuccessful)
-			partialErr.WithDetail("disks_failed", result.DisksFailed)
+			_ = partialErr.WithDetail("disks_processed", result.DisksProcessed)
+			_ = partialErr.WithDetail("disks_successful", result.DisksSuccessful)
+			_ = partialErr.WithDetail("disks_failed", result.DisksFailed)
 			o.setResultError(result, partialErr, PhaseMigration)
 		}
 	}
@@ -431,7 +431,7 @@ func (o *MigrationOrchestrator) setResultError(result *InstanceMigrationResult, 
 
 	// Add job context if not already present
 	if enhancedErr.JobID == "" {
-		enhancedErr.WithJobContext(result.JobID, result.InstanceID)
+		_ = enhancedErr.WithJobContext(result.JobID, result.InstanceID)
 	}
 
 	result.EnhancedError = enhancedErr

@@ -38,6 +38,7 @@ func TestExecutor_ProgressLogging(t *testing.T) {
 	completed, total := executor.GetProgress()
 	assert.Equal(t, 0, completed)
 	// Total might be 0 before results are initialized, so we'll check after execution
+	_ = total // Will be used later
 
 	// Execute the DAG
 	ctx := context.Background()

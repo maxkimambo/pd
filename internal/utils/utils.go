@@ -34,7 +34,12 @@ func AddSuffix(name string, length int) string {
 	if length == 0 {
 		length = 4
 	}
-	suffix := fmt.Sprintf("%x", rand.Intn(0xFFF))
+	// Generate a random hex string with the specified length
+	maxVal := 1
+	for i := 0; i < length; i++ {
+		maxVal *= 16
+	}
+	suffix := fmt.Sprintf("%0*x", length, rand.Intn(maxVal))
 	return fmt.Sprintf("%s-%s", name, suffix)
 }
 

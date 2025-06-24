@@ -351,7 +351,7 @@ func (sc *SnapshotClient) ListExpiredSnapshots(ctx context.Context, projectID st
 			continue
 		}
 
-		cleanupAfter, err := time.Parse("2025-01-02T15-04-05Z", cleanupAfterStr)
+		cleanupAfter, err := time.Parse(time.RFC3339, cleanupAfterStr)
 		if err != nil {
 			logger.Op.WithFields(logFields).WithError(err).Warnf("Failed to parse cleanup time for snapshot %s", snapshot.GetName())
 			continue

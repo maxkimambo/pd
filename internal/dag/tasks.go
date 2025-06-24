@@ -536,11 +536,7 @@ func (t *EnhancedCleanupTask) Execute(ctx context.Context) (*TaskResult, error) 
 		return taskResult, err
 	}
 
-	// Add cleanup metrics to task result
-	taskResult.AddMetric("snapshots_found", cleanupResult.SnapshotsFound)
-	taskResult.AddMetric("snapshots_deleted", cleanupResult.SnapshotsDeleted)
-	taskResult.AddMetric("snapshots_failed", len(cleanupResult.SnapshotsFailed))
-	taskResult.AddMetric("duration_seconds", cleanupResult.Duration.Seconds())
+	// Basic cleanup result logging (detailed metrics removed)
 
 	// Check if cleanup had any errors
 	if len(cleanupResult.Errors) > 0 {

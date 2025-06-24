@@ -2,7 +2,6 @@ package orchestrator
 
 import (
 	"context"
-	"fmt"
 	"testing"
 
 	computepb "cloud.google.com/go/compute/apiv1/computepb"
@@ -235,29 +234,4 @@ func TestDAGValidation(t *testing.T) {
 	// Empty DAG should validate successfully
 	err = dag.Validate()
 	assert.NoError(t, err)
-}
-
-// Helper function to create test instances
-func createTestInstance(name, zone string) *computepb.Instance {
-	return &computepb.Instance{
-		Name:   proto.String(name),
-		Zone:   proto.String(fmt.Sprintf("projects/test-project/zones/%s", zone)),
-		Status: proto.String("RUNNING"),
-		Disks: []*computepb.AttachedDisk{
-			{
-				Source:     proto.String(fmt.Sprintf("projects/test-project/zones/%s/disks/data-disk", zone)),
-				DeviceName: proto.String("persistent-disk-1"),
-				Boot:       proto.Bool(false),
-			},
-		},
-	}
-}
-
-// Helper function to create test attached disk
-func createTestAttachedDisk(diskName, deviceName string, isBootDisk bool) *computepb.AttachedDisk {
-	return &computepb.AttachedDisk{
-		Source:     proto.String(fmt.Sprintf("projects/test-project/zones/us-central1-a/disks/%s", diskName)),
-		DeviceName: proto.String(deviceName),
-		Boot:       proto.Bool(isBootDisk),
-	}
 }

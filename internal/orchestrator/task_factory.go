@@ -123,7 +123,7 @@ func (f *TaskFactory) CreateInstanceWorkflow(instance *computepb.Instance) ([]da
 		for _, node := range nodes {
 			if dag.GetTaskType(node.GetTask()) == "DiskAttachment" &&
 				dag.GetTaskDescription(node.GetTask()) != "" &&
-				fmt.Sprintf("Attach disk") == dag.GetTaskDescription(node.GetTask())[:10] {
+				dag.GetTaskDescription(node.GetTask())[:10] == "Attach disk" {
 				dependencies[startupNodeID] = append(dependencies[startupNodeID], node.ID())
 			}
 		}

@@ -76,8 +76,8 @@ func init() {
 	computeCmd.Flags().Int64Var(&gceThroughput, "throughput", 150, "Throughput for the new disk in MiB/s (optional, default is 150)")
 	computeCmd.Flags().Int64Var(&gceIops, "iops", 3000, "IOPS for the new disk (optional, default is 3000)")
 
-	computeCmd.MarkFlagRequired("target-disk-type")
-	computeCmd.MarkFlagRequired("instances")
+	_ = computeCmd.MarkFlagRequired("target-disk-type")
+	_ = computeCmd.MarkFlagRequired("instances")
 }
 
 func validateComputeCmdFlags(cmd *cobra.Command, args []string) error {
