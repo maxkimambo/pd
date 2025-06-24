@@ -3,9 +3,10 @@ package dag
 import (
 	"context"
 	"fmt"
-	"strings"
 	"sync"
 	"time"
+
+	"github.com/maxkimambo/pd/internal/logger"
 )
 
 // ExecutorConfig contains configuration for the DAG executor
@@ -76,10 +77,8 @@ type Executor struct {
 	cancel        context.CancelFunc
 	wg            sync.WaitGroup
 	startTime     time.Time
-	visualization *DAGVisualization
-	visualizeFile string
-	visualizeTicker *time.Ticker
 	finished      chan struct{}
+	lastProgressLog time.Time
 }
 
 // NewExecutor creates a new DAG executor
@@ -93,7 +92,6 @@ func NewExecutor(dag *DAG, config *ExecutorConfig) *Executor {
 		config:        config,
 		workers:       make(chan struct{}, config.MaxParallelTasks),
 		results:       make(map[string]*NodeResult),
-		visualization: NewDAGVisualization(dag),
 		finished:      make(chan struct{}),
 	}
 }
@@ -123,6 +121,15 @@ func (e *Executor) Execute(ctx context.Context) (*ExecutionResult, error) {
 		return e.buildResult(), fmt.Errorf("no root nodes found in DAG")
 	}
 	
+	// Log execution start
+	totalNodes := len(e.dag.GetAllNodes())
+	if logger.User != nil {
+		logger.User.Infof("Starting execution of %d tasks (max %d parallel)", totalNodes, e.config.MaxParallelTasks)
+	}
+	
+	// Start progress logging goroutine
+	go e.logProgress()
+	
 	// Execute root nodes
 	for _, nodeID := range rootNodes {
 		e.scheduleNode(nodeID)
@@ -134,13 +141,8 @@ func (e *Executor) Execute(ctx context.Context) (*ExecutionResult, error) {
 	// Signal that execution is finished
 	close(e.finished)
 	
-	// Stop visualization updates if running
-	if e.visualizeTicker != nil {
-		e.visualizeTicker.Stop()
-	}
-	
-	// Final visualization update
-	e.updateVisualization()
+	// Log final progress
+	e.logFinalProgress()
 	
 	return e.buildResult(), nil
 }
@@ -226,7 +228,23 @@ func (e *Executor) executeNode(nodeID string) {
 	
 	e.setNodeStarted(nodeID)
 	
+	// Log task start
+	if logger.User != nil {
+		task := node.GetTask()
+		logger.User.Infof("Starting task: %s (%s)", nodeID, task.GetType())
+	}
+	
 	err = node.Execute(nodeCtx)
+	
+	// Log task completion
+	if logger.User != nil {
+		if err != nil {
+			logger.User.Errorf("Task failed: %s - %v", nodeID, err)
+		} else {
+			task := node.GetTask()
+			logger.User.Successf("Task completed: %s (%s)", nodeID, task.GetType())
+		}
+	}
 	
 	e.setNodeCompleted(nodeID, err)
 	
@@ -251,18 +269,45 @@ func (e *Executor) waitForDependencies(nodeID string) bool {
 		return true
 	}
 	
+	// Log dependency waiting
+	if logger.Op != nil && len(deps) > 0 {
+		logger.Op.WithFields(map[string]interface{}{
+			"task": nodeID,
+			"dependencies": deps,
+		}).Debug("Waiting for dependencies to complete")
+	}
+	
 	timeout := time.After(e.config.TaskTimeout)
 	ticker := time.NewTicker(e.config.PollInterval)
 	defer ticker.Stop()
+	
+	dependencyLogTimer := time.NewTicker(30 * time.Second)
+	defer dependencyLogTimer.Stop()
 	
 	for {
 		select {
 		case <-e.ctx.Done():
 			return false
 		case <-timeout:
+			if logger.User != nil {
+				logger.User.Warnf("Task %s timed out waiting for dependencies: %v", nodeID, deps)
+			}
 			return false
+		case <-dependencyLogTimer.C:
+			// Log still waiting for dependencies every 30 seconds
+			if logger.User != nil {
+				pending := e.getPendingDependencies(deps)
+				if len(pending) > 0 {
+					logger.User.Infof("Task %s still waiting for dependencies: %v", nodeID, pending)
+				}
+			}
 		case <-ticker.C:
 			if e.areDependenciesCompleted(deps) {
+				if logger.Op != nil {
+					logger.Op.WithFields(map[string]interface{}{
+						"task": nodeID,
+					}).Debug("All dependencies completed, proceeding with execution")
+				}
 				return true
 			}
 		}
@@ -282,6 +327,22 @@ func (e *Executor) areDependenciesCompleted(deps []string) bool {
 	}
 	
 	return true
+}
+
+// getPendingDependencies returns the list of dependencies that are still pending
+func (e *Executor) getPendingDependencies(deps []string) []string {
+	e.mutex.RLock()
+	defer e.mutex.RUnlock()
+	
+	var pending []string
+	for _, depID := range deps {
+		result, exists := e.results[depID]
+		if !exists || (!result.Success && result.Error == nil) {
+			pending = append(pending, depID)
+		}
+	}
+	
+	return pending
 }
 
 // scheduleDependents schedules all dependent nodes that are ready to execute
@@ -422,46 +483,54 @@ func (e *Executor) IsRunning() bool {
 	}
 }
 
-// EnableVisualization turns on visualization with periodic updates
-func (e *Executor) EnableVisualization(filename string, updateInterval time.Duration) {
-	e.visualizeFile = filename
+// logProgress provides periodic progress updates during execution
+func (e *Executor) logProgress() {
+	ticker := time.NewTicker(5 * time.Second)
+	defer ticker.Stop()
 	
-	// Start a goroutine to periodically update the visualization
-	go func() {
-		e.visualizeTicker = time.NewTicker(updateInterval)
-		defer e.visualizeTicker.Stop()
-		
-		for {
-			select {
-			case <-e.finished:
-				// Final visualization update
-				e.updateVisualization()
-				return
-			case <-e.visualizeTicker.C:
-				// Periodic visualization update
-				e.updateVisualization()
+	for {
+		select {
+		case <-e.finished:
+			return
+		case <-ticker.C:
+			e.printProgress()
+		}
+	}
+}
+
+// printProgress logs current execution progress
+func (e *Executor) printProgress() {
+	completed, total := e.GetProgress()
+	if total > 0 && logger.User != nil {
+		percentage := float64(completed) / float64(total) * 100
+		elapsed := time.Since(e.startTime)
+		logger.User.Infof("Progress: %d/%d tasks completed (%.1f%%) - elapsed: %v", 
+			completed, total, percentage, elapsed.Round(time.Second))
+	}
+}
+
+// logFinalProgress logs the final execution summary
+func (e *Executor) logFinalProgress() {
+	completed, total := e.GetProgress()
+	elapsed := time.Since(e.startTime)
+	
+	if logger.User != nil {
+		// Count failed tasks
+		failed := 0
+		e.mutex.RLock()
+		for _, result := range e.results {
+			if result.Error != nil {
+				failed++
 			}
 		}
-	}()
-}
-
-// updateVisualization exports the current state to the visualization file
-func (e *Executor) updateVisualization() {
-	if e.visualizeFile == "" {
-		return
+		e.mutex.RUnlock()
+		
+		if failed == 0 {
+			logger.User.Successf("Execution completed: %d/%d tasks successful in %v", 
+				completed, total, elapsed.Round(time.Second))
+		} else {
+			logger.User.Errorf("Execution completed: %d successful, %d failed in %v", 
+				completed-failed, failed, elapsed.Round(time.Second))
+		}
 	}
-	
-	// Determine file type and export accordingly
-	if strings.HasSuffix(e.visualizeFile, ".json") {
-		e.visualization.ExportToJSON(e.visualizeFile)
-	} else if strings.HasSuffix(e.visualizeFile, ".dot") {
-		e.visualization.ExportToDOT(e.visualizeFile)
-	} else if strings.HasSuffix(e.visualizeFile, ".txt") {
-		e.visualization.ExportToText(e.visualizeFile)
-	}
-}
-
-// GetVisualization returns the visualization helper for manual export
-func (e *Executor) GetVisualization() *DAGVisualization {
-	return e.visualization
 }

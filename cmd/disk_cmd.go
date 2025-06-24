@@ -28,13 +28,12 @@ var (
 	throughput     int64
 	iops           int64
 	storagePoolId  string
-	visualize      string
 )
 
 var diskCmd = &cobra.Command{
 	Use:   "disk",
 	Short: "Migrate detached persistent disks to a new disk type",
-	Long: `Performs bulk migration of detached Google Cloud persistent disks using DAG-based orchestration.
+	Long: `Performs bulk migration of detached Google Cloud persistent disks using task orchestration.
 
 Identifies detached disks based on location (zone or region) and optional label filter.
 Migrates disks by:
@@ -43,15 +42,14 @@ Migrates disks by:
 3. Recreating the disk from the snapshot with the target type.
 4. Cleaning up snapshots afterwards.
 
-The DAG-based approach provides improved parallelism, dependency management, and optional visualization.
+The orchestration provides improved parallelism and dependency management with detailed progress logging.
 
 Example:
 pd migrate disk --project my-gcp-project --zone us-central1-a --target-disk-type pd-ssd --label env=staging --max-concurrency 20
 pd migrate disk --project my-gcp-project --region us-central1 --target-disk-type hyperdisk-balanced --auto-approve --retain-name=false
-pd migrate disk --project my-gcp-project --zone us-central1-a --target-disk-type pd-ssd --visualize migration.json
 `,
 	PreRunE: validateDiskCmdFlags,
-	RunE:    runConvertDAG,
+	RunE:    runConvert,
 }
 
 func init() {
@@ -69,9 +67,6 @@ func init() {
 	diskCmd.Flags().Int64Var(&throughput, "throughput", 140, "Throughput in MB/s to set (optional, default: 140 MiB/s)")
 	diskCmd.Flags().Int64Var(&iops, "iops", 2000, "IOPS to set(optional, default: 2000 IOPS)")
 	diskCmd.Flags().StringVarP(&storagePoolId, "pool-id", "s", "", "Storage pool ID to use for the new disks (optional)")
-	
-	// New DAG-specific flag for visualization
-	diskCmd.Flags().StringVar(&visualize, "visualize", "", "Export DAG visualization to file (optional). Format auto-detected from extension (.json, .dot, .txt)")
 	
 	diskCmd.MarkFlagRequired("target-disk-type")
 }
@@ -112,14 +107,14 @@ func validateDiskCmdFlags(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func runConvertDAG(cmd *cobra.Command, args []string) error {
+func runConvert(cmd *cobra.Command, args []string) error {
 	// Set verbose to true if debug is enabled for backward compatibility
 	if debug {
 		verbose = true
 	}
 	logger.Setup(verbose, jsonLogs, quiet)
 
-	logger.User.Starting("Starting DAG-based disk conversion process...")
+	logger.User.Starting("Starting task-based disk conversion process...")
 
 	config := migrator.Config{
 		ProjectID:        projectID,
@@ -133,7 +128,7 @@ func runConvertDAG(cmd *cobra.Command, args []string) error {
 		Zone:             zone,
 		AutoApproveAll:   autoApprove,
 		Concurrency:      concurrency,
-		MaxParallelTasks: concurrency, // Map concurrency to DAG parallelism
+		MaxParallelTasks: concurrency, // Map concurrency to task parallelism
 		RetainName:       retainName,
 		Debug:            debug,
 		Throughput:       throughput,
@@ -148,10 +143,6 @@ func runConvertDAG(cmd *cobra.Command, args []string) error {
 		logger.User.Infof("Region: %s", region)
 	}
 	logger.User.Infof("Target disk type: %s", targetDiskType)
-	
-	if visualize != "" {
-		logger.User.Infof("Visualization will be exported to: %s", visualize)
-	}
 
 	ctx := context.Background()
 
@@ -173,25 +164,25 @@ func runConvertDAG(cmd *cobra.Command, args []string) error {
 	}
 	logger.User.Infof("Discovered %d disk(s) for migration.", len(discoveredDisks))
 
-	// --- Phase 2: DAG-based Migration ---
-	logger.User.Info("--- Phase 2: DAG-based Migration (Detached Disks) ---")
+	// --- Phase 2: Task-based Migration ---
+	logger.User.Info("--- Phase 2: Task-based Migration (Detached Disks) ---")
 
-	// Create DAG orchestrator
-	dagOrchestrator := orchestrator.NewDAGOrchestrator(&config, gcpClient)
+	// Create task orchestrator
+	taskOrchestrator := orchestrator.NewDAGOrchestrator(&config, gcpClient)
 
-	// Execute DAG-based migration with visualization
-	result, err := dagOrchestrator.ExecuteDiskMigrationsWithVisualization(ctx, discoveredDisks, visualize)
+	// Execute migration workflow
+	result, err := taskOrchestrator.ExecuteDiskMigrations(ctx, discoveredDisks)
 	if err != nil {
-		return fmt.Errorf("DAG-based migration failed: %w", err)
+		return fmt.Errorf("migration workflow failed: %w", err)
 	}
 
 	// --- Phase 3: Results Summary ---
 	logger.User.Info("--- Phase 3: Results Summary ---")
-	err = dagOrchestrator.ProcessExecutionResults(result)
+	err = taskOrchestrator.ProcessExecutionResults(result)
 	if err != nil {
 		return fmt.Errorf("migration completed with errors: %w", err)
 	}
 
-	logger.User.Success("DAG-based disk conversion process finished.")
+	logger.User.Success("Task-based disk conversion process finished.")
 	return nil
 }

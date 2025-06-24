@@ -11,33 +11,30 @@ import (
 	"github.com/maxkimambo/pd/internal/logger"
 )
 
-// ExecuteInstanceMigrations orchestrates compute instance migrations using DAG
+// ExecuteInstanceMigrations orchestrates compute instance migrations using task graphs
 // This is the high-level entry point for CLI commands
 func (o *DAGOrchestrator) ExecuteInstanceMigrations(ctx context.Context, instances []*computepb.Instance) (*dag.ExecutionResult, error) {
-	return o.ExecuteInstanceMigrationsWithVisualization(ctx, instances, "")
-}
-
-// ExecuteInstanceMigrationsWithVisualization orchestrates compute instance migrations using DAG with optional visualization
-func (o *DAGOrchestrator) ExecuteInstanceMigrationsWithVisualization(ctx context.Context, instances []*computepb.Instance, visualizeFile string) (*dag.ExecutionResult, error) {
 	if logger.User != nil {
 		logger.User.Info("--- Phase 2: Migration of GCE Attached Disks ---")
+		logger.User.Infof("Preparing migration tasks for %d instance(s)", len(instances))
 	}
 
-	// Build DAG from instances
+	// Build task graph from instances
 	migrationDAG, err := o.BuildMigrationDAG(ctx, instances)
 	if err != nil {
-		return nil, fmt.Errorf("failed to build migration DAG: %w", err)
+		return nil, fmt.Errorf("failed to build migration task graph: %w", err)
 	}
 
 	if logger.User != nil {
 		allNodes := migrationDAG.GetAllNodes()
-		logger.User.Infof("Built migration graph of %d tasks", len(allNodes))
+		logger.User.Infof("Built migration graph with %d tasks", len(allNodes))
+		logger.User.Info("Starting parallel task execution...")
 	}
 
-	// Execute DAG with visualization
-	result, err := o.ExecuteWithVisualization(ctx, migrationDAG, visualizeFile)
+	// Execute task graph
+	result, err := o.ExecuteMigrationDAG(ctx, migrationDAG)
 	if err != nil {
-		return nil, fmt.Errorf("DAG execution failed: %w", err)
+		return nil, fmt.Errorf("task execution failed: %w", err)
 	}
 
 	// Log execution summary
@@ -53,46 +50,42 @@ func (o *DAGOrchestrator) ExecuteInstanceMigrationsWithVisualization(ctx context
 		}
 
 		if result.Success {
-			logger.User.Successf("DAG execution completed successfully: %d tasks completed", completed)
+			logger.User.Successf("Task execution completed successfully: %d tasks completed", completed)
 		} else {
-			logger.User.Errorf("DAG execution completed with errors: %d succeeded, %d failed", completed, failed)
+			logger.User.Errorf("Task execution completed with errors: %d succeeded, %d failed", completed, failed)
 		}
 	}
 
 	return result, nil
 }
 
-// ExecuteDiskMigrations orchestrates standalone disk migrations using DAG
-// This handles detached disk migrations with DAG-based orchestration
+// ExecuteDiskMigrations orchestrates standalone disk migrations using task graphs
+// This handles detached disk migrations with task-based orchestration
 func (o *DAGOrchestrator) ExecuteDiskMigrations(ctx context.Context, disks []*computepb.Disk) (*dag.ExecutionResult, error) {
-	return o.ExecuteDiskMigrationsWithVisualization(ctx, disks, "")
-}
-
-// ExecuteDiskMigrationsWithVisualization orchestrates standalone disk migrations using DAG with optional visualization
-func (o *DAGOrchestrator) ExecuteDiskMigrationsWithVisualization(ctx context.Context, disks []*computepb.Disk, visualizeFile string) (*dag.ExecutionResult, error) {
 	// Ensure config and gcpClient are available
 	if o.config == nil || o.gcpClient == nil {
 		return nil, fmt.Errorf("orchestrator not properly initialized")
 	}
 	if logger.User != nil {
-		logger.User.Infof("Starting migration for %d disk(s)", len(disks))
+		logger.User.Infof("Preparing migration tasks for %d disk(s)", len(disks))
 	}
 
-	// Build DAG from disks
+	// Build task graph from disks
 	migrationDAG, err := o.BuildDiskMigrationDAG(ctx, disks)
 	if err != nil {
-		return nil, fmt.Errorf("failed to build disk migration DAG: %w", err)
+		return nil, fmt.Errorf("failed to build disk migration task graph: %w", err)
 	}
 
 	if logger.User != nil {
 		allNodes := migrationDAG.GetAllNodes()
 		logger.User.Infof("Built disk migration graph with %d tasks", len(allNodes))
+		logger.User.Info("Starting parallel task execution...")
 	}
 
-	// Execute DAG with visualization
-	result, err := o.ExecuteWithVisualization(ctx, migrationDAG, visualizeFile)
+	// Execute task graph
+	result, err := o.ExecuteMigrationDAG(ctx, migrationDAG)
 	if err != nil {
-		return nil, fmt.Errorf("graph execution failed: %w", err)
+		return nil, fmt.Errorf("task graph execution failed: %w", err)
 	}
 
 	// Log execution summary
@@ -117,20 +110,24 @@ func (o *DAGOrchestrator) ExecuteDiskMigrationsWithVisualization(ctx context.Con
 	return result, nil
 }
 
-// BuildDiskMigrationDAG creates a DAG for standalone disk migrations
+// BuildDiskMigrationDAG creates a task graph for standalone disk migrations
 func (o *DAGOrchestrator) BuildDiskMigrationDAG(ctx context.Context, disks []*computepb.Disk) (*dag.DAG, error) {
 	if logger.User != nil {
-		logger.User.Info("Building migration graph for standalone disk migration")
+		logger.User.Info("Building task graph for standalone disk migration")
 	}
 
-	// Create a new DAG
+	// Create a new task graph
 	migrationDAG := dag.NewDAG()
 
 	// For each disk, create migration tasks
-	for _, disk := range disks {
+	for i, disk := range disks {
 		diskName := disk.GetName()
 		zone := extractZoneFromSelfLink(disk.GetZone())
 
+		if logger.User != nil {
+			logger.User.Infof("Creating tasks for disk %d/%d: %s", i+1, len(disks), diskName)
+		}
+		
 		if logger.Op != nil {
 			logger.Op.WithFields(map[string]interface{}{
 				"disk": diskName,
@@ -192,7 +189,7 @@ func (o *DAGOrchestrator) BuildDiskMigrationDAG(ctx context.Context, disks []*co
 
 	if logger.User != nil {
 		allNodes := migrationDAG.GetAllNodes()
-		logger.User.Infof("Built migration DAG with %d total tasks for %d disks", len(allNodes), len(disks))
+		logger.User.Infof("Built migration task graph with %d total tasks for %d disks", len(allNodes), len(disks))
 	}
 
 	return migrationDAG, nil
