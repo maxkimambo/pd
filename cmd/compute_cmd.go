@@ -6,13 +6,13 @@ import (
 	"strings"
 
 	computepb "cloud.google.com/go/compute/apiv1/computepb"
+	migerrors "github.com/maxkimambo/pd/internal/errors"
 	"github.com/maxkimambo/pd/internal/gcp"
 	"github.com/maxkimambo/pd/internal/logger"
 	"github.com/maxkimambo/pd/internal/migrator"
 	"github.com/maxkimambo/pd/internal/orchestrator"
 	"github.com/maxkimambo/pd/internal/utils"
 	"github.com/maxkimambo/pd/internal/validation"
-	migerrors "github.com/maxkimambo/pd/internal/errors"
 	"github.com/spf13/cobra"
 )
 
@@ -230,7 +230,7 @@ func runGceConvert(cmd *cobra.Command, args []string) error {
 	if gceInstances[0] == "*" {
 		logger.User.Infof("Target: All instances in scope (%s)", config.Location())
 	} else {
-		logger.User.Infof("Target: %s", strings.Join(gceInstances, ", "))
+		logger.User.Infof("Target instances: %s", strings.Join(gceInstances, ", "))
 	}
 	logger.User.Infof("Target disk type: %s", gceTargetDiskType)
 
@@ -290,8 +290,7 @@ func runGceConvert(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("migration workflow failed: %w", err)
 	}
 
-	// --- Phase 3: Results Summary ---
-	logger.User.Info("--- Phase 3: Results Summary ---")
+	logger.User.Info("=== RESULTS ===")
 	err = taskOrchestrator.ProcessExecutionResults(result)
 	if err != nil {
 		return fmt.Errorf("migration completed with errors: %w", err)
@@ -312,7 +311,7 @@ func validateInstancesForMigration(ctx context.Context, instances []*computepb.I
 	var validatedInstances []*computepb.Instance
 	var failedInstances []ValidationFailure
 
-	logger.User.Info("--- Validating instance compatibility before migration ---")
+	logger.User.Info("=== VALIDATION ===")
 	logger.User.Infof("Validating %d instance(s) against target disk type: %s", len(instances), targetDiskType)
 
 	for _, instance := range instances {

@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/maxkimambo/pd/internal/logger"
-	"github.com/maxkimambo/pd/internal/progress"
 )
 
 // ExecutorConfig contains configuration for the DAG executor
@@ -133,8 +132,7 @@ func (e *Executor) Execute(ctx context.Context) (*ExecutionResult, error) {
 		logger.User.Infof("Starting execution of %d tasks (max %d parallel)", totalNodes, e.config.MaxParallelTasks)
 	}
 
-	// Start progress logging goroutine
-	go e.logProgress()
+	// Remove periodic progress logging - we'll just show task-by-task progress
 
 	// Execute root nodes
 	for _, nodeID := range rootNodes {
@@ -147,8 +145,8 @@ func (e *Executor) Execute(ctx context.Context) (*ExecutionResult, error) {
 	// Signal that execution is finished
 	close(e.finished)
 
-	// Log final progress
-	e.logFinalProgress()
+	// Log final summary
+	e.logFinalSummary()
 
 	return e.buildResult(), nil
 }
@@ -251,21 +249,25 @@ func (e *Executor) executeNode(nodeID string) {
 
 	e.setNodeStarted(nodeID)
 
-	// Log task start
+	// Log task start with simplified name
+	var taskStartTime time.Time
 	if logger.User != nil {
-		task := node.GetTask()
-		logger.User.Infof("Starting task: %s (%s)", nodeID, GetTaskType(task))
+		simplifiedName := e.simplifyTaskName(nodeID)
+		logger.User.Infof("🔄 Starting: %s", simplifiedName)
+		taskStartTime = time.Now()
 	}
 
 	err = node.Execute(nodeCtx)
 
-	// Log task completion
+	// Log task completion with timing
 	if logger.User != nil {
+		simplifiedName := e.simplifyTaskName(nodeID)
+		duration := time.Since(taskStartTime)
+		
 		if err != nil {
-			logger.User.Errorf("Task failed: %s - %v", nodeID, err)
+			logger.User.Errorf("❌ Failed: %s (%v) - %v", simplifiedName, duration.Round(time.Millisecond), err)
 		} else {
-			task := node.GetTask()
-			logger.User.Successf("Task completed: %s (%s)", nodeID, GetTaskType(task))
+			logger.User.Successf("Completed: %s (%v)", simplifiedName, duration.Round(time.Millisecond))
 		}
 	}
 
@@ -513,222 +515,68 @@ func (e *Executor) IsRunning() bool {
 	}
 }
 
-// logProgress provides periodic progress updates during execution
-func (e *Executor) logProgress() {
-	ticker := time.NewTicker(5 * time.Second)
-	defer ticker.Stop()
+// Removed periodic progress logging - we now show individual task progress
 
-	for {
-		select {
-		case <-e.finished:
-			return
-		case <-ticker.C:
-			e.printProgress()
-		}
-	}
-}
+// Removed complex progress tracking - we now use simple task-by-task logging
 
-// printProgress logs current execution progress with enhanced details
-func (e *Executor) printProgress() {
-	completed, total := e.GetProgress()
-	if total > 0 && logger.User != nil {
-		// Create enhanced progress info
-		progressInfo := e.buildProgressInfo(completed, total)
-		
-		// Use enhanced reporter
-		reporter := progress.NewReporter()
-		progressReport := reporter.Report(progressInfo)
-		
-		logger.User.Info(progressReport)
-	}
-}
+// Removed complex task type and phase tracking - no longer needed for simplified reporting
 
-// buildProgressInfo creates detailed progress information
-func (e *Executor) buildProgressInfo(completed, total int) progress.ProgressInfo {
-	e.mutex.RLock()
-	defer e.mutex.RUnlock()
+// simplifyTaskName converts task IDs to target:action format
+func (e *Executor) simplifyTaskName(taskID string) string {
+	// Examples:
+	// "startup_sap-mig-1" -> "sap-mig-1:startup"
+	// "hot-snapshot_sap-mig-1_sap-mig-1-disk-1" -> "sap-mig-1-disk-1:hot-snapshot"
+	// "cold-snapshot_sap-mig-1_sap-mig-1-disk-1" -> "sap-mig-1-disk-1:cold-snapshot"
+	// "detach_sap-mig-1_sap-mig-1-disk-1" -> "sap-mig-1-disk-1:detach"
+	// "migrate_sap-mig-1_sap-mig-1-disk-1" -> "sap-mig-1-disk-1:migrate"
+	// "attach_sap-mig-1_sap-mig-1-disk-1" -> "sap-mig-1-disk-1:attach"
 	
-	elapsed := time.Since(e.startTime)
-	
-	// Calculate task breakdown by type
-	taskBreakdown := make(map[progress.TaskType]progress.TaskStats)
-	instanceStats := make(map[string]progress.InstanceProgress)
-	runningCount := 0
-	failedCount := 0
-	pendingCount := 0
-	currentOperation := ""
-	
-	// Get all node IDs from the DAG
-	nodeIDs := e.dag.GetAllNodes()
-	
-	// Analyze running tasks and task types
-	for _, nodeID := range nodeIDs {
-		node, err := e.dag.GetNode(nodeID)
-		if err != nil {
-			continue
-		}
-		
-		task := node.GetTask()
-		if task != nil {
-			taskType := e.getTaskType(task.GetID())
-			
-			if _, exists := taskBreakdown[taskType]; !exists {
-				taskBreakdown[taskType] = progress.TaskStats{}
-			}
-			stats := taskBreakdown[taskType]
-			stats.Total++
-			
-			if result, hasResult := e.results[nodeID]; hasResult {
-				if result.Success {
-					stats.Completed++
-				} else {
-					stats.Failed++
-					failedCount++
-				}
-			} else {
-				// Task is pending (not started yet)
-				stats.Pending++
-				pendingCount++
-			}
-			
-			taskBreakdown[taskType] = stats
-			
-			// Track instance progress
-			instanceName := e.extractInstanceName(task.GetID())
-			if instanceName != "" {
-				if _, exists := instanceStats[instanceName]; !exists {
-					instanceStats[instanceName] = progress.InstanceProgress{
-						InstanceName: instanceName,
-						Status:       "pending",
-						CurrentPhase: progress.PhaseDiscovery,
-					}
-				}
-				
-				instanceProg := instanceStats[instanceName]
-				taskPhase := e.getTaskPhase(task.GetID())
-				
-				if result, hasResult := e.results[nodeID]; hasResult {
-					if result.Success {
-						instanceProg.DisksProcessed++
-						instanceProg.Status = "completed"
-						// Update to the latest completed phase for this instance
-						instanceProg.CurrentPhase = taskPhase
-					} else {
-						instanceProg.Status = "failed"
-						instanceProg.CurrentPhase = taskPhase
-					}
-				} else {
-					// Task is pending - only update phase if this is earlier than current
-					if e.isEarlierPhase(taskPhase, instanceProg.CurrentPhase) {
-						instanceProg.CurrentPhase = taskPhase
-					}
-					// Keep existing status if already processing/failed
-					if instanceProg.Status == "pending" {
-						instanceProg.Status = "pending"
-					}
-				}
-				
-				instanceStats[instanceName] = instanceProg
-			}
-		}
-	}
-	
-	// Calculate ETA
-	eta := progress.CalculateETA(completed, total, elapsed)
-	
-	return progress.ProgressInfo{
-		CurrentPhase:      e.getCurrentPhase(currentOperation),
-		TotalTasks:        total,
-		CompletedTasks:    completed,
-		FailedTasks:       failedCount,
-		RunningTasks:      runningCount,
-		ElapsedTime:       elapsed,
-		EstimatedTimeLeft: eta,
-		TaskBreakdown:     taskBreakdown,
-		CurrentOperation:  currentOperation,
-		InstanceStats:     instanceStats,
-	}
-}
-
-// getTaskType determines the task type from task ID
-func (e *Executor) getTaskType(taskID string) progress.TaskType {
-	if strings.Contains(taskID, "snapshot") {
-		return progress.TaskTypeSnapshot
-	} else if strings.Contains(taskID, "shutdown") || strings.Contains(taskID, "startup") {
-		return progress.TaskTypeInstanceState
-	} else if strings.Contains(taskID, "attach") || strings.Contains(taskID, "detach") {
-		return progress.TaskTypeDiskAttachment
-	} else if strings.Contains(taskID, "migrate") {
-		return progress.TaskTypeDiskMigration
-	} else if strings.Contains(taskID, "cleanup") {
-		return progress.TaskTypeCleanup
-	}
-	return progress.TaskType("Unknown")
-}
-
-// getCurrentPhase determines the current migration phase
-func (e *Executor) getCurrentPhase(currentOperation string) progress.Phase {
-	if strings.Contains(currentOperation, "snapshot") {
-		return progress.PhaseSnapshot
-	} else if strings.Contains(currentOperation, "shutdown") {
-		return progress.PhaseShutdown
-	} else if strings.Contains(currentOperation, "detach") {
-		return progress.PhaseDetach
-	} else if strings.Contains(currentOperation, "migrate") {
-		return progress.PhaseMigration
-	} else if strings.Contains(currentOperation, "attach") {
-		return progress.PhaseAttach
-	} else if strings.Contains(currentOperation, "startup") {
-		return progress.PhaseStartup
-	} else if strings.Contains(currentOperation, "cleanup") {
-		return progress.PhaseCleanup
-	}
-	return progress.Phase("Processing")
-}
-
-// getTaskPhase determines the phase for a task
-func (e *Executor) getTaskPhase(taskID string) progress.Phase {
-	return e.getCurrentPhase(taskID)
-}
-
-// isEarlierPhase determines if phase1 comes before phase2 in the migration sequence
-func (e *Executor) isEarlierPhase(phase1, phase2 progress.Phase) bool {
-	phaseOrder := map[progress.Phase]int{
-		progress.PhaseDiscovery:  1,
-		progress.PhaseValidation: 2,
-		progress.PhaseSnapshot:   3,
-		progress.PhaseShutdown:   4,
-		progress.PhaseDetach:     5,
-		progress.PhaseMigration:  6,
-		progress.PhaseAttach:     7,
-		progress.PhaseStartup:    8,
-		progress.PhaseCleanup:    9,
-		progress.PhaseCompletion: 10,
-	}
-	
-	order1, exists1 := phaseOrder[phase1]
-	order2, exists2 := phaseOrder[phase2]
-	
-	if !exists1 || !exists2 {
-		return false
-	}
-	
-	return order1 < order2
-}
-
-// extractInstanceName extracts instance name from task ID
-func (e *Executor) extractInstanceName(taskID string) string {
-	// Task IDs typically follow pattern: operation_instance_disk
 	parts := strings.Split(taskID, "_")
-	if len(parts) >= 2 {
-		return parts[1]
+	if len(parts) < 2 {
+		return taskID // Return as-is if can't parse
 	}
-	return ""
+	
+	action := parts[0]
+	
+	// For simple instance actions like "startup_sap-mig-1"
+	if len(parts) == 2 && (action == "startup" || action == "shutdown") {
+		instanceName := parts[1]
+		return fmt.Sprintf("%s:%s", instanceName, action)
+	}
+	
+	// For hot/cold snapshots like "hot-snapshot_sap-mig-1_sap-mig-1-disk-1"
+	if len(parts) == 3 && (action == "hot-snapshot" || action == "cold-snapshot") {
+		diskName := parts[2]
+		return fmt.Sprintf("%s:%s", diskName, action)
+	}
+	
+	// For disk operations like "detach_sap-mig-1_sap-mig-1-disk-1"
+	if len(parts) == 3 && (action == "detach" || action == "attach" || action == "migrate") {
+		diskName := parts[2]
+		return fmt.Sprintf("%s:%s", diskName, action)
+	}
+	
+	// For cleanup operations like "cleanup-hot_sap-mig-1_sap-mig-1-disk-1"
+	if len(parts) == 3 && (action == "cleanup-hot" || action == "cleanup-cold") {
+		diskName := parts[2]
+		cleanupType := strings.Replace(action, "cleanup-", "", 1)
+		return fmt.Sprintf("%s:cleanup-%s", diskName, cleanupType)
+	}
+	
+	// For legacy snapshot format "snapshot_sap-mig-1-disk-1"
+	if len(parts) == 2 && action == "snapshot" {
+		diskName := parts[1]
+		return fmt.Sprintf("%s:%s", diskName, action)
+	}
+	
+	// Fallback: return original taskID
+	return taskID
 }
 
+// Removed instance tracking functions - no longer needed for simplified reporting
 
-// logFinalProgress logs the final execution summary
-func (e *Executor) logFinalProgress() {
+// logFinalSummary logs a simple final execution summary
+func (e *Executor) logFinalSummary() {
 	completed, total := e.GetProgress()
 	elapsed := time.Since(e.startTime)
 
@@ -743,12 +591,21 @@ func (e *Executor) logFinalProgress() {
 		}
 		e.mutex.RUnlock()
 
+		logger.User.Info("=== EXECUTION SUMMARY ===")
 		if failed == 0 {
-			logger.User.Successf("Execution completed: %d/%d tasks successful in %v",
-				completed, total, elapsed.Round(time.Second))
+			logger.User.Successf("✅ All %d tasks completed successfully in %v", total, elapsed.Round(time.Second))
 		} else {
-			logger.User.Errorf("Execution completed: %d successful, %d failed in %v",
-				completed-failed, failed, elapsed.Round(time.Second))
+			logger.User.Errorf("⚠️  Execution completed: %d successful, %d failed in %v", completed-failed, failed, elapsed.Round(time.Second))
+			
+			// Show failed tasks
+			logger.User.Info("Failed tasks:")
+			for nodeID, result := range e.results {
+				if result.Error != nil {
+					simplifiedName := e.simplifyTaskName(nodeID)
+					logger.User.Errorf("  ❌ %s: %v", simplifiedName, result.Error)
+				}
+			}
 		}
+		logger.User.Info("========================")
 	}
 }

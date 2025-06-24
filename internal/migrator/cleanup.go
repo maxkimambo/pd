@@ -11,7 +11,7 @@ import (
 
 // CleanupSnapshots performs legacy cleanup for backward compatibility
 func CleanupSnapshots(ctx context.Context, config *Config, gcpClient *gcp.Clients, results []MigrationResult) error {
-	logger.User.Info("--- Phase 3: Cleanup ---")
+	logger.User.Info("=== CLEANUP ===")
 	logger.User.Infof("Searching for snapshots with label '%s=%s' in project %s for cleanup...",
 		gcp.MANAGED_BY_KEY, gcp.MANAGED_BY_VALUE, config.ProjectID)
 
@@ -22,7 +22,7 @@ func CleanupSnapshots(ctx context.Context, config *Config, gcpClient *gcp.Client
 
 	if len(snapshotsToDelete) == 0 {
 		logger.User.Info("No snapshots found with the cleanup label.")
-		logger.User.Info("--- Cleanup Phase Complete ---")
+		logger.User.Success("Cleanup complete")
 		return nil
 	}
 
@@ -87,13 +87,13 @@ func CleanupSnapshots(ctx context.Context, config *Config, gcpClient *gcp.Client
 		logger.User.Info("Snapshot cleanup completed successfully.")
 	}
 
-	logger.User.Info("--- Cleanup Phase Complete ---")
+	logger.User.Success("Cleanup complete")
 	return nil
 }
 
 // CleanupSnapshotsWithManager performs enhanced cleanup using the multi-level cleanup manager
 func CleanupSnapshotsWithManager(ctx context.Context, config *Config, gcpClient *gcp.Clients, sessionID string, results []MigrationResult) error {
-	logger.User.Info("--- Phase 3: Enhanced Cleanup ---")
+	logger.User.Info("=== CLEANUP ===")
 
 	// Create cleanup manager with default strategy
 	strategy := DefaultCleanupStrategy()
@@ -139,7 +139,7 @@ func CleanupSnapshotsWithManager(ctx context.Context, config *Config, gcpClient 
 		return fmt.Errorf("enhanced cleanup completed with %d failures", len(result.SnapshotsFailed))
 	}
 
-	logger.User.Info("--- Enhanced Cleanup Phase Complete ---")
+	logger.User.Success("Enhanced cleanup complete")
 	return nil
 }
 

@@ -49,20 +49,24 @@ type ProgressInfo struct {
 
 // TaskStats provides statistics for each task type
 type TaskStats struct {
-	Total     int
-	Completed int
-	Failed    int
-	Running   int
-	Pending   int
+	Total       int
+	Completed   int
+	Failed      int
+	Running     int
+	Pending     int
+	RunningTasks []string  // Names of currently running tasks
 }
 
 // InstanceProgress tracks progress per instance
 type InstanceProgress struct {
-	InstanceName   string
-	CurrentPhase   Phase
-	DisksProcessed int
-	TotalDisks     int
-	Status         string
+	InstanceName    string
+	CurrentPhase    Phase
+	DisksProcessed  int
+	TotalDisks      int
+	Status          string
+	StartTime       *time.Time
+	CurrentDuration time.Duration
+	EstimatedTotal  time.Duration
 }
 
 // Reporter handles enhanced progress reporting
@@ -107,13 +111,7 @@ func (r *Reporter) Report(info ProgressInfo) string {
 	}
 	
 	// Time information
-	elapsed := time.Since(r.startTime)
-	sb.WriteString(fmt.Sprintf(" | Elapsed: %v", elapsed.Round(time.Second)))
-	
-	// Estimated time remaining
-	if info.EstimatedTimeLeft > 0 {
-		sb.WriteString(fmt.Sprintf(" | ETA: %v", info.EstimatedTimeLeft.Round(time.Second)))
-	}
+	sb.WriteString(fmt.Sprintf(" | Elapsed: %v", info.ElapsedTime.Round(time.Second)))
 	
 	// Current operation
 	if info.CurrentOperation != "" {
@@ -132,6 +130,10 @@ func (r *Reporter) Report(info ProgressInfo) string {
 				}
 				if stats.Running > 0 {
 					sb.WriteString(fmt.Sprintf(", %d running", stats.Running))
+					// Show running task names
+					if len(stats.RunningTasks) > 0 {
+						sb.WriteString(fmt.Sprintf(" (%s)", strings.Join(stats.RunningTasks, ", ")))
+					}
 				}
 				if stats.Pending > 0 {
 					sb.WriteString(fmt.Sprintf(", %d pending", stats.Pending))
@@ -149,9 +151,16 @@ func (r *Reporter) Report(info ProgressInfo) string {
 				diskProgress = fmt.Sprintf(" (%d/%d disks)", 
 					instanceProg.DisksProcessed, instanceProg.TotalDisks)
 			}
-			sb.WriteString(fmt.Sprintf("\n      %s: %s%s - %s",
+			
+			// Add timing information for running instances
+			timingInfo := ""
+			if instanceProg.Status == "running" && instanceProg.CurrentDuration > 0 {
+				timingInfo = fmt.Sprintf(" [%s]", FormatDuration(instanceProg.CurrentDuration))
+			}
+			
+			sb.WriteString(fmt.Sprintf("\n      %s: %s%s - %s%s",
 				instanceProg.InstanceName, instanceProg.CurrentPhase, 
-				diskProgress, instanceProg.Status))
+				diskProgress, instanceProg.Status, timingInfo))
 		}
 	}
 	

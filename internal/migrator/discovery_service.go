@@ -27,7 +27,7 @@ func NewInstanceDiscovery(computeClient gcp.ComputeClientInterface, diskClient g
 
 // DiscoverInstances discovers instances based on the provided configuration
 func (d *InstanceDiscovery) DiscoverInstances(ctx context.Context, config *Config) ([]*InstanceMigration, error) {
-	logger.User.Info("--- Phase 1: Instance Discovery ---")
+	logger.User.Info("=== DISCOVERY ===")
 
 	if len(config.Instances) > 0 {
 		return d.DiscoverByNames(ctx, config)
