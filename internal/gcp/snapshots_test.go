@@ -14,15 +14,19 @@ import (
 type mockSnapshotClient struct {
 	SnapshotClientInterface
 	CreateSnapshotFunc       func(ctx context.Context, projectID, zone, diskName, snapshotName string, kmsParams *SnapshotKmsParams, labels map[string]string) error
+	GetSnapshotFunc          func(ctx context.Context, projectID, snapshotName string) (*computepb.Snapshot, error)
 	DeleteSnapshotFunc       func(ctx context.Context, projectID, snapshotName string) error
 	ListSnapshotsByLabelFunc func(ctx context.Context, projectID, labelKey, labelValue string) ([]*computepb.Snapshot, error)
 
 	CreateSnapshotErr error
+	GetSnapshotResp   *computepb.Snapshot
+	GetSnapshotErr    error
 	DeleteSnapshotErr error
 	ListSnapshotsResp []*computepb.Snapshot
 	ListSnapshotsErr  error
 
 	CreateSnapshotCalled bool
+	GetSnapshotCalled    bool
 	DeleteSnapshotCalled bool
 	ListSnapshotsCalled  bool
 
@@ -33,6 +37,9 @@ type mockSnapshotClient struct {
 	LastCreateSnapshotName string
 	LastCreateKmsParams    *SnapshotKmsParams
 	LastCreateLabels       map[string]string
+
+	LastGetProjectID    string
+	LastGetSnapshotName string
 
 	LastDeleteProjectID    string
 	LastDeleteSnapshotName string
@@ -55,6 +62,17 @@ func (m *mockSnapshotClient) CreateSnapshot(ctx context.Context, projectID, zone
 		return m.CreateSnapshotFunc(ctx, projectID, zone, diskName, snapshotName, kmsParams, labels)
 	}
 	return m.CreateSnapshotErr
+}
+
+func (m *mockSnapshotClient) GetSnapshot(ctx context.Context, projectID, snapshotName string) (*computepb.Snapshot, error) {
+	m.GetSnapshotCalled = true
+	m.LastGetProjectID = projectID
+	m.LastGetSnapshotName = snapshotName
+
+	if m.GetSnapshotFunc != nil {
+		return m.GetSnapshotFunc(ctx, projectID, snapshotName)
+	}
+	return m.GetSnapshotResp, m.GetSnapshotErr
 }
 
 func (m *mockSnapshotClient) DeleteSnapshot(ctx context.Context, projectID, snapshotName string) error {
@@ -334,5 +352,68 @@ func TestListSnapshotsByLabel(t *testing.T) {
 		assert.Equal(t, customErr, err)
 		assert.True(t, mockClient.ListSnapshotsCalled)
 		assert.Nil(t, snapshots)
+	})
+}
+
+func TestGetSnapshot(t *testing.T) {
+	// Setup logger for tests
+	logger.Setup(false, false, false)
+
+	ctx := context.Background()
+	projectID := "test-proj"
+	snapshotName := "test-snapshot"
+
+	t.Run("Success", func(t *testing.T) {
+		expectedSnapshot := &computepb.Snapshot{
+			Name: proto.String(snapshotName),
+			Labels: map[string]string{
+				"env":        "prod",
+				"managed-by": "pd-migrate",
+			},
+		}
+
+		mockClient := &mockSnapshotClient{
+			GetSnapshotResp: expectedSnapshot,
+		}
+		clients := &Clients{SnapshotClient: mockClient}
+		snapshot, err := clients.SnapshotClient.GetSnapshot(ctx, projectID, snapshotName)
+
+		assert.NoError(t, err)
+		assert.True(t, mockClient.GetSnapshotCalled)
+		assert.Equal(t, projectID, mockClient.LastGetProjectID)
+		assert.Equal(t, snapshotName, mockClient.LastGetSnapshotName)
+		assert.Equal(t, expectedSnapshot, snapshot)
+	})
+
+	t.Run("GetSnapshot Error", func(t *testing.T) {
+		expectedErr := errors.New("snapshot not found")
+		mockClient := &mockSnapshotClient{
+			GetSnapshotErr: expectedErr,
+		}
+		clients := &Clients{SnapshotClient: mockClient}
+		snapshot, err := clients.SnapshotClient.GetSnapshot(ctx, projectID, snapshotName)
+
+		assert.Error(t, err)
+		assert.Equal(t, expectedErr, err)
+		assert.True(t, mockClient.GetSnapshotCalled)
+		assert.Nil(t, snapshot)
+	})
+
+	t.Run("GetSnapshot Custom Function", func(t *testing.T) {
+		customSnapshot := &computepb.Snapshot{
+			Name:   proto.String("custom-snapshot"),
+			Labels: map[string]string{"env": "custom"},
+		}
+		mockClient := &mockSnapshotClient{
+			GetSnapshotFunc: func(ctx context.Context, projectID, snapshotName string) (*computepb.Snapshot, error) {
+				return customSnapshot, nil
+			},
+		}
+		clients := &Clients{SnapshotClient: mockClient}
+		snapshot, err := clients.SnapshotClient.GetSnapshot(ctx, projectID, snapshotName)
+
+		assert.NoError(t, err)
+		assert.True(t, mockClient.GetSnapshotCalled)
+		assert.Equal(t, customSnapshot, snapshot)
 	})
 }

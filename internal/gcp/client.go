@@ -41,34 +41,34 @@ func NewClients(ctx context.Context) (*Clients, error) {
 
 	snapshotsClient, err := compute.NewSnapshotsRESTClient(ctx, defaultOpts...)
 	if err != nil {
-		disksClient.Close()
+		_ = disksClient.Close()
 		return nil, fmt.Errorf("failed to create compute Snapshots client: %w", err)
 	}
 	logger.Op.Debug("Snapshots client initialized.")
 
 	zonesClient, err := compute.NewZonesRESTClient(ctx, defaultOpts...)
 	if err != nil {
-		disksClient.Close()
-		snapshotsClient.Close()
+		_ = disksClient.Close()
+		_ = snapshotsClient.Close()
 		return nil, fmt.Errorf("failed to create compute Zones client: %w", err)
 	}
 	logger.Op.Debug("Zones client initialized.")
 
 	regionsClient, err := compute.NewRegionsRESTClient(ctx, defaultOpts...)
 	if err != nil {
-		disksClient.Close()
-		snapshotsClient.Close()
-		zonesClient.Close()
+		_ = disksClient.Close()
+		_ = snapshotsClient.Close()
+		_ = zonesClient.Close()
 		return nil, fmt.Errorf("failed to create compute Regions client: %w", err)
 	}
 	logger.Op.Debug("Regions client initialized.")
 
 	gceClient, err := compute.NewInstancesRESTClient(ctx, defaultOpts...)
 	if err != nil {
-		disksClient.Close()
-		snapshotsClient.Close()
-		zonesClient.Close()
-		regionsClient.Close()
+		_ = disksClient.Close()
+		_ = snapshotsClient.Close()
+		_ = zonesClient.Close()
+		_ = regionsClient.Close()
 		return nil, fmt.Errorf("failed to create compute Instances (GCE) client: %w", err)
 	}
 	logger.Op.Debug("GCE client initialized.")
@@ -91,19 +91,19 @@ func NewClients(ctx context.Context) (*Clients, error) {
 func (c *Clients) Close() {
 	logger.Op.Debug("Closing GCP Compute API clients...")
 	if c.DiskClient != nil {
-		c.DiskClient.Close()
+		_ = c.DiskClient.Close()
 	}
 	if c.SnapshotClient != nil {
-		c.SnapshotClient.Close()
+		_ = c.SnapshotClient.Close()
 	}
 	if c.ComputeClient != nil {
-		c.ComputeClient.Close()
+		_ = c.ComputeClient.Close()
 	}
 	if c.Zones != nil {
-		c.Zones.Close()
+		_ = c.Zones.Close()
 	}
 	if c.Regions != nil {
-		c.Regions.Close()
+		_ = c.Regions.Close()
 	}
 	logger.Op.Debug("GCP Compute API clients closed.")
 }

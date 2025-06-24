@@ -1,0 +1,16 @@
+with-expecter: true
+dir: "{{.InterfaceDir}}/mocks"
+outpkg: mocks
+mockname: "Mock{{.InterfaceName}}"
+filename: "{{.MockName}}.go"
+packages:
+  github.com/maxkimambo/pd/internal/gcp:
+    interfaces:
+      DiskClientInterface:
+      SnapshotClientInterface:
+      ComputeClientInterface:
+  github.com/maxkimambo/pd/internal/migrator:
+    interfaces:
+      DiskMigratorInterface:
+      JobPrioritizer:
+      Worker:

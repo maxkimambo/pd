@@ -25,12 +25,19 @@ func supportsIopsAndThroughput(diskType string) bool {
 	return slices.Contains(supportedTypes, diskType)
 }
 
+// DiskClientInterface defines the high-level disk operations interface
 type DiskClientInterface interface {
+	// GetDisk retrieves a specific disk by name and zone
 	GetDisk(ctx context.Context, projectID, zone, diskName string) (*computepb.Disk, error)
+	// ListDetachedDisks lists all detached disks in the specified location, optionally filtered by labels
 	ListDetachedDisks(ctx context.Context, projectID string, location string, labelFilter string) ([]*computepb.Disk, error)
+	// CreateNewDiskFromSnapshot creates a new disk from an existing snapshot with the specified configuration
 	CreateNewDiskFromSnapshot(ctx context.Context, projectID string, zone string, newDiskName string, targetDiskType string, snapshotSource string, labels map[string]string, size int64, iops int64, throughput int64, storagePoolID string) error
+	// UpdateDiskLabel updates a single label on the specified disk
 	UpdateDiskLabel(ctx context.Context, projectID string, zone string, diskName string, labelKey string, labelValue string) error
+	// DeleteDisk deletes the specified disk
 	DeleteDisk(ctx context.Context, projectID, zone, diskName string) error
+	// Close closes the underlying client connections
 	Close() error
 }
 
