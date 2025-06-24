@@ -195,11 +195,23 @@ func (m *mockSnapshotClientForMigrator) GetSnapshot(ctx context.Context, project
 }
 
 // Implement other required interface methods as no-ops for testing
+func (m *mockSnapshotClientForMigrator) CreateSnapshotWithMetadata(ctx context.Context, projectID, zone, diskName, snapshotName string, kmsParams *gcp.SnapshotKmsParams, metadata *gcp.SnapshotMetadata) error {
+	return nil
+}
 func (m *mockSnapshotClientForMigrator) DeleteSnapshot(ctx context.Context, projectID, snapshotName string) error {
 	return nil
 }
 func (m *mockSnapshotClientForMigrator) ListSnapshotsByLabel(ctx context.Context, projectID, labelKey, labelValue string) ([]*computepb.Snapshot, error) {
 	return nil, nil
+}
+func (m *mockSnapshotClientForMigrator) ListSnapshotsBySessionID(ctx context.Context, projectID, sessionID string) ([]*computepb.Snapshot, error) {
+	return nil, nil
+}
+func (m *mockSnapshotClientForMigrator) ListExpiredSnapshots(ctx context.Context, projectID string) ([]*computepb.Snapshot, error) {
+	return nil, nil
+}
+func (m *mockSnapshotClientForMigrator) DeleteSnapshotsBySessionID(ctx context.Context, projectID, sessionID string) error {
+	return nil
 }
 func (m *mockSnapshotClientForMigrator) Close() error {
 	return nil

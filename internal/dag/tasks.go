@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/maxkimambo/pd/internal/gcp"
 	"github.com/maxkimambo/pd/internal/migrator"
@@ -65,13 +66,15 @@ func (t *DiscoveryTask) GetDiscoveredResources() interface{} {
 // SnapshotTask wraps snapshot creation operations
 type SnapshotTask struct {
 	*BaseTask
-	projectID    string
-	zone         string
-	diskName     string
-	snapshotName string
-	gcpClient    *gcp.Clients
-	config       *migrator.Config
-	created      bool
+	projectID     string
+	zone          string
+	diskName      string
+	snapshotName  string
+	gcpClient     *gcp.Clients
+	config        *migrator.Config
+	sessionID     string
+	cleanupAfter  time.Duration
+	created       bool
 }
 
 // NewSnapshotTask creates a new snapshot task
@@ -84,6 +87,24 @@ func NewSnapshotTask(id, projectID, zone, diskName, snapshotName string, gcpClie
 		snapshotName: snapshotName,
 		gcpClient:    gcpClient,
 		config:       config,
+		sessionID:    "", // Will be set by the task factory or orchestrator
+		cleanupAfter: 24 * time.Hour, // Default cleanup after 24 hours
+		created:      false,
+	}
+}
+
+// NewSnapshotTaskWithSession creates a new snapshot task with session tracking
+func NewSnapshotTaskWithSession(id, projectID, zone, diskName, snapshotName, sessionID string, gcpClient *gcp.Clients, config *migrator.Config, cleanupAfter time.Duration) *SnapshotTask {
+	return &SnapshotTask{
+		BaseTask:     NewBaseTask(id, "Snapshot", fmt.Sprintf("Create snapshot %s of disk %s", snapshotName, diskName)),
+		projectID:    projectID,
+		zone:         zone,
+		diskName:     diskName,
+		snapshotName: snapshotName,
+		gcpClient:    gcpClient,
+		config:       config,
+		sessionID:    sessionID,
+		cleanupAfter: cleanupAfter,
 		created:      false,
 	}
 }
@@ -92,15 +113,39 @@ func NewSnapshotTask(id, projectID, zone, diskName, snapshotName string, gcpClie
 func (t *SnapshotTask) Execute(ctx context.Context) error {
 	kmsParams := t.config.PopulateKmsParams()
 	
-	// Get disk labels to include in snapshot
-	disk, err := t.gcpClient.DiskClient.GetDisk(ctx, t.projectID, t.zone, t.diskName)
-	if err != nil {
-		return fmt.Errorf("failed to get disk for snapshot: %w", err)
-	}
-	
-	err = t.gcpClient.SnapshotClient.CreateSnapshot(ctx, t.projectID, t.zone, t.diskName, t.snapshotName, kmsParams, disk.GetLabels())
-	if err != nil {
-		return err
+	// Use enhanced snapshot creation if session ID is available
+	if t.sessionID != "" && t.cleanupAfter > 0 {
+		// Create snapshot metadata
+		metadata := gcp.NewSnapshotMetadata(t.sessionID, t.GetID(), t.diskName, t.cleanupAfter)
+		
+		// Get disk labels to include in snapshot metadata
+		disk, err := t.gcpClient.DiskClient.GetDisk(ctx, t.projectID, t.zone, t.diskName)
+		if err != nil {
+			return fmt.Errorf("failed to get disk for snapshot: %w", err)
+		}
+		
+		// Add disk labels to metadata
+		if disk.GetLabels() != nil {
+			for k, v := range disk.GetLabels() {
+				metadata.Labels[k] = v
+			}
+		}
+		
+		err = t.gcpClient.SnapshotClient.CreateSnapshotWithMetadata(ctx, t.projectID, t.zone, t.diskName, t.snapshotName, kmsParams, metadata)
+		if err != nil {
+			return err
+		}
+	} else {
+		// Fallback to legacy snapshot creation
+		disk, err := t.gcpClient.DiskClient.GetDisk(ctx, t.projectID, t.zone, t.diskName)
+		if err != nil {
+			return fmt.Errorf("failed to get disk for snapshot: %w", err)
+		}
+		
+		err = t.gcpClient.SnapshotClient.CreateSnapshot(ctx, t.projectID, t.zone, t.diskName, t.snapshotName, kmsParams, disk.GetLabels())
+		if err != nil {
+			return err
+		}
 	}
 	
 	t.created = true
@@ -348,5 +393,85 @@ func (t *CleanupTask) Execute(ctx context.Context) error {
 // Rollback is simplified - no operation needed
 func (t *CleanupTask) Rollback(ctx context.Context) error {
 	// Rollback functionality simplified - no operation needed
+	return nil
+}
+
+// EnhancedCleanupTask wraps multi-level cleanup operations
+type EnhancedCleanupTask struct {
+	*BaseTask
+	cleanupManager *migrator.MultiLevelCleanupManager
+	cleanupLevel   migrator.CleanupLevel
+	taskID         string
+	snapshotName   string
+}
+
+// NewEnhancedCleanupTask creates a new enhanced cleanup task for task-level cleanup
+func NewEnhancedCleanupTask(id string, cleanupManager *migrator.MultiLevelCleanupManager, taskID, snapshotName string) *EnhancedCleanupTask {
+	return &EnhancedCleanupTask{
+		BaseTask:       NewBaseTask(id, "EnhancedCleanup", fmt.Sprintf("Clean up snapshot %s for task %s", snapshotName, taskID)),
+		cleanupManager: cleanupManager,
+		cleanupLevel:   migrator.CleanupLevelTask,
+		taskID:         taskID,
+		snapshotName:   snapshotName,
+	}
+}
+
+// NewSessionCleanupTask creates a new enhanced cleanup task for session-level cleanup
+func NewSessionCleanupTask(id string, cleanupManager *migrator.MultiLevelCleanupManager) *EnhancedCleanupTask {
+	return &EnhancedCleanupTask{
+		BaseTask:       NewBaseTask(id, "SessionCleanup", "Clean up all snapshots for migration session"),
+		cleanupManager: cleanupManager,
+		cleanupLevel:   migrator.CleanupLevelSession,
+	}
+}
+
+// NewEmergencyCleanupTask creates a new enhanced cleanup task for emergency cleanup
+func NewEmergencyCleanupTask(id string, cleanupManager *migrator.MultiLevelCleanupManager) *EnhancedCleanupTask {
+	return &EnhancedCleanupTask{
+		BaseTask:       NewBaseTask(id, "EmergencyCleanup", "Clean up all expired snapshots"),
+		cleanupManager: cleanupManager,
+		cleanupLevel:   migrator.CleanupLevelEmergency,
+	}
+}
+
+// Execute performs the enhanced cleanup operation
+func (t *EnhancedCleanupTask) Execute(ctx context.Context) error {
+	var result *migrator.CleanupResult
+	var err error
+	
+	switch t.cleanupLevel {
+	case migrator.CleanupLevelTask:
+		result = t.cleanupManager.CleanupTaskSnapshot(ctx, t.taskID, t.snapshotName)
+	case migrator.CleanupLevelSession:
+		result = t.cleanupManager.CleanupSessionSnapshots(ctx)
+	case migrator.CleanupLevelEmergency:
+		result = t.cleanupManager.CleanupExpiredSnapshots(ctx)
+	default:
+		return fmt.Errorf("unknown cleanup level: %v", t.cleanupLevel)
+	}
+	
+	// Check if cleanup had any errors
+	if len(result.Errors) > 0 {
+		// Return the first error, but log all errors
+		for i, cleanupErr := range result.Errors {
+			if i == 0 {
+				err = cleanupErr
+			}
+		}
+	}
+	
+	return err
+}
+
+// Rollback is simplified - no operation needed for cleanup tasks
+func (t *EnhancedCleanupTask) Rollback(ctx context.Context) error {
+	// Rollback functionality simplified - no operation needed
+	return nil
+}
+
+// GetCleanupResult returns the result of the last cleanup operation
+func (t *EnhancedCleanupTask) GetCleanupResult() *migrator.CleanupResult {
+	// This would need to be stored during Execute() if we want to retrieve it later
+	// For now, this is a placeholder for future enhancement
 	return nil
 }
