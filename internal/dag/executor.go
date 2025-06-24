@@ -3,10 +3,12 @@ package dag
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/maxkimambo/pd/internal/logger"
+	"github.com/maxkimambo/pd/internal/progress"
 )
 
 // ExecutorConfig contains configuration for the DAG executor
@@ -526,16 +528,204 @@ func (e *Executor) logProgress() {
 	}
 }
 
-// printProgress logs current execution progress
+// printProgress logs current execution progress with enhanced details
 func (e *Executor) printProgress() {
 	completed, total := e.GetProgress()
 	if total > 0 && logger.User != nil {
-		percentage := float64(completed) / float64(total) * 100
-		elapsed := time.Since(e.startTime)
-		logger.User.Infof("Progress: %d/%d tasks completed (%.1f%%) - elapsed: %v",
-			completed, total, percentage, elapsed.Round(time.Second))
+		// Create enhanced progress info
+		progressInfo := e.buildProgressInfo(completed, total)
+		
+		// Use enhanced reporter
+		reporter := progress.NewReporter()
+		progressReport := reporter.Report(progressInfo)
+		
+		logger.User.Info(progressReport)
 	}
 }
+
+// buildProgressInfo creates detailed progress information
+func (e *Executor) buildProgressInfo(completed, total int) progress.ProgressInfo {
+	e.mutex.RLock()
+	defer e.mutex.RUnlock()
+	
+	elapsed := time.Since(e.startTime)
+	
+	// Calculate task breakdown by type
+	taskBreakdown := make(map[progress.TaskType]progress.TaskStats)
+	instanceStats := make(map[string]progress.InstanceProgress)
+	runningCount := 0
+	failedCount := 0
+	pendingCount := 0
+	currentOperation := ""
+	
+	// Get all node IDs from the DAG
+	nodeIDs := e.dag.GetAllNodes()
+	
+	// Analyze running tasks and task types
+	for _, nodeID := range nodeIDs {
+		node, err := e.dag.GetNode(nodeID)
+		if err != nil {
+			continue
+		}
+		
+		task := node.GetTask()
+		if task != nil {
+			taskType := e.getTaskType(task.GetID())
+			
+			if _, exists := taskBreakdown[taskType]; !exists {
+				taskBreakdown[taskType] = progress.TaskStats{}
+			}
+			stats := taskBreakdown[taskType]
+			stats.Total++
+			
+			if result, hasResult := e.results[nodeID]; hasResult {
+				if result.Success {
+					stats.Completed++
+				} else {
+					stats.Failed++
+					failedCount++
+				}
+			} else {
+				// Task is pending (not started yet)
+				stats.Pending++
+				pendingCount++
+			}
+			
+			taskBreakdown[taskType] = stats
+			
+			// Track instance progress
+			instanceName := e.extractInstanceName(task.GetID())
+			if instanceName != "" {
+				if _, exists := instanceStats[instanceName]; !exists {
+					instanceStats[instanceName] = progress.InstanceProgress{
+						InstanceName: instanceName,
+						Status:       "pending",
+						CurrentPhase: progress.PhaseDiscovery,
+					}
+				}
+				
+				instanceProg := instanceStats[instanceName]
+				taskPhase := e.getTaskPhase(task.GetID())
+				
+				if result, hasResult := e.results[nodeID]; hasResult {
+					if result.Success {
+						instanceProg.DisksProcessed++
+						instanceProg.Status = "completed"
+						// Update to the latest completed phase for this instance
+						instanceProg.CurrentPhase = taskPhase
+					} else {
+						instanceProg.Status = "failed"
+						instanceProg.CurrentPhase = taskPhase
+					}
+				} else {
+					// Task is pending - only update phase if this is earlier than current
+					if e.isEarlierPhase(taskPhase, instanceProg.CurrentPhase) {
+						instanceProg.CurrentPhase = taskPhase
+					}
+					// Keep existing status if already processing/failed
+					if instanceProg.Status == "pending" {
+						instanceProg.Status = "pending"
+					}
+				}
+				
+				instanceStats[instanceName] = instanceProg
+			}
+		}
+	}
+	
+	// Calculate ETA
+	eta := progress.CalculateETA(completed, total, elapsed)
+	
+	return progress.ProgressInfo{
+		CurrentPhase:      e.getCurrentPhase(currentOperation),
+		TotalTasks:        total,
+		CompletedTasks:    completed,
+		FailedTasks:       failedCount,
+		RunningTasks:      runningCount,
+		ElapsedTime:       elapsed,
+		EstimatedTimeLeft: eta,
+		TaskBreakdown:     taskBreakdown,
+		CurrentOperation:  currentOperation,
+		InstanceStats:     instanceStats,
+	}
+}
+
+// getTaskType determines the task type from task ID
+func (e *Executor) getTaskType(taskID string) progress.TaskType {
+	if strings.Contains(taskID, "snapshot") {
+		return progress.TaskTypeSnapshot
+	} else if strings.Contains(taskID, "shutdown") || strings.Contains(taskID, "startup") {
+		return progress.TaskTypeInstanceState
+	} else if strings.Contains(taskID, "attach") || strings.Contains(taskID, "detach") {
+		return progress.TaskTypeDiskAttachment
+	} else if strings.Contains(taskID, "migrate") {
+		return progress.TaskTypeDiskMigration
+	} else if strings.Contains(taskID, "cleanup") {
+		return progress.TaskTypeCleanup
+	}
+	return progress.TaskType("Unknown")
+}
+
+// getCurrentPhase determines the current migration phase
+func (e *Executor) getCurrentPhase(currentOperation string) progress.Phase {
+	if strings.Contains(currentOperation, "snapshot") {
+		return progress.PhaseSnapshot
+	} else if strings.Contains(currentOperation, "shutdown") {
+		return progress.PhaseShutdown
+	} else if strings.Contains(currentOperation, "detach") {
+		return progress.PhaseDetach
+	} else if strings.Contains(currentOperation, "migrate") {
+		return progress.PhaseMigration
+	} else if strings.Contains(currentOperation, "attach") {
+		return progress.PhaseAttach
+	} else if strings.Contains(currentOperation, "startup") {
+		return progress.PhaseStartup
+	} else if strings.Contains(currentOperation, "cleanup") {
+		return progress.PhaseCleanup
+	}
+	return progress.Phase("Processing")
+}
+
+// getTaskPhase determines the phase for a task
+func (e *Executor) getTaskPhase(taskID string) progress.Phase {
+	return e.getCurrentPhase(taskID)
+}
+
+// isEarlierPhase determines if phase1 comes before phase2 in the migration sequence
+func (e *Executor) isEarlierPhase(phase1, phase2 progress.Phase) bool {
+	phaseOrder := map[progress.Phase]int{
+		progress.PhaseDiscovery:  1,
+		progress.PhaseValidation: 2,
+		progress.PhaseSnapshot:   3,
+		progress.PhaseShutdown:   4,
+		progress.PhaseDetach:     5,
+		progress.PhaseMigration:  6,
+		progress.PhaseAttach:     7,
+		progress.PhaseStartup:    8,
+		progress.PhaseCleanup:    9,
+		progress.PhaseCompletion: 10,
+	}
+	
+	order1, exists1 := phaseOrder[phase1]
+	order2, exists2 := phaseOrder[phase2]
+	
+	if !exists1 || !exists2 {
+		return false
+	}
+	
+	return order1 < order2
+}
+
+// extractInstanceName extracts instance name from task ID
+func (e *Executor) extractInstanceName(taskID string) string {
+	// Task IDs typically follow pattern: operation_instance_disk
+	parts := strings.Split(taskID, "_")
+	if len(parts) >= 2 {
+		return parts[1]
+	}
+	return ""
+}
+
 
 // logFinalProgress logs the final execution summary
 func (e *Executor) logFinalProgress() {

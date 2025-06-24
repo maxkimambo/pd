@@ -14,6 +14,22 @@ func ExtractZoneName(zone string) string {
 	return parts[len(parts)-1]
 }
 
+// ExtractZoneFromDiskURL extracts the zone name from a GCP disk URL
+// URL format: projects/PROJECT/zones/ZONE/disks/DISK_NAME
+func ExtractZoneFromDiskURL(diskURL string) string {
+	if diskURL == "" {
+		return ""
+	}
+	parts := strings.Split(diskURL, "/")
+	// Look for the "zones" part and get the next element
+	for i, part := range parts {
+		if part == "zones" && i+1 < len(parts) {
+			return parts[i+1]
+		}
+	}
+	return ""
+}
+
 func ExtractDiskType(diskType string) string {
 	if diskType == "" {
 		return ""

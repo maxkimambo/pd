@@ -346,10 +346,10 @@ func (o *DAGOrchestrator) isDiskAlreadyTargetType(attachedDisk *computepb.Attach
 		return false
 	}
 
-	// Extract zone from the source URL
-	zoneName := utils.ExtractZoneName(attachedDisk.GetSource())
+	// Use the zone from config instead of trying to extract from disk URL
+	zoneName := o.config.Zone
 	if zoneName == "" {
-		// If we can't determine the zone, include the disk for migration to be safe
+		// If no zone configured, include the disk for migration to be safe
 		return false
 	}
 
@@ -362,8 +362,10 @@ func (o *DAGOrchestrator) isDiskAlreadyTargetType(attachedDisk *computepb.Attach
 		// If we can't get disk details, include it for migration to be safe
 		if logger.Op != nil {
 			logger.Op.WithFields(map[string]interface{}{
-				"disk":  diskName,
-				"error": err.Error(),
+				"disk":    diskName,
+				"zone":    zoneName,
+				"project": o.config.ProjectID,
+				"error":   err.Error(),
 			}).Warn("Could not get disk details for type check, including in migration")
 		}
 		return false
