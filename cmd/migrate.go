@@ -15,7 +15,7 @@ func init() {
 	// Register new DAG-based commands as default
 	migrateCmd.AddCommand(diskCmd)
 	migrateCmd.AddCommand(computeCmd)
-	
+
 	// Register legacy commands as hidden fallbacks
 	diskCmdLegacy.Hidden = true
 	computeCmdLegacy.Hidden = true

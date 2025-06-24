@@ -11,24 +11,24 @@ import (
 
 // JobResult represents the result of a migration job
 type JobResult struct {
-	JobID            string
-	InstanceName     string
-	Success          bool
-	Error            error
+	JobID             string
+	InstanceName      string
+	Success           bool
+	Error             error
 	InstanceMigration *InstanceMigration
-	ProcessedAt      time.Time
+	ProcessedAt       time.Time
 }
 
 // MigrationWorker implements the Worker interface
 type MigrationWorker struct {
-	id                  int
-	jobQueue           *JobQueue
-	resultChan         chan *JobResult
-	diskMigrator       DiskMigratorInterface
+	id                   int
+	jobQueue             *JobQueue
+	resultChan           chan *JobResult
+	diskMigrator         DiskMigratorInterface
 	instanceStateManager *InstanceStateManager
-	ctx                context.Context
-	cancel             context.CancelFunc
-	wg                 *sync.WaitGroup
+	ctx                  context.Context
+	cancel               context.CancelFunc
+	wg                   *sync.WaitGroup
 }
 
 // NewMigrationWorker creates a new migration worker
@@ -43,13 +43,13 @@ func NewMigrationWorker(
 	ctx, cancel := context.WithCancel(context.Background())
 	return &MigrationWorker{
 		id:                   id,
-		jobQueue:            jobQueue,
-		resultChan:          resultChan,
-		diskMigrator:        diskMigrator,
+		jobQueue:             jobQueue,
+		resultChan:           resultChan,
+		diskMigrator:         diskMigrator,
 		instanceStateManager: instanceStateManager,
-		ctx:                 ctx,
-		cancel:              cancel,
-		wg:                  wg,
+		ctx:                  ctx,
+		cancel:               cancel,
+		wg:                   wg,
 	}
 }
 
@@ -74,7 +74,7 @@ func (w *MigrationWorker) ProcessJob(job *MigrationJob) error {
 
 	// Store initial instance state
 	initialState := w.instanceStateManager.GetState(job.Instance)
-	
+
 	// Create instance migration
 	instanceMigration := &InstanceMigration{
 		Instance:     job.Instance,
@@ -95,7 +95,7 @@ func (w *MigrationWorker) ProcessJob(job *MigrationJob) error {
 			Target: job.GetInstanceName(),
 			Cause:  err,
 		})
-		
+
 		logger.Op.WithFields(map[string]interface{}{
 			"workerID":     w.id,
 			"jobID":        job.ID,
@@ -105,7 +105,7 @@ func (w *MigrationWorker) ProcessJob(job *MigrationJob) error {
 	} else {
 		result.Success = true
 		instanceMigration.Status = MigrationStatusCompleted
-		
+
 		logger.Op.WithFields(map[string]interface{}{
 			"workerID":     w.id,
 			"jobID":        job.ID,
@@ -169,7 +169,7 @@ func (w *MigrationWorker) Start() {
 					// Use a timeout channel to avoid blocking indefinitely
 					jobChan := make(chan *MigrationJob, 1)
 					errChan := make(chan error, 1)
-					
+
 					go func() {
 						job, err := w.jobQueue.Dequeue()
 						if err != nil {
@@ -178,10 +178,10 @@ func (w *MigrationWorker) Start() {
 							jobChan <- job
 						}
 					}()
-					
+
 					var job *MigrationJob
 					var err error
-					
+
 					select {
 					case <-w.ctx.Done():
 						return
@@ -212,7 +212,7 @@ func (w *MigrationWorker) Start() {
 							continue
 						}
 					}
-					
+
 					if job == nil {
 						continue
 					}
@@ -222,12 +222,12 @@ func (w *MigrationWorker) Start() {
 					if err != nil && job.CanRetry() {
 						job.IncrementAttempts()
 						logger.Op.WithFields(map[string]interface{}{
-							"workerID": w.id,
-							"jobID":    job.ID,
-							"attempts": job.Attempts,
+							"workerID":   w.id,
+							"jobID":      job.ID,
+							"attempts":   job.Attempts,
 							"maxRetries": job.MaxRetries,
 						}).Info("Retrying failed job")
-						
+
 						// Re-enqueue for retry
 						if retryErr := w.jobQueue.Enqueue(job); retryErr != nil {
 							logger.Op.WithFields(map[string]interface{}{
@@ -251,15 +251,15 @@ func (w *MigrationWorker) Stop() {
 // WorkerPool manages a pool of migration workers
 type WorkerPool struct {
 	workers              []*MigrationWorker
-	jobQueue            *JobQueue
-	resultChan          chan *JobResult
-	concurrency         int
-	shutdownChan        chan struct{}
-	wg                  sync.WaitGroup
-	diskMigrator        DiskMigratorInterface
+	jobQueue             *JobQueue
+	resultChan           chan *JobResult
+	concurrency          int
+	shutdownChan         chan struct{}
+	wg                   sync.WaitGroup
+	diskMigrator         DiskMigratorInterface
 	instanceStateManager *InstanceStateManager
-	started             bool
-	mu                  sync.RWMutex
+	started              bool
+	mu                   sync.RWMutex
 }
 
 // NewWorkerPool creates a new worker pool
@@ -271,13 +271,13 @@ func NewWorkerPool(
 ) *WorkerPool {
 	return &WorkerPool{
 		workers:              make([]*MigrationWorker, 0, concurrency),
-		jobQueue:            jobQueue,
-		resultChan:          make(chan *JobResult, concurrency*10),
-		concurrency:         concurrency,
-		shutdownChan:        make(chan struct{}),
-		diskMigrator:        diskMigrator,
+		jobQueue:             jobQueue,
+		resultChan:           make(chan *JobResult, concurrency*10),
+		concurrency:          concurrency,
+		shutdownChan:         make(chan struct{}),
+		diskMigrator:         diskMigrator,
 		instanceStateManager: instanceStateManager,
-		started:             false,
+		started:              false,
 	}
 }
 
@@ -382,7 +382,7 @@ func (p *WorkerPool) GetWorkerCount() int {
 // DrainResults returns all remaining results from the result channel
 func (p *WorkerPool) DrainResults() []*JobResult {
 	var results []*JobResult
-	
+
 	for {
 		select {
 		case result := <-p.resultChan:

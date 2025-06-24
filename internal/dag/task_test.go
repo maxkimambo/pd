@@ -10,7 +10,7 @@ import (
 
 func TestNewBaseTask(t *testing.T) {
 	task := NewBaseTask("test-1", "Test migration task", "migration")
-	
+
 	assert.Equal(t, "test-1", task.GetID())
 	assert.Equal(t, "Test migration task", task.GetName())
 	assert.Equal(t, "migration", task.GetType())
@@ -59,7 +59,7 @@ func TestMockTask_Execute(t *testing.T) {
 		{
 			name: "Success with custom function",
 			executeFunc: func(ctx context.Context) (*TaskResult, error) {
-				result := NewTaskResult("id", "type") 
+				result := NewTaskResult("id", "type")
 				result.MarkStarted()
 				result.MarkCompleted()
 				return result, nil
@@ -72,9 +72,9 @@ func TestMockTask_Execute(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			task := newMockTask("test-1", "test", "Test task")
 			task.executeFunc = tt.executeFunc
-			
+
 			result, err := task.Execute(context.Background())
-			
+
 			assert.NotNil(t, result)
 			if tt.expectError {
 				assert.Error(t, err)
@@ -90,12 +90,12 @@ func TestMockTask_Execute(t *testing.T) {
 // Rollback functionality has been removed from the simplified Task interface
 
 func TestTask_InterfaceCompliance(t *testing.T) {
-	// Verify that mockTask implements Task interface  
+	// Verify that mockTask implements Task interface
 	var task Task = newMockTask("test", "description", "type")
-	
+
 	assert.Equal(t, "test", task.GetID())
 	assert.Equal(t, "description", task.GetName())
-	
+
 	// Test Execute method returns TaskResult
 	result, err := task.Execute(context.Background())
 	assert.NoError(t, err)
@@ -106,11 +106,11 @@ func TestTask_InterfaceCompliance(t *testing.T) {
 
 func TestTask_ContextCancellation(t *testing.T) {
 	task := newMockTask("test-1", "test", "Test task")
-	
+
 	// Test with cancelled context
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel() // Cancel immediately
-	
+
 	task.executeFunc = func(ctx context.Context) (*TaskResult, error) {
 		result := NewTaskResult("test-1", "Test task")
 		result.MarkStarted()
@@ -121,7 +121,7 @@ func TestTask_ContextCancellation(t *testing.T) {
 		result.MarkCompleted()
 		return result, nil
 	}
-	
+
 	result, err := task.Execute(ctx)
 	assert.Error(t, err)
 	assert.Equal(t, context.Canceled, err)

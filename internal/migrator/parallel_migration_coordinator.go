@@ -14,18 +14,18 @@ import (
 type ParallelMigrationConfig struct {
 	// Base migration configuration
 	BaseConfig *Config
-	
+
 	// Parallelism settings
 	MaxConcurrency int
 	QueueSize      int
-	
+
 	// Timeout settings
 	WorkerStartTimeout time.Duration
 	JobTimeout         time.Duration
 	ShutdownTimeout    time.Duration
-	
+
 	// Progress reporting
-	ProgressReportInterval time.Duration
+	ProgressReportInterval  time.Duration
 	EnableProgressReporting bool
 }
 
@@ -36,13 +36,13 @@ type MigrationSummary struct {
 	SuccessfulJobs    int
 	FailedJobsCount   int
 	CompletionPercent float64
-	
+
 	// Timing information
 	StartTime       time.Time
 	EndTime         time.Time
 	TotalDuration   time.Duration
 	AverageDuration time.Duration
-	
+
 	// Instance and disk statistics
 	TotalInstances      int
 	SuccessfulInstances int
@@ -50,17 +50,17 @@ type MigrationSummary struct {
 	TotalDisks          int
 	SuccessfulDisks     int
 	FailedDisks         int
-	
+
 	// Detailed results
-	JobResults      []*JobResult
-	FailedJobs      []*JobResult
-	RetryableJobs   []*JobResult
-	
+	JobResults    []*JobResult
+	FailedJobs    []*JobResult
+	RetryableJobs []*JobResult
+
 	// Performance metrics
-	ThroughputJobsPerSecond     float64
+	ThroughputJobsPerSecond      float64
 	ThroughputInstancesPerSecond float64
-	PeakConcurrency             int
-	AverageQueueDepth           float64
+	PeakConcurrency              int
+	AverageQueueDepth            float64
 }
 
 // ParallelMigrationCoordinator manages the overall parallel migration process
@@ -69,25 +69,25 @@ type ParallelMigrationCoordinator struct {
 	discoveryService *InstanceDiscovery
 	workerPool       *WorkerPool
 	jobQueue         *JobQueue
-	
+
 	// Resource management
 	resourceLocker  *ResourceLocker
 	progressTracker *ProgressTracker
-	
+
 	// Configuration
 	config *ParallelMigrationConfig
-	
+
 	// State management
-	mu               sync.RWMutex
-	isStarted        bool
-	isShutdown       bool
-	startTime        time.Time
-	endTime          time.Time
-	
+	mu         sync.RWMutex
+	isStarted  bool
+	isShutdown bool
+	startTime  time.Time
+	endTime    time.Time
+
 	// Results collection
-	results          []*JobResult
-	resultsMu        sync.Mutex
-	
+	results   []*JobResult
+	resultsMu sync.Mutex
+
 	// Control channels
 	shutdownCh       chan struct{}
 	doneCh           chan struct{}
@@ -99,19 +99,19 @@ func NewParallelMigrationCoordinator(config *ParallelMigrationConfig) (*Parallel
 	if config == nil {
 		return nil, fmt.Errorf("config cannot be nil")
 	}
-	
+
 	if config.BaseConfig == nil {
 		return nil, fmt.Errorf("base config cannot be nil")
 	}
-	
+
 	if config.MaxConcurrency <= 0 {
 		config.MaxConcurrency = 4 // Default concurrency
 	}
-	
+
 	if config.QueueSize <= 0 {
 		config.QueueSize = config.MaxConcurrency * 10 // Default queue size
 	}
-	
+
 	// Set default timeouts
 	if config.WorkerStartTimeout == 0 {
 		config.WorkerStartTimeout = 30 * time.Second
@@ -137,14 +137,14 @@ func NewParallelMigrationCoordinator(config *ParallelMigrationConfig) (*Parallel
 	jobQueue := NewJobQueue(config.QueueSize)
 	resourceLocker := NewResourceLocker()
 	progressTracker := NewProgressTracker()
-	
+
 	// Create discovery service
 	discoveryService := NewInstanceDiscovery(clients.ComputeClient, clients.DiskClient)
-	
+
 	// Create disk migrator for workers
 	diskMigrator := NewDiskMigrator(clients.ComputeClient, clients.DiskClient, clients.SnapshotClient, config.BaseConfig)
 	instanceStateManager := NewInstanceStateManager()
-	
+
 	// Create worker pool
 	workerPool := NewWorkerPool(config.MaxConcurrency, jobQueue, diskMigrator, instanceStateManager)
 
@@ -271,9 +271,9 @@ func (c *ParallelMigrationCoordinator) DiscoverAndQueueJobs(ctx context.Context)
 	}
 
 	logger.Op.WithFields(map[string]interface{}{
-		"totalJobs":   len(jobs),
-		"queuedJobs":  queuedCount,
-		"failedJobs":  len(jobs) - queuedCount,
+		"totalJobs":  len(jobs),
+		"queuedJobs": queuedCount,
+		"failedJobs": len(jobs) - queuedCount,
 	}).Info("Finished queuing migration jobs")
 
 	return nil
@@ -287,9 +287,9 @@ func (c *ParallelMigrationCoordinator) calculateJobPriority(migration *InstanceM
 	// - Disk size
 	// - Business criticality
 	// - Time constraints
-	
+
 	diskCount := len(migration.Disks)
-	
+
 	switch {
 	case diskCount >= 5:
 		return HighPriority // Many disks = higher priority
@@ -315,9 +315,9 @@ func (c *ParallelMigrationCoordinator) sortJobsByPriority(jobs []*MigrationJob) 
 // collectResults collects results from the worker pool
 func (c *ParallelMigrationCoordinator) collectResults() {
 	defer close(c.doneCh)
-	
+
 	resultChan := c.workerPool.GetResultChannel()
-	
+
 	for {
 		select {
 		case result, ok := <-resultChan:
@@ -325,17 +325,17 @@ func (c *ParallelMigrationCoordinator) collectResults() {
 				// Channel closed, all workers done
 				return
 			}
-			
+
 			c.resultsMu.Lock()
 			c.results = append(c.results, result)
 			c.resultsMu.Unlock()
-			
+
 			// Trigger progress report
 			select {
 			case c.progressReportCh <- struct{}{}:
 			default:
 			}
-			
+
 		case <-c.shutdownCh:
 			return
 		}
@@ -367,14 +367,14 @@ func (c *ParallelMigrationCoordinator) logProgress() {
 	queueSize := c.jobQueue.Size()
 	totalResults := len(c.results)
 	successCount := 0
-	
+
 	for _, result := range c.results {
 		if result.Success {
 			successCount++
 		}
 	}
 
-	logger.User.Infof("Migration Progress: %d completed, %d successful, %d in queue", 
+	logger.User.Infof("Migration Progress: %d completed, %d successful, %d in queue",
 		totalResults, successCount, queueSize)
 }
 
@@ -431,10 +431,10 @@ func (c *ParallelMigrationCoordinator) generateMigrationSummary() *MigrationSumm
 	defer c.resultsMu.Unlock()
 
 	summary := &MigrationSummary{
-		StartTime: c.startTime,
-		EndTime:   c.endTime,
-		JobResults: make([]*JobResult, len(c.results)),
-		FailedJobs: make([]*JobResult, 0),
+		StartTime:     c.startTime,
+		EndTime:       c.endTime,
+		JobResults:    make([]*JobResult, len(c.results)),
+		FailedJobs:    make([]*JobResult, 0),
 		RetryableJobs: make([]*JobResult, 0),
 	}
 
@@ -449,7 +449,7 @@ func (c *ParallelMigrationCoordinator) generateMigrationSummary() *MigrationSumm
 		if result.Success {
 			summary.SuccessfulJobs++
 			summary.SuccessfulInstances++
-			
+
 			if result.InstanceMigration != nil {
 				summary.SuccessfulDisks += len(result.InstanceMigration.Results)
 				for _, diskResult := range result.InstanceMigration.Results {
@@ -464,7 +464,7 @@ func (c *ParallelMigrationCoordinator) generateMigrationSummary() *MigrationSumm
 			summary.FailedJobsCount++
 			summary.FailedInstances++
 			summary.FailedJobs = append(summary.FailedJobs, result)
-			
+
 			// Check if job is retryable
 			if result.InstanceMigration != nil {
 				// Add logic to determine if job is retryable based on error type
@@ -543,7 +543,7 @@ func (c *ParallelMigrationCoordinator) Shutdown(timeout time.Duration) error {
 	// Close the job queue
 	if c.jobQueue != nil {
 		c.jobQueue.Shutdown()
-		
+
 		// Drain any remaining jobs
 		remainingJobs := c.jobQueue.DrainJobs()
 		if len(remainingJobs) > 0 {
@@ -599,13 +599,13 @@ func (c *ParallelMigrationCoordinator) GetStatus() map[string]interface{} {
 	defer c.resultsMu.Unlock()
 
 	status := map[string]interface{}{
-		"is_started":        c.isStarted,
-		"is_shutdown":       c.isShutdown,
-		"start_time":        c.startTime,
-		"queue_size":        c.jobQueue.Size(),
-		"worker_count":      c.workerPool.GetWorkerCount(),
+		"is_started":          c.isStarted,
+		"is_shutdown":         c.isShutdown,
+		"start_time":          c.startTime,
+		"queue_size":          c.jobQueue.Size(),
+		"worker_count":        c.workerPool.GetWorkerCount(),
 		"worker_pool_started": c.workerPool.IsStarted(),
-		"total_results":     len(c.results),
+		"total_results":       len(c.results),
 	}
 
 	if c.isStarted && !c.startTime.IsZero() {
@@ -635,11 +635,11 @@ func (c *ParallelMigrationCoordinator) GetStatus() map[string]interface{} {
 // shutdown internal shutdown helper
 func (c *ParallelMigrationCoordinator) shutdown() {
 	close(c.shutdownCh)
-	
+
 	if c.workerPool != nil && c.workerPool.IsStarted() {
 		c.workerPool.Shutdown(c.config.ShutdownTimeout)
 	}
-	
+
 	if c.jobQueue != nil {
 		c.jobQueue.Shutdown()
 	}

@@ -6,9 +6,9 @@ import (
 	"testing"
 	"time"
 
+	computepb "cloud.google.com/go/compute/apiv1/computepb"
 	"github.com/maxkimambo/pd/internal/gcp"
 	"github.com/maxkimambo/pd/internal/logger"
-	computepb "cloud.google.com/go/compute/apiv1/computepb"
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/protobuf/proto"
 )
@@ -501,11 +501,11 @@ func TestDiskMigrator_WaitForSnapshotReady(t *testing.T) {
 		}
 
 		migrator := NewDiskMigrator(nil, nil, snapshotClient, config)
-		
+
 		// Use a shorter context timeout for testing
 		ctxWithTimeout, cancel := context.WithTimeout(ctx, 30*time.Second)
 		defer cancel()
-		
+
 		err := migrator.waitForSnapshotReady(ctxWithTimeout, projectID, snapshotName)
 
 		assert.NoError(t, err)
@@ -522,11 +522,11 @@ func TestDiskMigrator_WaitForSnapshotReady(t *testing.T) {
 		}
 
 		migrator := NewDiskMigrator(nil, nil, snapshotClient, config)
-		
+
 		// Cancel context immediately
 		ctxWithCancel, cancel := context.WithCancel(ctx)
 		cancel()
-		
+
 		err := migrator.waitForSnapshotReady(ctxWithCancel, projectID, snapshotName)
 
 		assert.Error(t, err)

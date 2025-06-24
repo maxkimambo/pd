@@ -32,7 +32,7 @@ func (d *DAG) AddNode(node Node) error {
 	if node == nil {
 		return fmt.Errorf("node cannot be nil")
 	}
-	
+
 	id := node.ID()
 	if id == "" {
 		return fmt.Errorf("node ID cannot be empty")
@@ -40,17 +40,17 @@ func (d *DAG) AddNode(node Node) error {
 
 	d.mutex.Lock()
 	defer d.mutex.Unlock()
-	
+
 	// Check if node already exists
 	if _, exists := d.nodes[id]; exists {
 		return fmt.Errorf("node with ID %s already exists", id)
 	}
-	
+
 	// Add to graph using dagger API
 	path := dagger.Path{XID: id, XType: DefaultNodeType}
 	attributes := dagger.Attributes{"node": node}
 	d.graph.SetNode(path, attributes)
-	
+
 	d.nodes[id] = node
 	return nil
 }
@@ -59,7 +59,7 @@ func (d *DAG) AddNode(node Node) error {
 func (d *DAG) AddDependency(fromID, toID string) error {
 	d.mutex.Lock()
 	defer d.mutex.Unlock()
-	
+
 	// Verify both nodes exist
 	if _, exists := d.nodes[fromID]; !exists {
 		return fmt.Errorf("source node %s does not exist", fromID)
@@ -67,7 +67,7 @@ func (d *DAG) AddDependency(fromID, toID string) error {
 	if _, exists := d.nodes[toID]; !exists {
 		return fmt.Errorf("target node %s does not exist", toID)
 	}
-	
+
 	// Add edge in graph
 	fromPath := dagger.Path{XID: fromID, XType: DefaultNodeType}
 	toPath := dagger.Path{XID: toID, XType: DefaultNodeType}
@@ -75,12 +75,12 @@ func (d *DAG) AddDependency(fromID, toID string) error {
 		Path:       dagger.Path{XType: DefaultEdgeType},
 		Attributes: dagger.Attributes{"type": "dependency"},
 	}
-	
+
 	_, err := d.graph.SetEdge(fromPath, toPath, edgeNode)
 	if err != nil {
 		return fmt.Errorf("failed to add dependency from %s to %s: %w", fromID, toID, err)
 	}
-	
+
 	return nil
 }
 
@@ -88,12 +88,12 @@ func (d *DAG) AddDependency(fromID, toID string) error {
 func (d *DAG) GetNode(id string) (Node, error) {
 	d.mutex.RLock()
 	defer d.mutex.RUnlock()
-	
+
 	node, exists := d.nodes[id]
 	if !exists {
 		return nil, fmt.Errorf("node %s not found", id)
 	}
-	
+
 	return node, nil
 }
 
@@ -101,19 +101,19 @@ func (d *DAG) GetNode(id string) (Node, error) {
 func (d *DAG) GetDependencies(id string) ([]string, error) {
 	d.mutex.RLock()
 	defer d.mutex.RUnlock()
-	
+
 	if _, exists := d.nodes[id]; !exists {
 		return nil, fmt.Errorf("node %s not found", id)
 	}
-	
+
 	var deps []string
 	nodePath := dagger.Path{XID: id, XType: DefaultNodeType}
-	
+
 	d.graph.RangeEdgesTo(DefaultEdgeType, nodePath, func(e dagger.Edge) bool {
 		deps = append(deps, e.From.XID)
 		return true
 	})
-	
+
 	return deps, nil
 }
 
@@ -121,19 +121,19 @@ func (d *DAG) GetDependencies(id string) ([]string, error) {
 func (d *DAG) GetDependents(id string) ([]string, error) {
 	d.mutex.RLock()
 	defer d.mutex.RUnlock()
-	
+
 	if _, exists := d.nodes[id]; !exists {
 		return nil, fmt.Errorf("node %s not found", id)
 	}
-	
+
 	var dependents []string
 	nodePath := dagger.Path{XID: id, XType: DefaultNodeType}
-	
+
 	d.graph.RangeEdgesFrom(DefaultEdgeType, nodePath, func(e dagger.Edge) bool {
 		dependents = append(dependents, e.To.XID)
 		return true
 	})
-	
+
 	return dependents, nil
 }
 
@@ -141,12 +141,12 @@ func (d *DAG) GetDependents(id string) ([]string, error) {
 func (d *DAG) GetAllNodes() []string {
 	d.mutex.RLock()
 	defer d.mutex.RUnlock()
-	
+
 	nodeIDs := make([]string, 0, len(d.nodes))
 	for id := range d.nodes {
 		nodeIDs = append(nodeIDs, id)
 	}
-	
+
 	return nodeIDs
 }
 
@@ -154,7 +154,7 @@ func (d *DAG) GetAllNodes() []string {
 func (d *DAG) GetRootNodes() ([]string, error) {
 	d.mutex.RLock()
 	defer d.mutex.RUnlock()
-	
+
 	var roots []string
 	for id := range d.nodes {
 		deps, err := d.getDependenciesUnsafe(id)
@@ -165,7 +165,7 @@ func (d *DAG) GetRootNodes() ([]string, error) {
 			roots = append(roots, id)
 		}
 	}
-	
+
 	return roots, nil
 }
 
@@ -173,12 +173,12 @@ func (d *DAG) GetRootNodes() ([]string, error) {
 func (d *DAG) getDependenciesUnsafe(id string) ([]string, error) {
 	var deps []string
 	nodePath := dagger.Path{XID: id, XType: DefaultNodeType}
-	
+
 	d.graph.RangeEdgesTo(DefaultEdgeType, nodePath, func(e dagger.Edge) bool {
 		deps = append(deps, e.From.XID)
 		return true
 	})
-	
+
 	return deps, nil
 }
 
@@ -186,7 +186,7 @@ func (d *DAG) getDependenciesUnsafe(id string) ([]string, error) {
 func (d *DAG) GetReadyNodes() ([]string, error) {
 	d.mutex.RLock()
 	defer d.mutex.RUnlock()
-	
+
 	var ready []string
 	for id, node := range d.nodes {
 		// Skip if already completed, failed, cancelled, or running
@@ -194,13 +194,13 @@ func (d *DAG) GetReadyNodes() ([]string, error) {
 		if status == StatusCompleted || status == StatusFailed || status == StatusCancelled || status == StatusRunning {
 			continue
 		}
-		
+
 		// Check if all dependencies are completed
 		deps, err := d.getDependenciesUnsafe(id)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get dependencies for %s: %w", id, err)
 		}
-		
+
 		allDepsCompleted := true
 		for _, depID := range deps {
 			depNode := d.nodes[depID]
@@ -209,12 +209,12 @@ func (d *DAG) GetReadyNodes() ([]string, error) {
 				break
 			}
 		}
-		
+
 		if allDepsCompleted {
 			ready = append(ready, id)
 		}
 	}
-	
+
 	return ready, nil
 }
 
@@ -222,13 +222,13 @@ func (d *DAG) GetReadyNodes() ([]string, error) {
 func (d *DAG) Validate() error {
 	d.mutex.RLock()
 	defer d.mutex.RUnlock()
-	
+
 	// Check for cycles using topological sort
 	// If we can't complete a topological sort, there's a cycle
 	if d.hasCycle() {
 		return fmt.Errorf("DAG contains cycles")
 	}
-	
+
 	return nil
 }
 
@@ -236,7 +236,7 @@ func (d *DAG) Validate() error {
 func (d *DAG) hasCycle() bool {
 	visited := make(map[string]bool)
 	recStack := make(map[string]bool)
-	
+
 	for id := range d.nodes {
 		if !visited[id] {
 			if d.hasCycleDFS(id, visited, recStack) {
@@ -244,7 +244,7 @@ func (d *DAG) hasCycle() bool {
 			}
 		}
 	}
-	
+
 	return false
 }
 
@@ -252,13 +252,13 @@ func (d *DAG) hasCycle() bool {
 func (d *DAG) hasCycleDFS(nodeID string, visited, recStack map[string]bool) bool {
 	visited[nodeID] = true
 	recStack[nodeID] = true
-	
+
 	// Get all dependents (outgoing edges)
 	dependents, err := d.getDependentsUnsafe(nodeID)
 	if err != nil {
 		return false // If we can't get dependents, assume no cycle for this branch
 	}
-	
+
 	for _, depID := range dependents {
 		if !visited[depID] {
 			if d.hasCycleDFS(depID, visited, recStack) {
@@ -268,7 +268,7 @@ func (d *DAG) hasCycleDFS(nodeID string, visited, recStack map[string]bool) bool
 			return true // Back edge found - cycle detected
 		}
 	}
-	
+
 	recStack[nodeID] = false
 	return false
 }
@@ -277,12 +277,12 @@ func (d *DAG) hasCycleDFS(nodeID string, visited, recStack map[string]bool) bool
 func (d *DAG) getDependentsUnsafe(id string) ([]string, error) {
 	var dependents []string
 	nodePath := dagger.Path{XID: id, XType: DefaultNodeType}
-	
+
 	d.graph.RangeEdgesFrom(DefaultEdgeType, nodePath, func(e dagger.Edge) bool {
 		dependents = append(dependents, e.To.XID)
 		return true
 	})
-	
+
 	return dependents, nil
 }
 
@@ -297,13 +297,13 @@ func (d *DAG) Size() int {
 func (d *DAG) IsComplete() bool {
 	d.mutex.RLock()
 	defer d.mutex.RUnlock()
-	
+
 	for _, node := range d.nodes {
 		if node.GetStatus() != StatusCompleted {
 			return false
 		}
 	}
-	
+
 	return true
 }
 
@@ -311,14 +311,14 @@ func (d *DAG) IsComplete() bool {
 func (d *DAG) HasFailed() bool {
 	d.mutex.RLock()
 	defer d.mutex.RUnlock()
-	
+
 	for _, node := range d.nodes {
 		status := node.GetStatus()
 		if status == StatusFailed || status == StatusCancelled {
 			return true
 		}
 	}
-	
+
 	return false
 }
 
@@ -326,7 +326,7 @@ func (d *DAG) HasFailed() bool {
 func (d *DAG) Close() {
 	d.mutex.Lock()
 	defer d.mutex.Unlock()
-	
+
 	if d.graph != nil {
 		d.graph.Close()
 	}

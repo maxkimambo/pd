@@ -257,7 +257,6 @@ func (o *DAGOrchestrator) addDiskMigrationWorkflow(d *dag.DAG, instanceName, zon
 	return operations, nil
 }
 
-
 // ExecuteMigrationDAG runs the migration workflow with enhanced logging
 func (o *DAGOrchestrator) ExecuteMigrationDAG(ctx context.Context, migrationDAG *dag.DAG) (*dag.ExecutionResult, error) {
 	if logger.User != nil {
@@ -309,23 +308,79 @@ func (o *DAGOrchestrator) filterDisksForMigration(attachedDisks []*computepb.Att
 	var disksToMigrate []*computepb.AttachedDisk
 
 	for _, attachedDisk := range attachedDisks {
+		diskName := extractDiskNameFromSource(attachedDisk.GetSource())
+
 		// Skip if it's a boot disk and we don't want to migrate boot disks
 		if attachedDisk.GetBoot() {
 			// Log if logger is available (not in unit tests)
 			if logger.Op != nil {
 				logger.Op.WithFields(map[string]interface{}{
-					"disk": extractDiskNameFromSource(attachedDisk.GetSource()),
+					"disk": diskName,
 				}).Debug("Skipping boot disk")
 			}
 			continue
 		}
 
-		// For now, include all non-boot disks
-		// TODO: Add logic to check if disk is already target type
+		// Check if disk is already the target type
+		if o.isDiskAlreadyTargetType(attachedDisk, diskName) {
+			// Log if logger is available (not in unit tests)
+			if logger.Op != nil {
+				logger.Op.WithFields(map[string]interface{}{
+					"disk":       diskName,
+					"targetType": o.config.TargetDiskType,
+				}).Debug("Skipping disk - already target type")
+			}
+			continue
+		}
+
 		disksToMigrate = append(disksToMigrate, attachedDisk)
 	}
 
 	return disksToMigrate
+}
+
+// isDiskAlreadyTargetType checks if a disk is already the target disk type
+func (o *DAGOrchestrator) isDiskAlreadyTargetType(attachedDisk *computepb.AttachedDisk, diskName string) bool {
+	// If GCP client or disk client is nil (e.g., in unit tests), assume disk needs migration
+	if o.gcpClient == nil || o.gcpClient.DiskClient == nil {
+		return false
+	}
+
+	// Extract zone from the source URL
+	zoneName := utils.ExtractZoneName(attachedDisk.GetSource())
+	if zoneName == "" {
+		// If we can't determine the zone, include the disk for migration to be safe
+		return false
+	}
+
+	// Get the disk details to check its current type
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	disk, err := o.gcpClient.DiskClient.GetDisk(ctx, o.config.ProjectID, zoneName, diskName)
+	if err != nil {
+		// If we can't get disk details, include it for migration to be safe
+		if logger.Op != nil {
+			logger.Op.WithFields(map[string]interface{}{
+				"disk":  diskName,
+				"error": err.Error(),
+			}).Warn("Could not get disk details for type check, including in migration")
+		}
+		return false
+	}
+
+	// Check if the disk type matches the target type
+	currentType := disk.GetType()
+	if currentType == "" {
+		// If disk type is empty, include it for migration to be safe
+		return false
+	}
+
+	// Extract the disk type name from the full URL
+	// URL format: projects/PROJECT/zones/ZONE/diskTypes/TYPE_NAME
+	currentTypeName := utils.ExtractDiskType(currentType)
+
+	return currentTypeName == o.config.TargetDiskType
 }
 
 // extractDiskNameFromSource extracts the disk name from a source URL

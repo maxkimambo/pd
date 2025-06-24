@@ -67,7 +67,7 @@ func init() {
 	diskCmd.Flags().Int64Var(&throughput, "throughput", 140, "Throughput in MB/s to set (optional, default: 140 MiB/s)")
 	diskCmd.Flags().Int64Var(&iops, "iops", 2000, "IOPS to set(optional, default: 2000 IOPS)")
 	diskCmd.Flags().StringVarP(&storagePoolId, "pool-id", "s", "", "Storage pool ID to use for the new disks (optional)")
-	
+
 	diskCmd.MarkFlagRequired("target-disk-type")
 }
 
@@ -134,7 +134,7 @@ func runConvert(cmd *cobra.Command, args []string) error {
 		Throughput:       throughput,
 		Iops:             iops,
 	}
-	
+
 	logger.Op.Debugf("Configuration: %+v", config)
 	logger.User.Infof("Project: %s", projectID)
 	if zone != "" {

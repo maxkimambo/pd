@@ -9,34 +9,34 @@ import (
 type TaskStatus string
 
 const (
-	TaskStatusPending    TaskStatus = "pending"
-	TaskStatusRunning    TaskStatus = "running"
-	TaskStatusCompleted  TaskStatus = "completed"
-	TaskStatusFailed     TaskStatus = "failed"
-	TaskStatusCancelled  TaskStatus = "cancelled"
-	TaskStatusSkipped    TaskStatus = "skipped"
+	TaskStatusPending   TaskStatus = "pending"
+	TaskStatusRunning   TaskStatus = "running"
+	TaskStatusCompleted TaskStatus = "completed"
+	TaskStatusFailed    TaskStatus = "failed"
+	TaskStatusCancelled TaskStatus = "cancelled"
+	TaskStatusSkipped   TaskStatus = "skipped"
 )
 
 // TaskResult contains execution results and metrics for a task
 type TaskResult struct {
 	// Task identification
-	TaskID   string    `json:"task_id"`
-	TaskName string    `json:"task_name"`
-	
+	TaskID   string `json:"task_id"`
+	TaskName string `json:"task_name"`
+
 	// Execution status and timing
-	Status    TaskStatus `json:"status"`
-	StartTime time.Time  `json:"start_time"`
-	EndTime   time.Time  `json:"end_time"`
+	Status    TaskStatus    `json:"status"`
+	StartTime time.Time     `json:"start_time"`
+	EndTime   time.Time     `json:"end_time"`
 	Duration  time.Duration `json:"duration"`
-	
+
 	// Error information
 	Error        error  `json:"-"` // Not JSON serialized due to interface complexity
 	ErrorMessage string `json:"error_message,omitempty"`
-	
+
 	// Metrics and metadata
 	Metrics  map[string]interface{} `json:"metrics,omitempty"`
 	Metadata map[string]string      `json:"metadata,omitempty"`
-	
+
 	// Resource usage (can be extended)
 	ResourcesUsed map[string]interface{} `json:"resources_used,omitempty"`
 }
@@ -110,10 +110,10 @@ func (tr *TaskResult) AddMetadata(key, value string) {
 type Task interface {
 	// Execute performs the task operation and returns TaskResult with metrics and error information
 	Execute(ctx context.Context) (*TaskResult, error)
-	
+
 	// GetID returns the unique identifier for this task
 	GetID() string
-	
+
 	// GetName returns a human-readable name for this task
 	GetName() string
 }
@@ -145,7 +145,6 @@ func GetTaskDescription(task Task) string {
 	}
 	return task.GetName()
 }
-
 
 // BaseTask provides common functionality for tasks implementing the new Task interface
 type BaseTask struct {
@@ -201,4 +200,3 @@ func (t *BaseTask) GetDescription() string {
 func (t *BaseTask) Execute(ctx context.Context) (*TaskResult, error) {
 	panic("Execute method must be implemented by concrete task types")
 }
-

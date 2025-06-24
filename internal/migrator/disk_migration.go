@@ -166,28 +166,21 @@ func MigrateSingleDisk(ctx context.Context, config *Config, gcpClient *gcp.Clien
 			}).Error("disk deletion failed")
 			result.Status = "Failed: Disk Deletion"
 			result.ErrorMessage = errMsg
-			logger.User.Cleanupf("Cleaning up snapshot %s", snapshotName)
+
+			// Decision: Do NOT clean up snapshot when disk deletion fails
+			// Rationale:
+			// 1. Snapshot preserves data for manual recovery or retry attempts
+			// 2. Multi-level cleanup system will handle expired snapshots via session/emergency cleanup
+			// 3. SnapshotCleaned=false provides clear indication that manual intervention may be needed
+			// 4. Follows defensive programming pattern - preserve data until certain it's safe to delete
+			logger.User.Warnf("Preserving snapshot %s for potential recovery after disk deletion failure", snapshotName)
 			logger.Op.WithFields(map[string]interface{}{
 				"snapshot": snapshotName,
-				"reason":   "disk_deletion_failed",
-			}).Info("attempting snapshot cleanup")
+				"reason":   "disk_deletion_failed_preserve_for_recovery",
+			}).Info("snapshot preserved due to disk deletion failure")
 
-			// TODO: decide if we really want to delete the snapshot here
-
-			// cleanupErr := gcpClient.SnapshotClient.DeleteSnapshot(ctx, config.ProjectID, snapshotName)
-			// if cleanupErr != nil {
-			// 	logger.Op.WithFields(map[string]interface{}{
-			// 		"snapshot": snapshotName,
-			// 		"error":    cleanupErr.Error(),
-			// 	}).Error("snapshot cleanup failed")
-			// 	result.ErrorMessage += fmt.Sprintf("Snapshot cleanup failed: %v", cleanupErr)
-			// } else {
-			// 	logger.Op.WithFields(map[string]interface{}{
-			// 		"snapshot": snapshotName,
-			// 	}).Info("snapshot cleanup successful")
-			// 	result.SnapshotCleaned = true
-			// }
-			// result.Duration = time.Since(startTime)
+			result.SnapshotCleaned = false
+			result.Duration = time.Since(startTime)
 			return result
 		}
 		logger.Op.WithFields(map[string]interface{}{

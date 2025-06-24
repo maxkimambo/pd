@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/maxkimambo/pd/internal/logger"
 	computepb "cloud.google.com/go/compute/apiv1/computepb"
+	"github.com/maxkimambo/pd/internal/logger"
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/protobuf/proto"
 )
@@ -95,7 +95,7 @@ func TestMigrationJob_IncrementAttempts(t *testing.T) {
 	job := &MigrationJob{
 		Attempts: 0,
 	}
-	
+
 	assert.Equal(t, 0, job.Attempts)
 	job.IncrementAttempts()
 	assert.Equal(t, 1, job.Attempts)
@@ -108,7 +108,7 @@ func TestQueueMetrics(t *testing.T) {
 	logger.Setup(false, false, false)
 
 	metrics := NewQueueMetrics()
-	
+
 	assert.Equal(t, int64(0), metrics.GetJobsEnqueued())
 	assert.Equal(t, int64(0), metrics.GetJobsDequeued())
 	assert.Equal(t, int64(0), metrics.GetJobsDropped())
@@ -117,7 +117,7 @@ func TestQueueMetrics(t *testing.T) {
 
 func TestJobQueue_NewJobQueue(t *testing.T) {
 	queue := NewJobQueue(10)
-	
+
 	assert.NotNil(t, queue)
 	assert.NotNil(t, queue.jobs)
 	assert.NotNil(t, queue.workers)

@@ -215,51 +215,51 @@ func TestIsCompatible(t *testing.T) {
 
 func TestGetSupportedDiskTypes(t *testing.T) {
 	tests := []struct {
-		name        string
-		machineType string
-		expectedContains []string
+		name                string
+		machineType         string
+		expectedContains    []string
 		expectedNotContains []string
 	}{
 		{
-			name:        "N2 standard 8 supports basic disk types",
-			machineType: "n2-standard-8",
-			expectedContains: []string{"pd-standard", "pd-balanced", "pd-ssd", "hyperdisk-throughput"},
+			name:                "N2 standard 8 supports basic disk types",
+			machineType:         "n2-standard-8",
+			expectedContains:    []string{"pd-standard", "pd-balanced", "pd-ssd", "hyperdisk-throughput"},
 			expectedNotContains: []string{"hyperdisk-extreme"},
 		},
 		{
-			name:        "N2 standard 80 supports hyperdisk extreme",
-			machineType: "n2-standard-80",
-			expectedContains: []string{"pd-standard", "pd-balanced", "pd-ssd", "hyperdisk-throughput", "hyperdisk-extreme", "local-ssd"},
+			name:                "N2 standard 80 supports hyperdisk extreme",
+			machineType:         "n2-standard-80",
+			expectedContains:    []string{"pd-standard", "pd-balanced", "pd-ssd", "hyperdisk-throughput", "hyperdisk-extreme", "local-ssd"},
 			expectedNotContains: []string{},
 		},
 		{
-			name:        "E2 micro limited disk support",
-			machineType: "e2-micro",
-			expectedContains: []string{"pd-standard", "pd-balanced"},
+			name:                "E2 micro limited disk support",
+			machineType:         "e2-micro",
+			expectedContains:    []string{"pd-standard", "pd-balanced"},
 			expectedNotContains: []string{"hyperdisk-extreme", "hyperdisk-balanced", "local-ssd"},
 		},
 		{
-			name:        "F1 micro minimal disk support",
-			machineType: "f1-micro",
-			expectedContains: []string{"pd-standard"},
+			name:                "F1 micro minimal disk support",
+			machineType:         "f1-micro",
+			expectedContains:    []string{"pd-standard"},
 			expectedNotContains: []string{"pd-balanced", "pd-ssd", "hyperdisk-extreme"},
 		},
 		{
-			name:        "C3 standard 88 supports hyperdisk extreme",
-			machineType: "c3-standard-88",
-			expectedContains: []string{"hyperdisk-balanced", "hyperdisk-throughput", "hyperdisk-extreme", "local-ssd"},
+			name:                "C3 standard 88 supports hyperdisk extreme",
+			machineType:         "c3-standard-88",
+			expectedContains:    []string{"hyperdisk-balanced", "hyperdisk-throughput", "hyperdisk-extreme", "local-ssd"},
 			expectedNotContains: []string{"pd-standard", "pd-balanced"},
 		},
 		{
-			name:        "C3 standard 4 supports hyperdisk balanced but not extreme",
-			machineType: "c3-standard-4",
-			expectedContains: []string{"hyperdisk-balanced", "hyperdisk-throughput", "local-ssd"},
+			name:                "C3 standard 4 supports hyperdisk balanced but not extreme",
+			machineType:         "c3-standard-4",
+			expectedContains:    []string{"hyperdisk-balanced", "hyperdisk-throughput", "local-ssd"},
 			expectedNotContains: []string{"hyperdisk-extreme", "pd-standard"},
 		},
 		{
-			name:        "Unknown machine type",
-			machineType: "unknown-type",
-			expectedContains: []string{},
+			name:                "Unknown machine type",
+			machineType:         "unknown-type",
+			expectedContains:    []string{},
 			expectedNotContains: []string{"pd-standard", "pd-balanced"},
 		},
 	}
@@ -267,11 +267,11 @@ func TestGetSupportedDiskTypes(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := GetSupportedDiskTypes(tt.machineType)
-			
+
 			for _, diskType := range tt.expectedContains {
 				assert.Contains(t, result, diskType, "Expected %s to support %s", tt.machineType, diskType)
 			}
-			
+
 			for _, diskType := range tt.expectedNotContains {
 				assert.NotContains(t, result, diskType, "Expected %s to NOT support %s", tt.machineType, diskType)
 			}
@@ -281,26 +281,26 @@ func TestGetSupportedDiskTypes(t *testing.T) {
 
 func TestGetAllMachineTypes(t *testing.T) {
 	result := GetAllMachineTypes()
-	
+
 	// Check that we get some expected machine types
 	assert.Contains(t, result, "n2-standard-8")
 	assert.Contains(t, result, "e2-micro")
 	assert.Contains(t, result, "c3-standard-88")
 	assert.Contains(t, result, "f1-micro")
-	
+
 	// Check that the result is not empty
 	assert.Greater(t, len(result), 0, "Should return at least some machine types")
 }
 
 func TestGetAllDiskTypes(t *testing.T) {
 	result := GetAllDiskTypes()
-	
+
 	// Check that we get some expected disk types
 	assert.Contains(t, result, "pd-standard")
 	assert.Contains(t, result, "pd-balanced")
 	assert.Contains(t, result, "hyperdisk-extreme")
 	assert.Contains(t, result, "local-ssd")
-	
+
 	// Check that the result is not empty
 	assert.Greater(t, len(result), 0, "Should return at least some disk types")
 }
@@ -309,11 +309,11 @@ func TestCompatibilityMatrixLoading(t *testing.T) {
 	// Test that the matrix was loaded correctly
 	assert.NotNil(t, matrix, "Compatibility matrix should be loaded")
 	assert.NotEmpty(t, matrix.DiskTypes, "Matrix should contain disk types")
-	
+
 	// Test some specific entries exist
 	assert.Contains(t, matrix.DiskTypes, "pd-standard")
 	assert.Contains(t, matrix.DiskTypes, "hyperdisk-extreme")
-	
+
 	// Test that pd-standard has expected machine types
 	pdStandardInfo := matrix.DiskTypes["pd-standard"]
 	assert.Contains(t, pdStandardInfo.SupportedMachineTypes, "n2-standard-8")
@@ -326,7 +326,7 @@ func TestValidationResultStruct(t *testing.T) {
 		Compatible: true,
 		Reason:     "test reason",
 	}
-	
+
 	assert.True(t, result.Compatible)
 	assert.Equal(t, "test reason", result.Reason)
 }
@@ -352,13 +352,13 @@ func TestEdgeCases(t *testing.T) {
 		assert.False(t, result.Compatible)
 		assert.Contains(t, result.Reason, "does not support")
 	})
-	
+
 	t.Run("GetSupportedDiskTypes with whitespace", func(t *testing.T) {
 		result := GetSupportedDiskTypes("  n2-standard-8  ")
 		assert.Greater(t, len(result), 0)
 		assert.Contains(t, result, "pd-standard")
 	})
-	
+
 	t.Run("Case sensitivity", func(t *testing.T) {
 		result1 := IsCompatible("N2-STANDARD-8", "PD-STANDARD")
 		result2 := IsCompatible("n2-standard-8", "pd-standard")

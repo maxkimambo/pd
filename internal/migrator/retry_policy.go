@@ -55,21 +55,21 @@ func (p *RetryPolicy) GetBackoffDuration(attempts int) time.Duration {
 	if attempts <= 0 {
 		return 0
 	}
-	
+
 	// Calculate exponential backoff: initialBackoff * (factor ^ (attempts-1))
 	backoff := time.Duration(float64(p.InitialBackoff) * math.Pow(p.BackoffFactor, float64(attempts-1)))
-	
+
 	// Cap at maximum backoff
 	if backoff > p.MaxBackoff {
 		backoff = p.MaxBackoff
 	}
-	
+
 	// Add jitter to prevent thundering herd problem
 	if p.EnableJitter {
 		jitter := rand.Float64() * p.JitterFactor
 		backoff = time.Duration(float64(backoff) * (1 + jitter))
 	}
-	
+
 	return backoff
 }
 
@@ -78,11 +78,11 @@ func (p *RetryPolicy) IsRetryableError(err error) bool {
 	if err == nil {
 		return false
 	}
-	
+
 	// Add logic to determine if error is retryable
 	// For now, consider most errors retryable except for specific permanent failures
 	errorMsg := err.Error()
-	
+
 	// Non-retryable errors (permanent failures)
 	permanentErrors := []string{
 		"not found",
@@ -92,13 +92,13 @@ func (p *RetryPolicy) IsRetryableError(err error) bool {
 		"disk already exists",
 		"instance not found",
 	}
-	
+
 	for _, permanentErr := range permanentErrors {
 		if containsIgnoreCase(errorMsg, permanentErr) {
 			return false
 		}
 	}
-	
+
 	// Most other errors are considered retryable (network issues, timeouts, etc.)
 	return true
 }
@@ -137,13 +137,13 @@ type DeadLetterQueue struct {
 
 // FailedJob represents a job that has permanently failed
 type FailedJob struct {
-	Job            *MigrationJob `json:"job"`
-	LastError      error         `json:"last_error,omitempty"`
-	ErrorMessage   string        `json:"error_message"`
-	FailedAt       time.Time     `json:"failed_at"`
-	TotalAttempts  int           `json:"total_attempts"`
-	TotalDuration  time.Duration `json:"total_duration"`
-	IsRetryable    bool          `json:"is_retryable"`
+	Job           *MigrationJob `json:"job"`
+	LastError     error         `json:"last_error,omitempty"`
+	ErrorMessage  string        `json:"error_message"`
+	FailedAt      time.Time     `json:"failed_at"`
+	TotalAttempts int           `json:"total_attempts"`
+	TotalDuration time.Duration `json:"total_duration"`
+	IsRetryable   bool          `json:"is_retryable"`
 }
 
 // NewDeadLetterQueue creates a new dead letter queue with optional max size
@@ -152,7 +152,7 @@ func NewDeadLetterQueue(maxSize ...int) *DeadLetterQueue {
 	if len(maxSize) > 0 && maxSize[0] > 0 {
 		size = maxSize[0]
 	}
-	
+
 	return &DeadLetterQueue{
 		failedJobs: make([]*FailedJob, 0),
 		maxSize:    size,
@@ -163,7 +163,7 @@ func NewDeadLetterQueue(maxSize ...int) *DeadLetterQueue {
 func (q *DeadLetterQueue) AddFailedJob(job *MigrationJob, err error, totalDuration time.Duration, retryPolicy *RetryPolicy) {
 	q.mu.Lock()
 	defer q.mu.Unlock()
-	
+
 	// Create failed job entry
 	failedJob := &FailedJob{
 		Job:           job,
@@ -174,22 +174,22 @@ func (q *DeadLetterQueue) AddFailedJob(job *MigrationJob, err error, totalDurati
 		TotalDuration: totalDuration,
 		IsRetryable:   false,
 	}
-	
+
 	if err != nil {
 		failedJob.ErrorMessage = err.Error()
 		if retryPolicy != nil {
 			failedJob.IsRetryable = retryPolicy.IsRetryableError(err)
 		}
 	}
-	
+
 	// Add to queue with size limit
 	q.failedJobs = append(q.failedJobs, failedJob)
-	
+
 	// Trim if exceeding max size (FIFO)
 	if len(q.failedJobs) > q.maxSize {
 		q.failedJobs = q.failedJobs[1:]
 	}
-	
+
 	// Safely log with nil check for testing environments
 	if logger.Op != nil {
 		logger.Op.WithFields(map[string]interface{}{
@@ -206,11 +206,11 @@ func (q *DeadLetterQueue) AddFailedJob(job *MigrationJob, err error, totalDurati
 func (q *DeadLetterQueue) GetFailedJobs() []*FailedJob {
 	q.mu.RLock()
 	defer q.mu.RUnlock()
-	
+
 	// Return a copy to prevent external modification
 	jobs := make([]*FailedJob, len(q.failedJobs))
 	copy(jobs, q.failedJobs)
-	
+
 	return jobs
 }
 
@@ -218,14 +218,14 @@ func (q *DeadLetterQueue) GetFailedJobs() []*FailedJob {
 func (q *DeadLetterQueue) GetRetryableJobs() []*FailedJob {
 	q.mu.RLock()
 	defer q.mu.RUnlock()
-	
+
 	retryableJobs := make([]*FailedJob, 0)
 	for _, job := range q.failedJobs {
 		if job.IsRetryable {
 			retryableJobs = append(retryableJobs, job)
 		}
 	}
-	
+
 	return retryableJobs
 }
 
@@ -240,10 +240,10 @@ func (q *DeadLetterQueue) GetFailedJobCount() int {
 func (q *DeadLetterQueue) Clear() {
 	q.mu.Lock()
 	defer q.mu.Unlock()
-	
+
 	count := len(q.failedJobs)
 	q.failedJobs = make([]*FailedJob, 0)
-	
+
 	if logger.Op != nil {
 		logger.Op.WithFields(map[string]interface{}{
 			"clearedJobs": count,
@@ -255,11 +255,11 @@ func (q *DeadLetterQueue) Clear() {
 type RetryManager struct {
 	retryPolicy     *RetryPolicy
 	deadLetterQueue *DeadLetterQueue
-	
+
 	// Statistics
-	totalRetries    int64
+	totalRetries      int64
 	successfulRetries int64
-	mu              sync.RWMutex
+	mu                sync.RWMutex
 }
 
 // NewRetryManager creates a new retry manager with the given policy
@@ -270,7 +270,7 @@ func NewRetryManager(retryPolicy *RetryPolicy, deadLetterQueue *DeadLetterQueue)
 	if deadLetterQueue == nil {
 		deadLetterQueue = NewDeadLetterQueue()
 	}
-	
+
 	return &RetryManager{
 		retryPolicy:     retryPolicy,
 		deadLetterQueue: deadLetterQueue,
@@ -285,7 +285,7 @@ func (rm *RetryManager) ProcessJobWithRetry(
 ) error {
 	startTime := time.Now()
 	var lastErr error
-	
+
 	for {
 		// Check if context is cancelled
 		select {
@@ -293,10 +293,10 @@ func (rm *RetryManager) ProcessJobWithRetry(
 			return ctx.Err()
 		default:
 		}
-		
+
 		// Attempt to process the job
 		job.Attempts++
-		
+
 		if logger.Op != nil {
 			logger.Op.WithFields(map[string]interface{}{
 				"jobID":        job.ID,
@@ -305,16 +305,16 @@ func (rm *RetryManager) ProcessJobWithRetry(
 				"maxRetries":   job.MaxRetries,
 			}).Debug("Processing job attempt")
 		}
-		
+
 		lastErr = processor(ctx, job)
-		
+
 		if lastErr == nil {
 			// Job succeeded
 			if job.Attempts > 1 {
 				rm.mu.Lock()
 				rm.successfulRetries++
 				rm.mu.Unlock()
-				
+
 				if logger.Op != nil {
 					logger.Op.WithFields(map[string]interface{}{
 						"jobID":        job.ID,
@@ -325,13 +325,13 @@ func (rm *RetryManager) ProcessJobWithRetry(
 			}
 			return nil
 		}
-		
+
 		// Job failed, check if we should retry
 		if !rm.retryPolicy.ShouldRetry(job) || !rm.retryPolicy.IsRetryableError(lastErr) {
 			// Job permanently failed
 			totalDuration := time.Since(startTime)
 			rm.deadLetterQueue.AddFailedJob(job, lastErr, totalDuration, rm.retryPolicy)
-			
+
 			if logger.Op != nil {
 				logger.Op.WithFields(map[string]interface{}{
 					"jobID":        job.ID,
@@ -340,17 +340,17 @@ func (rm *RetryManager) ProcessJobWithRetry(
 					"error":        lastErr.Error(),
 				}).Error("Job permanently failed after exhausting retries")
 			}
-			
+
 			return fmt.Errorf("job permanently failed after %d attempts: %w", job.Attempts, lastErr)
 		}
-		
+
 		// Calculate backoff and wait
 		backoff := rm.retryPolicy.GetBackoffDuration(job.Attempts)
-		
+
 		rm.mu.Lock()
 		rm.totalRetries++
 		rm.mu.Unlock()
-		
+
 		if logger.Op != nil {
 			logger.Op.WithFields(map[string]interface{}{
 				"jobID":        job.ID,
@@ -360,7 +360,7 @@ func (rm *RetryManager) ProcessJobWithRetry(
 				"error":        lastErr.Error(),
 			}).Warn("Job failed, retrying after backoff")
 		}
-		
+
 		// Wait for backoff period
 		select {
 		case <-time.After(backoff):
@@ -375,7 +375,7 @@ func (rm *RetryManager) ProcessJobWithRetry(
 func (rm *RetryManager) GetRetryStats() map[string]interface{} {
 	rm.mu.RLock()
 	defer rm.mu.RUnlock()
-	
+
 	return map[string]interface{}{
 		"total_retries":      rm.totalRetries,
 		"successful_retries": rm.successfulRetries,

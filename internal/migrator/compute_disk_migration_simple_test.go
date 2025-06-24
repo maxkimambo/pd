@@ -4,10 +4,10 @@ import (
 	"context"
 	"testing"
 
+	computepb "cloud.google.com/go/compute/apiv1/computepb"
 	"github.com/maxkimambo/pd/internal/gcp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
-	computepb "cloud.google.com/go/compute/apiv1/computepb"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -90,11 +90,11 @@ func TestComputeDiskMigratorInterface(t *testing.T) {
 
 	// Test that the migrator has the expected methods
 	assert.NotNil(t, migrator)
-	
+
 	// Test MigrateInstanceDisks method exists and returns correct types
 	ctx := context.Background()
 	instances := []*computepb.Instance{}
-	
+
 	// Setup mock expectations
 	orchestrator.On("BuildMigrationDAG", mock.Anything, instances).
 		Return(map[string]interface{}{"dag": "empty"}, nil)
@@ -104,6 +104,6 @@ func TestComputeDiskMigratorInterface(t *testing.T) {
 	result, err := migrator.MigrateInstanceDisks(ctx, instances)
 	assert.NoError(t, err)
 	assert.NotNil(t, result)
-	
+
 	orchestrator.AssertExpectations(t)
 }

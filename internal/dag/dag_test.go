@@ -82,7 +82,7 @@ func TestDAG_AddNode(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			dag := NewDAG()
 			err := dag.AddNode(tt.node)
-			
+
 			if tt.expectErr {
 				assert.Error(t, err)
 			} else {
@@ -96,10 +96,10 @@ func TestDAG_AddNode(t *testing.T) {
 func TestDAG_AddDuplicateNode(t *testing.T) {
 	dag := NewDAG()
 	node := newMockNode("test-1")
-	
+
 	err := dag.AddNode(node)
 	require.NoError(t, err)
-	
+
 	// Adding the same node should fail
 	err = dag.AddNode(node)
 	assert.Error(t, err)
@@ -109,15 +109,15 @@ func TestDAG_AddDuplicateNode(t *testing.T) {
 func TestDAG_GetNode(t *testing.T) {
 	dag := NewDAG()
 	node := newMockNode("test-1")
-	
+
 	err := dag.AddNode(node)
 	require.NoError(t, err)
-	
+
 	// Get existing node
 	retrievedNode, err := dag.GetNode("test-1")
 	assert.NoError(t, err)
 	assert.Equal(t, node, retrievedNode)
-	
+
 	// Get non-existent node
 	_, err = dag.GetNode("non-existent")
 	assert.Error(t, err)
@@ -128,20 +128,20 @@ func TestDAG_AddDependency(t *testing.T) {
 	dag := NewDAG()
 	node1 := newMockNode("node-1")
 	node2 := newMockNode("node-2")
-	
+
 	err := dag.AddNode(node1)
 	require.NoError(t, err)
 	err = dag.AddNode(node2)
 	require.NoError(t, err)
-	
+
 	// Add valid dependency
 	err = dag.AddDependency("node-1", "node-2")
 	assert.NoError(t, err)
-	
+
 	// Add dependency with non-existent source
 	err = dag.AddDependency("non-existent", "node-2")
 	assert.Error(t, err)
-	
+
 	// Add dependency with non-existent target
 	err = dag.AddDependency("node-1", "non-existent")
 	assert.Error(t, err)
@@ -152,26 +152,26 @@ func TestDAG_GetDependencies(t *testing.T) {
 	node1 := newMockNode("node-1")
 	node2 := newMockNode("node-2")
 	node3 := newMockNode("node-3")
-	
+
 	err := dag.AddNode(node1)
 	require.NoError(t, err)
 	err = dag.AddNode(node2)
 	require.NoError(t, err)
 	err = dag.AddNode(node3)
 	require.NoError(t, err)
-	
+
 	// Add dependencies: node-1 -> node-3, node-2 -> node-3
 	err = dag.AddDependency("node-1", "node-3")
 	require.NoError(t, err)
 	err = dag.AddDependency("node-2", "node-3")
 	require.NoError(t, err)
-	
+
 	deps, err := dag.GetDependencies("node-3")
 	assert.NoError(t, err)
 	assert.Len(t, deps, 2)
 	assert.Contains(t, deps, "node-1")
 	assert.Contains(t, deps, "node-2")
-	
+
 	// Node with no dependencies
 	deps, err = dag.GetDependencies("node-1")
 	assert.NoError(t, err)
@@ -183,20 +183,20 @@ func TestDAG_GetDependents(t *testing.T) {
 	node1 := newMockNode("node-1")
 	node2 := newMockNode("node-2")
 	node3 := newMockNode("node-3")
-	
+
 	err := dag.AddNode(node1)
 	require.NoError(t, err)
 	err = dag.AddNode(node2)
 	require.NoError(t, err)
 	err = dag.AddNode(node3)
 	require.NoError(t, err)
-	
+
 	// Add dependencies: node-1 -> node-2, node-1 -> node-3
 	err = dag.AddDependency("node-1", "node-2")
 	require.NoError(t, err)
 	err = dag.AddDependency("node-1", "node-3")
 	require.NoError(t, err)
-	
+
 	dependents, err := dag.GetDependents("node-1")
 	assert.NoError(t, err)
 	assert.Len(t, dependents, 2)
@@ -209,20 +209,20 @@ func TestDAG_GetRootNodes(t *testing.T) {
 	node1 := newMockNode("node-1")
 	node2 := newMockNode("node-2")
 	node3 := newMockNode("node-3")
-	
+
 	err := dag.AddNode(node1)
 	require.NoError(t, err)
 	err = dag.AddNode(node2)
 	require.NoError(t, err)
 	err = dag.AddNode(node3)
 	require.NoError(t, err)
-	
+
 	// node-1 and node-2 -> node-3
 	err = dag.AddDependency("node-1", "node-3")
 	require.NoError(t, err)
 	err = dag.AddDependency("node-2", "node-3")
 	require.NoError(t, err)
-	
+
 	roots, err := dag.GetRootNodes()
 	assert.NoError(t, err)
 	assert.Len(t, roots, 2)
@@ -235,34 +235,34 @@ func TestDAG_GetReadyNodes(t *testing.T) {
 	node1 := newMockNode("node-1")
 	node2 := newMockNode("node-2")
 	node3 := newMockNode("node-3")
-	
+
 	err := dag.AddNode(node1)
 	require.NoError(t, err)
 	err = dag.AddNode(node2)
 	require.NoError(t, err)
 	err = dag.AddNode(node3)
 	require.NoError(t, err)
-	
+
 	// node-1 -> node-3, node-2 -> node-3
 	err = dag.AddDependency("node-1", "node-3")
 	require.NoError(t, err)
 	err = dag.AddDependency("node-2", "node-3")
 	require.NoError(t, err)
-	
+
 	// Initially, only root nodes should be ready
 	ready, err := dag.GetReadyNodes()
 	assert.NoError(t, err)
 	assert.Len(t, ready, 2)
 	assert.Contains(t, ready, "node-1")
 	assert.Contains(t, ready, "node-2")
-	
+
 	// Complete node-1
 	node1.SetStatus(StatusCompleted)
 	ready, err = dag.GetReadyNodes()
 	assert.NoError(t, err)
 	assert.Len(t, ready, 1)
 	assert.Contains(t, ready, "node-2")
-	
+
 	// Complete node-2, now node-3 should be ready
 	node2.SetStatus(StatusCompleted)
 	ready, err = dag.GetReadyNodes()
@@ -276,34 +276,34 @@ func TestDAG_Validate(t *testing.T) {
 		dag := NewDAG()
 		node1 := newMockNode("node-1")
 		node2 := newMockNode("node-2")
-		
+
 		err := dag.AddNode(node1)
 		require.NoError(t, err)
 		err = dag.AddNode(node2)
 		require.NoError(t, err)
 		err = dag.AddDependency("node-1", "node-2")
 		require.NoError(t, err)
-		
+
 		err = dag.Validate()
 		assert.NoError(t, err)
 	})
-	
+
 	t.Run("cyclic DAG", func(t *testing.T) {
 		dag := NewDAG()
 		node1 := newMockNode("node-1")
 		node2 := newMockNode("node-2")
-		
+
 		err := dag.AddNode(node1)
 		require.NoError(t, err)
 		err = dag.AddNode(node2)
 		require.NoError(t, err)
-		
+
 		// Create cycle: node-1 -> node-2 -> node-1
 		err = dag.AddDependency("node-1", "node-2")
 		require.NoError(t, err)
 		err = dag.AddDependency("node-2", "node-1")
 		require.NoError(t, err)
-		
+
 		err = dag.Validate()
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "cycles")
@@ -314,19 +314,19 @@ func TestDAG_IsComplete(t *testing.T) {
 	dag := NewDAG()
 	node1 := newMockNode("node-1")
 	node2 := newMockNode("node-2")
-	
+
 	err := dag.AddNode(node1)
 	require.NoError(t, err)
 	err = dag.AddNode(node2)
 	require.NoError(t, err)
-	
+
 	// Initially not complete
 	assert.False(t, dag.IsComplete())
-	
+
 	// Complete one node
 	node1.SetStatus(StatusCompleted)
 	assert.False(t, dag.IsComplete())
-	
+
 	// Complete all nodes
 	node2.SetStatus(StatusCompleted)
 	assert.True(t, dag.IsComplete())
@@ -336,19 +336,19 @@ func TestDAG_HasFailed(t *testing.T) {
 	dag := NewDAG()
 	node1 := newMockNode("node-1")
 	node2 := newMockNode("node-2")
-	
+
 	err := dag.AddNode(node1)
 	require.NoError(t, err)
 	err = dag.AddNode(node2)
 	require.NoError(t, err)
-	
+
 	// Initially no failures
 	assert.False(t, dag.HasFailed())
-	
+
 	// Complete one node
 	node1.SetStatus(StatusCompleted)
 	assert.False(t, dag.HasFailed())
-	
+
 	// Fail one node
 	node2.SetStatus(StatusFailed)
 	assert.True(t, dag.HasFailed())
@@ -356,11 +356,11 @@ func TestDAG_HasFailed(t *testing.T) {
 
 func TestDAG_ConcurrentAccess(t *testing.T) {
 	dag := NewDAG()
-	
+
 	// Test concurrent node additions
 	const numNodes = 100
 	nodes := make([]*mockNode, numNodes)
-	
+
 	// Create nodes concurrently
 	errChan := make(chan error, numNodes)
 	for i := 0; i < numNodes; i++ {
@@ -370,13 +370,13 @@ func TestDAG_ConcurrentAccess(t *testing.T) {
 			errChan <- dag.AddNode(node)
 		}(i)
 	}
-	
+
 	// Check all additions succeeded
 	for i := 0; i < numNodes; i++ {
 		err := <-errChan
 		assert.NoError(t, err)
 	}
-	
+
 	assert.Equal(t, numNodes, dag.Size())
 }
 
@@ -392,7 +392,7 @@ func TestNodeStatus_String(t *testing.T) {
 		{StatusCancelled, "cancelled"},
 		{NodeStatus(999), "unknown"},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.expected, func(t *testing.T) {
 			assert.Equal(t, tt.expected, tt.status.String())

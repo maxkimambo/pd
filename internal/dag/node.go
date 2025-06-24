@@ -9,31 +9,31 @@ import (
 type Node interface {
 	// ID returns the unique identifier for this node
 	ID() string
-	
+
 	// Execute runs the node's task with the given context
 	Execute(ctx context.Context) error
-	
+
 	// Rollback performs cleanup if execution fails
 	Rollback(ctx context.Context) error
-	
+
 	// GetStatus returns the current execution status of the node
 	GetStatus() NodeStatus
-	
+
 	// SetStatus updates the execution status of the node
 	SetStatus(status NodeStatus)
-	
+
 	// GetError returns any error from the last execution
 	GetError() error
-	
+
 	// SetError sets an error from execution
 	SetError(err error)
-	
+
 	// GetTask returns the underlying task
 	GetTask() Task
-	
+
 	// GetStartTime returns when the node started execution
 	GetStartTime() *time.Time
-	
+
 	// GetEndTime returns when the node finished execution
 	GetEndTime() *time.Time
 }

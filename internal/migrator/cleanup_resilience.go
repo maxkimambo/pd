@@ -31,16 +31,16 @@ const (
 
 // CleanupError represents a detailed cleanup error with context
 type CleanupError struct {
-	Type        CleanupErrorType
-	SnapshotID  string
-	SessionID   string
-	TaskID      string
-	Retryable   bool
-	RetryAfter  time.Duration
-	Attempt     int
-	Underlying  error
-	Timestamp   time.Time
-	Context     map[string]interface{}
+	Type       CleanupErrorType
+	SnapshotID string
+	SessionID  string
+	TaskID     string
+	Retryable  bool
+	RetryAfter time.Duration
+	Attempt    int
+	Underlying error
+	Timestamp  time.Time
+	Context    map[string]interface{}
 }
 
 // Error implements the error interface
@@ -71,7 +71,7 @@ func ClassifyError(err error, snapshotID, sessionID, taskID string, attempt int)
 	}
 
 	errStr := err.Error()
-	
+
 	// Classify based on error message patterns
 	switch {
 	case containsAny(errStr, []string{"not found", "404", "does not exist"}):
@@ -119,18 +119,18 @@ func calculateBackoff(attempt int, baseDelay time.Duration) time.Duration {
 	if attempt <= 0 {
 		return baseDelay
 	}
-	
+
 	// Exponential backoff: base * 2^attempt
 	delay := baseDelay
 	for i := 0; i < attempt && delay < 5*time.Minute; i++ {
 		delay *= 2
 	}
-	
+
 	// Cap at 5 minutes
 	if delay > 5*time.Minute {
-		delay = 5*time.Minute
+		delay = 5 * time.Minute
 	}
-	
+
 	// Add 10% jitter
 	jitter := time.Duration(float64(delay) * 0.1)
 	return delay + jitter
@@ -200,7 +200,7 @@ func (cb *CircuitBreaker) Execute(fn func() error) error {
 
 	// Execute the function
 	err := fn()
-	
+
 	if err != nil {
 		cb.recordFailure()
 		return err
@@ -246,14 +246,14 @@ func (cb *CircuitBreaker) GetState() CircuitBreakerState {
 
 // HealthChecker monitors cleanup operation health
 type HealthChecker struct {
-	checkInterval   time.Duration
-	successWindow   time.Duration
-	failureWindow   time.Duration
-	minSuccessRate  float64
-	recentResults   []HealthCheckResult
-	mu              sync.RWMutex
-	isHealthy       bool
-	lastCheck       time.Time
+	checkInterval  time.Duration
+	successWindow  time.Duration
+	failureWindow  time.Duration
+	minSuccessRate float64
+	recentResults  []HealthCheckResult
+	mu             sync.RWMutex
+	isHealthy      bool
+	lastCheck      time.Time
 }
 
 // HealthCheckResult represents the result of a health check
@@ -297,13 +297,13 @@ func (hc *HealthChecker) RecordResult(success bool, duration time.Duration, err 
 func (hc *HealthChecker) cleanupOldResults() {
 	cutoff := time.Now().Add(-hc.successWindow)
 	filtered := make([]HealthCheckResult, 0)
-	
+
 	for _, result := range hc.recentResults {
 		if result.Timestamp.After(cutoff) {
 			filtered = append(filtered, result)
 		}
 	}
-	
+
 	hc.recentResults = filtered
 }
 
@@ -366,20 +366,20 @@ type ResilientCleanupManager struct {
 // NewResilientCleanupManager creates a new resilient cleanup manager
 func NewResilientCleanupManager(config *Config, gcpClient *gcp.Clients, strategy *CleanupStrategy, sessionID string) *ResilientCleanupManager {
 	baseManager := NewMultiLevelCleanupManager(config, gcpClient, strategy, sessionID)
-	
+
 	return &ResilientCleanupManager{
 		MultiLevelCleanupManager: baseManager,
-		circuitBreaker:          NewCircuitBreaker("cleanup-operations", 5, 2*time.Minute),
-		healthChecker:           NewHealthChecker(30*time.Second, 5*time.Minute, 1*time.Minute, 0.8),
-		errorHistory:            make([]CleanupError, 0),
-		maxErrorHistory:         100,
+		circuitBreaker:           NewCircuitBreaker("cleanup-operations", 5, 2*time.Minute),
+		healthChecker:            NewHealthChecker(30*time.Second, 5*time.Minute, 1*time.Minute, 0.8),
+		errorHistory:             make([]CleanupError, 0),
+		maxErrorHistory:          100,
 	}
 }
 
 // ResilientCleanupTaskSnapshot performs resilient task-level cleanup
 func (rcm *ResilientCleanupManager) ResilientCleanupTaskSnapshot(ctx context.Context, taskID, snapshotName string) *CleanupResult {
 	startTime := time.Now()
-	
+
 	var result *CleanupResult
 	err := rcm.circuitBreaker.Execute(func() error {
 		result = rcm.CleanupTaskSnapshot(ctx, taskID, snapshotName)
@@ -394,7 +394,7 @@ func (rcm *ResilientCleanupManager) ResilientCleanupTaskSnapshot(ctx context.Con
 
 	// Record health check result
 	rcm.healthChecker.RecordResult(success, duration, err)
-	
+
 	// Record retry attempts
 	if !success {
 		rcm.MultiLevelCleanupManager.monitor.metrics.RecordRetryAttempt(false)
@@ -413,14 +413,14 @@ func (rcm *ResilientCleanupManager) ResilientCleanupTaskSnapshot(ctx context.Con
 	// If circuit breaker failed, create appropriate result
 	if err != nil && result == nil {
 		result = &CleanupResult{
-			Level:           CleanupLevelTask,
-			SessionID:       rcm.sessionID,
-			TaskID:          taskID,
-			SnapshotsFound:  1,
+			Level:            CleanupLevelTask,
+			SessionID:        rcm.sessionID,
+			TaskID:           taskID,
+			SnapshotsFound:   1,
 			SnapshotsDeleted: 0,
-			SnapshotsFailed: []string{snapshotName},
-			Errors:          []error{err},
-			Duration:        duration,
+			SnapshotsFailed:  []string{snapshotName},
+			Errors:           []error{err},
+			Duration:         duration,
 		}
 	}
 
@@ -430,7 +430,7 @@ func (rcm *ResilientCleanupManager) ResilientCleanupTaskSnapshot(ctx context.Con
 // ResilientCleanupSessionSnapshots performs resilient session-level cleanup
 func (rcm *ResilientCleanupManager) ResilientCleanupSessionSnapshots(ctx context.Context) *CleanupResult {
 	startTime := time.Now()
-	
+
 	var result *CleanupResult
 	err := rcm.circuitBreaker.Execute(func() error {
 		result = rcm.CleanupSessionSnapshots(ctx)
@@ -480,7 +480,7 @@ func (rcm *ResilientCleanupManager) recordError(err CleanupError) {
 	defer rcm.mu.Unlock()
 
 	rcm.errorHistory = append(rcm.errorHistory, err)
-	
+
 	// Trim history if it exceeds max size
 	if len(rcm.errorHistory) > rcm.maxErrorHistory {
 		rcm.errorHistory = rcm.errorHistory[len(rcm.errorHistory)-rcm.maxErrorHistory:]
@@ -491,7 +491,7 @@ func (rcm *ResilientCleanupManager) recordError(err CleanupError) {
 func (rcm *ResilientCleanupManager) GetErrorHistory() []CleanupError {
 	rcm.mu.RLock()
 	defer rcm.mu.RUnlock()
-	
+
 	// Return a copy to avoid race conditions
 	history := make([]CleanupError, len(rcm.errorHistory))
 	copy(history, rcm.errorHistory)
@@ -502,19 +502,19 @@ func (rcm *ResilientCleanupManager) GetErrorHistory() []CleanupError {
 func (rcm *ResilientCleanupManager) GetHealthStatus() (healthy bool, circuitState CircuitBreakerState, stats map[string]interface{}) {
 	healthy = rcm.healthChecker.IsHealthy()
 	circuitState = rcm.circuitBreaker.GetState()
-	
+
 	total, successful, successRate, lastCheck := rcm.healthChecker.GetStats()
-	
+
 	stats = map[string]interface{}{
-		"healthy":         healthy,
-		"circuit_state":   circuitState,
-		"total_checks":    total,
-		"successful":      successful,
-		"success_rate":    successRate,
-		"last_check":      lastCheck,
-		"error_count":     len(rcm.GetErrorHistory()),
+		"healthy":          healthy,
+		"circuit_state":    circuitState,
+		"total_checks":     total,
+		"successful":       successful,
+		"success_rate":     successRate,
+		"last_check":       lastCheck,
+		"error_count":      len(rcm.GetErrorHistory()),
 		"active_snapshots": rcm.GetActiveSnapshotCount(),
 	}
-	
+
 	return healthy, circuitState, stats
 }

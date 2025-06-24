@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"testing"
 
+	computepb "cloud.google.com/go/compute/apiv1/computepb"
 	"github.com/maxkimambo/pd/internal/gcp"
 	"github.com/maxkimambo/pd/internal/migrator"
 	"github.com/stretchr/testify/assert"
-	computepb "cloud.google.com/go/compute/apiv1/computepb"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -19,9 +19,9 @@ func TestNewDAGOrchestrator(t *testing.T) {
 		Concurrency:    5,
 	}
 	gcpClient := &gcp.Clients{}
-	
+
 	orchestrator := NewDAGOrchestrator(config, gcpClient)
-	
+
 	assert.NotNil(t, orchestrator)
 	assert.Equal(t, config, orchestrator.config)
 	assert.Equal(t, gcpClient, orchestrator.gcpClient)
@@ -54,7 +54,7 @@ func TestExtractDiskNameFromSource(t *testing.T) {
 			expected: "test-disk",
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := extractDiskNameFromSource(tt.source)
@@ -70,7 +70,7 @@ func TestFilterDisksForMigration(t *testing.T) {
 	}
 	gcpClient := &gcp.Clients{}
 	orchestrator := NewDAGOrchestrator(config, gcpClient)
-	
+
 	tests := []struct {
 		name          string
 		attachedDisks []*computepb.AttachedDisk
@@ -120,12 +120,12 @@ func TestFilterDisksForMigration(t *testing.T) {
 			expected: 0,
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := orchestrator.filterDisksForMigration(tt.attachedDisks)
 			assert.Len(t, result, tt.expected)
-			
+
 			// Verify no boot disks in result
 			for _, disk := range result {
 				assert.False(t, disk.GetBoot(), "Boot disk should be filtered out")
@@ -142,9 +142,9 @@ func TestBuildMigrationDAG_NoInstances(t *testing.T) {
 	}
 	gcpClient := &gcp.Clients{}
 	orchestrator := NewDAGOrchestrator(config, gcpClient)
-	
+
 	dag, err := orchestrator.BuildMigrationDAG(context.Background(), []*computepb.Instance{})
-	
+
 	assert.NoError(t, err)
 	assert.NotNil(t, dag)
 	assert.Len(t, dag.GetAllNodes(), 0)
@@ -161,15 +161,15 @@ func TestBuildMigrationDAG_Structure(t *testing.T) {
 	}
 	gcpClient := &gcp.Clients{}
 	orchestrator := NewDAGOrchestrator(config, gcpClient)
-	
+
 	// Test with empty instances (should create empty but valid DAG)
 	instances := []*computepb.Instance{}
-	
+
 	dag, err := orchestrator.BuildMigrationDAG(context.Background(), instances)
-	
+
 	assert.NoError(t, err)
 	assert.NotNil(t, dag)
-	
+
 	// Validate the DAG structure
 	err = dag.Validate()
 	assert.NoError(t, err)
@@ -183,11 +183,11 @@ func TestExecutorConfigMapping(t *testing.T) {
 	}
 	gcpClient := &gcp.Clients{}
 	orchestrator := NewDAGOrchestrator(config, gcpClient)
-	
+
 	// Test that the executor config uses the right concurrency from migration config
 	assert.Equal(t, 15, config.Concurrency)
 	assert.NotNil(t, orchestrator) // Use the orchestrator variable
-	
+
 	// The actual executor config is created in ExecuteMigrationDAG,
 	// but we can verify the mapping logic would work correctly
 	expectedConcurrency := config.Concurrency
@@ -197,19 +197,19 @@ func TestExecutorConfigMapping(t *testing.T) {
 func TestDAGOrchestratorIntegration(t *testing.T) {
 	// Integration test that verifies the basic orchestrator workflow
 	// without requiring actual GCP API calls
-	
+
 	config := &migrator.Config{
 		ProjectID:      "test-project",
 		TargetDiskType: "pd-ssd",
 		Concurrency:    5,
 		RetainName:     false,
 	}
-	
+
 	// Use a real GCP client struct but don't make actual calls
 	gcpClient := &gcp.Clients{}
-	
+
 	orchestrator := NewDAGOrchestrator(config, gcpClient)
-	
+
 	// Verify orchestrator is properly initialized
 	assert.NotNil(t, orchestrator)
 	assert.Equal(t, config.ProjectID, orchestrator.config.ProjectID)
@@ -225,13 +225,13 @@ func TestDAGValidation(t *testing.T) {
 	}
 	gcpClient := &gcp.Clients{}
 	orchestrator := NewDAGOrchestrator(config, gcpClient)
-	
+
 	// Test building a DAG with no instances should still validate
 	dag, err := orchestrator.BuildMigrationDAG(context.Background(), []*computepb.Instance{})
-	
+
 	assert.NoError(t, err)
 	assert.NotNil(t, dag)
-	
+
 	// Empty DAG should validate successfully
 	err = dag.Validate()
 	assert.NoError(t, err)

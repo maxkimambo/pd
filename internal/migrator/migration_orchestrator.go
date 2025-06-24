@@ -20,46 +20,46 @@ type InstanceMigrationResult struct {
 	Error        error
 	Migration    *InstanceMigration
 	// Progress tracking fields
-	TotalSteps    int
+	TotalSteps     int
 	CompletedSteps int
-	CurrentStep   string
+	CurrentStep    string
 	// Performance metrics
 	DurationSeconds int64
 	DisksProcessed  int
 	DisksSuccessful int
 	DisksFailed     int
 	// Enhanced error information
-	EnhancedError   *EnhancedMigrationError
-	ErrorCategory   MigrationErrorCategory
-	IsRetryable     bool
-	RetryDelay      time.Duration
+	EnhancedError *EnhancedMigrationError
+	ErrorCategory MigrationErrorCategory
+	IsRetryable   bool
+	RetryDelay    time.Duration
 }
 
 // MigrationOrchestrator coordinates a single instance migration
 // Each orchestrator instance is self-contained and maintains its own state
 type MigrationOrchestrator struct {
 	// Service dependencies - each orchestrator has its own instances
-	discoveryService     *InstanceDiscovery
-	diskMigrator         *DiskMigrator
-	stateManager         *InstanceStateManager
-	
+	discoveryService *InstanceDiscovery
+	diskMigrator     *DiskMigrator
+	stateManager     *InstanceStateManager
+
 	// Configuration
-	config               *Config
-	
+	config *Config
+
 	// Resource locking - shared across orchestrators to prevent conflicts
-	resourceLocker       *ResourceLocker
-	
+	resourceLocker *ResourceLocker
+
 	// Progress tracking - shared across orchestrators for monitoring
-	progressTracker      *ProgressTracker
-	
+	progressTracker *ProgressTracker
+
 	// Internal state for this orchestrator instance
-	migrationID          string
-	startTime            time.Time
-	
+	migrationID string
+	startTime   time.Time
+
 	// Progress tracking
-	currentStep          string
-	totalSteps           int
-	completedSteps       int
+	currentStep    string
+	totalSteps     int
+	completedSteps int
 }
 
 // NewMigrationOrchestrator creates a new orchestrator with its own service instances
@@ -108,12 +108,12 @@ func (o *MigrationOrchestrator) MigrateInstance(ctx context.Context, job *Migrat
 	defer func() {
 		result.EndTime = time.Now()
 		result.DurationSeconds = int64(result.EndTime.Sub(result.StartTime).Seconds())
-		
+
 		// Always cleanup our local state on exit
 		if result.Migration != nil && result.Migration.Instance != nil {
 			o.stateManager.RemoveState(result.Migration.Instance)
 		}
-		
+
 		// Cleanup progress tracking for completed job
 		if o.progressTracker != nil {
 			// Report final progress event
@@ -138,14 +138,14 @@ func (o *MigrationOrchestrator) MigrateInstance(ctx context.Context, job *Migrat
 				},
 			}
 			o.progressTracker.ReportProgress(finalEvent)
-			
+
 			// Clean up tracking data after a delay to allow final reporting
 			go func() {
 				time.Sleep(5 * time.Second)
 				o.progressTracker.CleanupJob(result.JobID)
 			}()
 		}
-		
+
 		// Log final result
 		logFields := map[string]interface{}{
 			"jobID":           job.ID,
@@ -156,7 +156,7 @@ func (o *MigrationOrchestrator) MigrateInstance(ctx context.Context, job *Migrat
 			"disksFailed":     result.DisksFailed,
 			"success":         result.Success,
 		}
-		
+
 		if result.Error != nil {
 			logFields["error"] = result.Error.Error()
 			logger.Op.WithFields(logFields).Error("Instance migration completed with error")
@@ -167,10 +167,10 @@ func (o *MigrationOrchestrator) MigrateInstance(ctx context.Context, job *Migrat
 
 	// Initialize start time for this migration
 	o.startTime = time.Now()
-	
+
 	logger.Op.WithFields(map[string]interface{}{
-		"jobID":        job.ID,
-		"instanceName": job.Instance.GetName(),
+		"jobID":          job.ID,
+		"instanceName":   job.Instance.GetName(),
 		"orchestratorID": o.migrationID,
 	}).Info("Starting instance migration")
 
@@ -195,7 +195,7 @@ func (o *MigrationOrchestrator) MigrateInstance(ctx context.Context, job *Migrat
 		o.setResultError(result, err, PhaseDiscovery)
 		return result
 	}
-	
+
 	result.Migration = migration
 	result.DisksProcessed = len(migration.Disks)
 
@@ -257,7 +257,7 @@ func (o *MigrationOrchestrator) MigrateInstance(ctx context.Context, job *Migrat
 
 	// Perform the disk migration with the context - the diskMigrator should also respect context
 	migrationErr := o.diskMigrator.MigrateInstanceDisks(ctx, migration)
-	
+
 	// Check for cancellation after migration attempt
 	select {
 	case <-ctx.Done():
@@ -267,7 +267,7 @@ func (o *MigrationOrchestrator) MigrateInstance(ctx context.Context, job *Migrat
 		return result
 	default:
 	}
-	
+
 	// Step 5: Verify results
 	if err := o.updateProgress(ctx, result, "verification", "Verifying migration results"); err != nil {
 		o.setResultError(result, err, PhaseRestore)
@@ -333,14 +333,14 @@ func (o *MigrationOrchestrator) updateProgress(ctx context.Context, result *Inst
 
 	o.currentStep = step
 	o.completedSteps++
-	
+
 	result.CurrentStep = description
 	result.CompletedSteps = o.completedSteps
 
 	// Calculate progress metrics
 	progressPercent := float64(o.completedSteps) / float64(o.totalSteps) * 100
 	elapsedTime := time.Since(o.startTime)
-	
+
 	// Estimate time remaining
 	var estimatedTimeLeft time.Duration
 	if o.completedSteps > 0 {
@@ -351,21 +351,21 @@ func (o *MigrationOrchestrator) updateProgress(ctx context.Context, result *Inst
 
 	// Create progress event
 	progressEvent := &ProgressEvent{
-		JobID:               result.JobID,
-		InstanceID:          result.InstanceID,
-		InstanceName:        result.InstanceName,
-		Step:                step,
-		Description:         description,
-		CompletedSteps:      o.completedSteps,
-		TotalSteps:          o.totalSteps,
-		ProgressPercent:     progressPercent,
-		Timestamp:           time.Now(),
-		ElapsedTime:         elapsedTime,
-		EstimatedTimeLeft:   estimatedTimeLeft,
-		DisksProcessed:      result.DisksProcessed,
-		DisksCompleted:      result.DisksSuccessful,
-		Phase:               getPhaseFromStep(step),
-		Details:             make(map[string]interface{}),
+		JobID:             result.JobID,
+		InstanceID:        result.InstanceID,
+		InstanceName:      result.InstanceName,
+		Step:              step,
+		Description:       description,
+		CompletedSteps:    o.completedSteps,
+		TotalSteps:        o.totalSteps,
+		ProgressPercent:   progressPercent,
+		Timestamp:         time.Now(),
+		ElapsedTime:       elapsedTime,
+		EstimatedTimeLeft: estimatedTimeLeft,
+		DisksProcessed:    result.DisksProcessed,
+		DisksCompleted:    result.DisksSuccessful,
+		Phase:             getPhaseFromStep(step),
+		Details:           make(map[string]interface{}),
 	}
 
 	// Add resource usage information (simplified for now)
@@ -420,7 +420,7 @@ func (o *MigrationOrchestrator) GetCurrentProgress() (string, int, int, float64)
 func (o *MigrationOrchestrator) setResultError(result *InstanceMigrationResult, err error, phase MigrationPhase) {
 	result.Error = err
 	result.Success = false
-	
+
 	// Create or enhance the error
 	var enhancedErr *EnhancedMigrationError
 	if eErr, ok := err.(*EnhancedMigrationError); ok {
@@ -428,17 +428,17 @@ func (o *MigrationOrchestrator) setResultError(result *InstanceMigrationResult, 
 	} else {
 		enhancedErr = CategorizeError(err, phase)
 	}
-	
+
 	// Add job context if not already present
 	if enhancedErr.JobID == "" {
 		enhancedErr.WithJobContext(result.JobID, result.InstanceID)
 	}
-	
+
 	result.EnhancedError = enhancedErr
 	result.ErrorCategory = enhancedErr.Category
 	result.IsRetryable = enhancedErr.IsRetryable
 	result.RetryDelay = enhancedErr.RetryDelay
-	
+
 	// Log with enhanced error information
 	logger.Op.WithFields(enhancedErr.ToLogFields()).Error("Migration step failed")
 }

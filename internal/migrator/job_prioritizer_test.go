@@ -10,7 +10,7 @@ import (
 
 func TestNewDefaultJobPrioritizer(t *testing.T) {
 	prioritizer := NewDefaultJobPrioritizer()
-	
+
 	assert.NotNil(t, prioritizer)
 	assert.True(t, prioritizer.considerMachineType)
 	assert.True(t, prioritizer.considerDiskCount)
@@ -23,12 +23,12 @@ func TestNewDefaultJobPrioritizer(t *testing.T) {
 func TestNewCustomJobPrioritizer(t *testing.T) {
 	highLabels := map[string]string{"priority": "urgent"}
 	mediumLabels := map[string]string{"priority": "normal"}
-	
+
 	prioritizer := NewCustomJobPrioritizer(
 		true, false, true, false,
 		highLabels, mediumLabels,
 	)
-	
+
 	assert.NotNil(t, prioritizer)
 	assert.True(t, prioritizer.considerMachineType)
 	assert.False(t, prioritizer.considerDiskCount)
@@ -53,7 +53,7 @@ func TestDefaultJobPrioritizer_AssignPriority_ByLabels(t *testing.T) {
 			"priority":    "medium",
 		},
 	)
-	
+
 	tests := []struct {
 		name     string
 		labels   map[string]string
@@ -96,14 +96,14 @@ func TestDefaultJobPrioritizer_AssignPriority_ByLabels(t *testing.T) {
 			expected: LowPriority,
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			instance := &computepb.Instance{
 				Labels: tt.labels,
 			}
 			disks := []*AttachedDiskInfo{}
-			
+
 			priority := prioritizer.AssignPriority(instance, disks)
 			assert.Equal(t, tt.expected, priority)
 		})
@@ -115,7 +115,7 @@ func TestDefaultJobPrioritizer_AssignPriority_ByMachineType(t *testing.T) {
 		true, false, false, false, // Only consider machine type
 		nil, nil,
 	)
-	
+
 	tests := []struct {
 		name        string
 		machineType string
@@ -147,14 +147,14 @@ func TestDefaultJobPrioritizer_AssignPriority_ByMachineType(t *testing.T) {
 			expected:    MediumPriority,
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			instance := &computepb.Instance{
 				MachineType: &tt.machineType,
 			}
 			disks := []*AttachedDiskInfo{}
-			
+
 			priority := prioritizer.AssignPriority(instance, disks)
 			assert.Equal(t, tt.expected, priority)
 		})
@@ -166,7 +166,7 @@ func TestDefaultJobPrioritizer_AssignPriority_ByDiskCount(t *testing.T) {
 		false, true, false, false, // Only consider disk count
 		nil, nil,
 	)
-	
+
 	tests := []struct {
 		name      string
 		diskCount int
@@ -203,12 +203,12 @@ func TestDefaultJobPrioritizer_AssignPriority_ByDiskCount(t *testing.T) {
 			expected:  LowPriority,
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			instance := &computepb.Instance{}
 			disks := make([]*AttachedDiskInfo, tt.diskCount)
-			
+
 			priority := prioritizer.AssignPriority(instance, disks)
 			assert.Equal(t, tt.expected, priority)
 		})
@@ -220,11 +220,11 @@ func TestDefaultJobPrioritizer_AssignPriority_ByDiskSize(t *testing.T) {
 		false, false, true, false, // Only consider disk size
 		nil, nil,
 	)
-	
+
 	tests := []struct {
-		name     string
+		name      string
 		diskSizes []int64 // in GB
-		expected JobPriority
+		expected  JobPriority
 	}{
 		{
 			name:      "Low priority very large disk",
@@ -257,12 +257,12 @@ func TestDefaultJobPrioritizer_AssignPriority_ByDiskSize(t *testing.T) {
 			expected:  HighPriority,
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			instance := &computepb.Instance{}
 			disks := make([]*AttachedDiskInfo, len(tt.diskSizes))
-			
+
 			for i, size := range tt.diskSizes {
 				disks[i] = &AttachedDiskInfo{
 					DiskDetails: &computepb.Disk{
@@ -270,7 +270,7 @@ func TestDefaultJobPrioritizer_AssignPriority_ByDiskSize(t *testing.T) {
 					},
 				}
 			}
-			
+
 			priority := prioritizer.AssignPriority(instance, disks)
 			assert.Equal(t, tt.expected, priority)
 		})
@@ -279,11 +279,11 @@ func TestDefaultJobPrioritizer_AssignPriority_ByDiskSize(t *testing.T) {
 
 func TestDefaultJobPrioritizer_Compare(t *testing.T) {
 	prioritizer := NewDefaultJobPrioritizer()
-	
+
 	now := time.Now()
 	earlier := now.Add(-time.Hour)
 	later := now.Add(time.Hour)
-	
+
 	tests := []struct {
 		name     string
 		job1     *MigrationJob
@@ -375,7 +375,7 @@ func TestDefaultJobPrioritizer_Compare(t *testing.T) {
 			expected: 0,
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := prioritizer.Compare(tt.job1, tt.job2)
@@ -411,7 +411,7 @@ func TestExtractMachineTypeName(t *testing.T) {
 			expected:    "",
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := extractMachineTypeName(tt.machineType)
@@ -422,9 +422,9 @@ func TestExtractMachineTypeName(t *testing.T) {
 
 func TestSortJobs(t *testing.T) {
 	prioritizer := NewDefaultJobPrioritizer()
-	
+
 	now := time.Now()
-	
+
 	jobs := []*MigrationJob{
 		{
 			ID:        "job-3",
@@ -451,9 +451,9 @@ func TestSortJobs(t *testing.T) {
 			Instance:  &computepb.Instance{Name: stringPtr("instance-d")},
 		},
 	}
-	
+
 	SortJobs(jobs, prioritizer)
-	
+
 	// Expected order: job-1 (High, earlier), job-4 (High, later), job-2 (Medium), job-3 (Low)
 	assert.Equal(t, "job-1", jobs[0].ID)
 	assert.Equal(t, "job-4", jobs[1].ID)
@@ -463,7 +463,7 @@ func TestSortJobs(t *testing.T) {
 
 func TestSortJobs_WithNilPrioritizer(t *testing.T) {
 	now := time.Now()
-	
+
 	jobs := []*MigrationJob{
 		{
 			ID:        "job-2",
@@ -478,10 +478,10 @@ func TestSortJobs_WithNilPrioritizer(t *testing.T) {
 			Instance:  &computepb.Instance{Name: stringPtr("instance-a")},
 		},
 	}
-	
+
 	// Should not panic with nil prioritizer
 	SortJobs(jobs, nil)
-	
+
 	// Should be sorted by priority (High first)
 	assert.Equal(t, "job-1", jobs[0].ID)
 	assert.Equal(t, "job-2", jobs[1].ID)
@@ -490,7 +490,7 @@ func TestSortJobs_WithNilPrioritizer(t *testing.T) {
 func TestNewPriorityJobQueue(t *testing.T) {
 	prioritizer := NewDefaultJobPrioritizer()
 	queue := NewPriorityJobQueue(10, prioritizer)
-	
+
 	assert.NotNil(t, queue)
 	assert.NotNil(t, queue.JobQueue)
 	assert.Equal(t, prioritizer, queue.prioritizer)
@@ -500,7 +500,7 @@ func TestNewPriorityJobQueue(t *testing.T) {
 
 func TestNewPriorityJobQueue_WithNilPrioritizer(t *testing.T) {
 	queue := NewPriorityJobQueue(10, nil)
-	
+
 	assert.NotNil(t, queue)
 	assert.NotNil(t, queue.prioritizer)
 	assert.IsType(t, &DefaultJobPrioritizer{}, queue.prioritizer)

@@ -6,10 +6,10 @@ import (
 	"strings"
 	"time"
 
+	computepb "cloud.google.com/go/compute/apiv1/computepb"
 	"github.com/maxkimambo/pd/internal/gcp"
 	"github.com/maxkimambo/pd/internal/logger"
 	"github.com/maxkimambo/pd/internal/utils"
-	computepb "cloud.google.com/go/compute/apiv1/computepb"
 )
 
 // DiskMigratorInterface defines the interface for disk migration operations
@@ -47,7 +47,7 @@ func (m *DiskMigrator) MigrateInstanceDisks(ctx context.Context, migration *Inst
 	// Process each disk
 	for _, diskInfo := range migration.Disks {
 		logger.User.Infof("Processing disk: %s (boot: %t)", diskInfo.DiskDetails.GetName(), diskInfo.IsBoot)
-		
+
 		result := DiskMigrationResult{
 			DiskInfo: diskInfo,
 			Success:  false,
@@ -106,7 +106,7 @@ func (m *DiskMigrator) MigrateInstanceDisks(ctx context.Context, migration *Inst
 
 	// Update migration status based on results
 	m.updateMigrationStatus(migration)
-	
+
 	logger.User.Infof("Completed disk migration for instance %s", instance.GetName())
 	return nil
 }
@@ -141,9 +141,9 @@ func (m *DiskMigrator) detachDiskIfNeeded(ctx context.Context, project, zone str
 // createDiskSnapshot creates a snapshot of a disk
 func (m *DiskMigrator) createDiskSnapshot(ctx context.Context, project, zone, diskName, snapshotName string) error {
 	labels := map[string]string{
-		"managed-by":   "pd-migrate",
-		"source-disk":  diskName,
-		"phase":        "migration",
+		"managed-by":  "pd-migrate",
+		"source-disk": diskName,
+		"phase":       "migration",
 	}
 
 	logger.Op.WithFields(map[string]interface{}{
@@ -184,11 +184,11 @@ func (m *DiskMigrator) createNewDiskFromSnapshot(ctx context.Context, project, z
 	labels["migration"] = "success"
 
 	logger.Op.WithFields(map[string]interface{}{
-		"newDisk":     newDiskName,
-		"snapshot":    snapshotName,
-		"sourceDisk":  sourceDisk.GetName(),
-		"targetType":  m.config.TargetDiskType,
-		"zone":        zone,
+		"newDisk":    newDiskName,
+		"snapshot":   snapshotName,
+		"sourceDisk": sourceDisk.GetName(),
+		"targetType": m.config.TargetDiskType,
+		"zone":       zone,
 	}).Info("Creating new disk from snapshot")
 
 	// Use the existing interface method with correct signature

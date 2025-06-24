@@ -3,8 +3,8 @@ package migrator
 import (
 	"sync"
 
-	"github.com/maxkimambo/pd/internal/utils"
 	computepb "cloud.google.com/go/compute/apiv1/computepb"
+	"github.com/maxkimambo/pd/internal/utils"
 )
 
 // InstanceStateManager provides thread-safe access to instance states

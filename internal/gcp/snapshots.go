@@ -16,10 +16,10 @@ import (
 const (
 	MANAGED_BY_KEY   = "managed-by"
 	MANAGED_BY_VALUE = "pd-migrate"
-	
+
 	// Enhanced labeling constants for migration session tracking
 	SESSION_ID_KEY    = "migration-session-id"
-	TASK_ID_KEY       = "migration-task-id" 
+	TASK_ID_KEY       = "migration-task-id"
 	CREATED_AT_KEY    = "created-at"
 	SOURCE_DISK_KEY   = "source-disk"
 	CLEANUP_AFTER_KEY = "cleanup-after"
@@ -34,19 +34,19 @@ type SnapshotKmsParams struct {
 
 // SnapshotMetadata holds enhanced metadata for migration snapshots
 type SnapshotMetadata struct {
-	SessionID     string
-	TaskID        string
-	CreatedAt     time.Time
-	SourceDisk    string
-	CleanupAfter  time.Time
-	Labels        map[string]string
+	SessionID    string
+	TaskID       string
+	CreatedAt    time.Time
+	SourceDisk   string
+	CleanupAfter time.Time
+	Labels       map[string]string
 }
 
 // NewSnapshotMetadata creates enhanced metadata for migration snapshots
 func NewSnapshotMetadata(sessionID, taskID, sourceDisk string, cleanupAfterDuration time.Duration) *SnapshotMetadata {
 	now := time.Now()
 	cleanupAfter := now.Add(cleanupAfterDuration)
-	
+
 	return &SnapshotMetadata{
 		SessionID:    sessionID,
 		TaskID:       taskID,
@@ -60,12 +60,12 @@ func NewSnapshotMetadata(sessionID, taskID, sourceDisk string, cleanupAfterDurat
 // ToLabels converts metadata to GCP labels format
 func (sm *SnapshotMetadata) ToLabels() map[string]string {
 	labels := make(map[string]string)
-	
+
 	// Copy custom labels first
 	for k, v := range sm.Labels {
 		labels[k] = v
 	}
-	
+
 	// Add standard migration labels
 	labels[MANAGED_BY_KEY] = MANAGED_BY_VALUE
 	labels[SESSION_ID_KEY] = sm.SessionID
@@ -193,7 +193,7 @@ func (sc *SnapshotClient) CreateSnapshotWithMetadata(ctx context.Context, projec
 
 	// Merge metadata labels with any existing disk labels
 	diskLabels := make(map[string]string)
-	
+
 	// Get disk to inherit its labels
 	disk, err := sc.getDiskForSnapshot(ctx, projectID, zone, diskName)
 	if err != nil {
@@ -203,15 +203,15 @@ func (sc *SnapshotClient) CreateSnapshotWithMetadata(ctx context.Context, projec
 			diskLabels[k] = v
 		}
 	}
-	
+
 	// Add disk labels to metadata
 	for k, v := range diskLabels {
 		metadata.Labels[k] = v
 	}
-	
+
 	// Convert metadata to labels
 	allLabels := metadata.ToLabels()
-	
+
 	return sc.CreateSnapshot(ctx, projectID, zone, diskName, snapshotName, kmsParams, allLabels)
 }
 
@@ -345,18 +345,18 @@ func (sc *SnapshotClient) ListExpiredSnapshots(ctx context.Context, projectID st
 		if snapshot.GetLabels() == nil {
 			continue
 		}
-		
+
 		cleanupAfterStr, exists := snapshot.GetLabels()[CLEANUP_AFTER_KEY]
 		if !exists {
 			continue
 		}
-		
+
 		cleanupAfter, err := time.Parse("2025-01-02T15-04-05Z", cleanupAfterStr)
 		if err != nil {
 			logger.Op.WithFields(logFields).WithError(err).Warnf("Failed to parse cleanup time for snapshot %s", snapshot.GetName())
 			continue
 		}
-		
+
 		if now.After(cleanupAfter) {
 			expiredSnapshots = append(expiredSnapshots, snapshot)
 		}
@@ -385,10 +385,10 @@ func (sc *SnapshotClient) DeleteSnapshotsBySessionID(ctx context.Context, projec
 	}
 
 	logger.Op.WithFields(logFields).Infof("Found %d snapshots to delete for session", len(snapshots))
-	
+
 	deletedCount := 0
 	failedCount := 0
-	
+
 	for _, snapshot := range snapshots {
 		snapshotName := snapshot.GetName()
 		snapshotLogFields := map[string]interface{}{
@@ -396,9 +396,9 @@ func (sc *SnapshotClient) DeleteSnapshotsBySessionID(ctx context.Context, projec
 			"sessionID":    sessionID,
 			"snapshotName": snapshotName,
 		}
-		
+
 		logger.Op.WithFields(snapshotLogFields).Info("Deleting session snapshot...")
-		
+
 		err := sc.DeleteSnapshot(ctx, projectID, snapshotName)
 		if err != nil {
 			logger.Op.WithFields(snapshotLogFields).WithError(err).Error("Failed to delete session snapshot")
@@ -410,18 +410,18 @@ func (sc *SnapshotClient) DeleteSnapshotsBySessionID(ctx context.Context, projec
 	}
 
 	resultFields := map[string]interface{}{
-		"project":     projectID,
-		"sessionID":   sessionID,
-		"deleted":     deletedCount,
-		"failed":      failedCount,
-		"total":       len(snapshots),
+		"project":   projectID,
+		"sessionID": sessionID,
+		"deleted":   deletedCount,
+		"failed":    failedCount,
+		"total":     len(snapshots),
 	}
-	
+
 	if failedCount > 0 {
 		logger.Op.WithFields(resultFields).Warnf("Session cleanup completed with %d failures out of %d snapshots", failedCount, len(snapshots))
 		return fmt.Errorf("failed to delete %d out of %d snapshots for session %s", failedCount, len(snapshots), sessionID)
 	}
-	
+
 	logger.Op.WithFields(resultFields).Info("All session snapshots deleted successfully")
 	return nil
 }

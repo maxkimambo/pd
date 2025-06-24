@@ -126,7 +126,7 @@ func (o *DAGOrchestrator) BuildDiskMigrationDAG(ctx context.Context, disks []*co
 		if logger.User != nil {
 			logger.User.Infof("Creating tasks for disk %d/%d: %s", i+1, len(disks), diskName)
 		}
-		
+
 		if logger.Op != nil {
 			logger.Op.WithFields(map[string]interface{}{
 				"disk": diskName,

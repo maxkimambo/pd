@@ -6,8 +6,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/maxkimambo/pd/internal/logger"
 	computepb "cloud.google.com/go/compute/apiv1/computepb"
+	"github.com/maxkimambo/pd/internal/logger"
 )
 
 // JobPriority defines the priority levels for migration jobs

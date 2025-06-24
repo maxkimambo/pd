@@ -51,25 +51,25 @@ type Alert struct {
 
 // CleanupMetrics holds cleanup operation metrics
 type CleanupMetrics struct {
-	SessionID               string                 `json:"session_id"`
-	StartTime               time.Time              `json:"start_time"`
-	LastUpdateTime          time.Time              `json:"last_update_time"`
-	TotalSnapshots          int64                  `json:"total_snapshots"`
-	SnapshotsDeleted        int64                  `json:"snapshots_deleted"`
-	SnapshotsFailed         int64                  `json:"snapshots_failed"`
-	TaskLevelCleanups       int64                  `json:"task_level_cleanups"`
-	SessionLevelCleanups    int64                  `json:"session_level_cleanups"`
-	EmergencyCleanups       int64                  `json:"emergency_cleanups"`
-	CircuitBreakerTrips     int64                  `json:"circuit_breaker_trips"`
-	RetryAttempts           int64                  `json:"retry_attempts"`
-	SuccessfulRetries       int64                  `json:"successful_retries"`
-	HealthCheckFailures     int64                  `json:"health_check_failures"`
-	AverageCleanupDuration  time.Duration          `json:"average_cleanup_duration"`
-	ErrorsByType            map[string]int64       `json:"errors_by_type"`
-	LastCleanupResult       *CleanupResult         `json:"last_cleanup_result,omitempty"`
-	Alerts                  []Alert                `json:"alerts"`
-	CustomMetrics           map[string]interface{} `json:"custom_metrics"`
-	mu                      sync.RWMutex
+	SessionID              string                 `json:"session_id"`
+	StartTime              time.Time              `json:"start_time"`
+	LastUpdateTime         time.Time              `json:"last_update_time"`
+	TotalSnapshots         int64                  `json:"total_snapshots"`
+	SnapshotsDeleted       int64                  `json:"snapshots_deleted"`
+	SnapshotsFailed        int64                  `json:"snapshots_failed"`
+	TaskLevelCleanups      int64                  `json:"task_level_cleanups"`
+	SessionLevelCleanups   int64                  `json:"session_level_cleanups"`
+	EmergencyCleanups      int64                  `json:"emergency_cleanups"`
+	CircuitBreakerTrips    int64                  `json:"circuit_breaker_trips"`
+	RetryAttempts          int64                  `json:"retry_attempts"`
+	SuccessfulRetries      int64                  `json:"successful_retries"`
+	HealthCheckFailures    int64                  `json:"health_check_failures"`
+	AverageCleanupDuration time.Duration          `json:"average_cleanup_duration"`
+	ErrorsByType           map[string]int64       `json:"errors_by_type"`
+	LastCleanupResult      *CleanupResult         `json:"last_cleanup_result,omitempty"`
+	Alerts                 []Alert                `json:"alerts"`
+	CustomMetrics          map[string]interface{} `json:"custom_metrics"`
+	mu                     sync.RWMutex
 }
 
 // NewCleanupMetrics creates a new metrics collector
@@ -151,7 +151,7 @@ func (cm *CleanupMetrics) generateAlertsFromResult(result *CleanupResult) {
 	// Alert for failed cleanups
 	if len(result.SnapshotsFailed) > 0 {
 		failureRate := float64(len(result.SnapshotsFailed)) / float64(result.SnapshotsFound)
-		
+
 		var level AlertLevel
 		switch {
 		case failureRate >= 0.8:
@@ -173,10 +173,10 @@ func (cm *CleanupMetrics) generateAlertsFromResult(result *CleanupResult) {
 			Component:   "cleanup",
 			Timestamp:   now,
 			Metadata: map[string]interface{}{
-				"failure_rate":      failureRate,
-				"failed_snapshots":  result.SnapshotsFailed,
-				"cleanup_level":     result.Level.String(),
-				"cleanup_duration":  result.Duration,
+				"failure_rate":     failureRate,
+				"failed_snapshots": result.SnapshotsFailed,
+				"cleanup_level":    result.Level.String(),
+				"cleanup_duration": result.Duration,
 			},
 		}
 		cm.Alerts = append(cm.Alerts, alert)
@@ -279,23 +279,23 @@ func (cm *CleanupMetrics) GetMetrics() CleanupMetrics {
 
 	// Create a deep copy
 	metrics := CleanupMetrics{
-		SessionID:               cm.SessionID,
-		StartTime:               cm.StartTime,
-		LastUpdateTime:          cm.LastUpdateTime,
-		TotalSnapshots:          cm.TotalSnapshots,
-		SnapshotsDeleted:        cm.SnapshotsDeleted,
-		SnapshotsFailed:         cm.SnapshotsFailed,
-		TaskLevelCleanups:       cm.TaskLevelCleanups,
-		SessionLevelCleanups:    cm.SessionLevelCleanups,
-		EmergencyCleanups:       cm.EmergencyCleanups,
-		CircuitBreakerTrips:     cm.CircuitBreakerTrips,
-		RetryAttempts:           cm.RetryAttempts,
-		SuccessfulRetries:       cm.SuccessfulRetries,
-		HealthCheckFailures:     cm.HealthCheckFailures,
-		AverageCleanupDuration:  cm.AverageCleanupDuration,
-		ErrorsByType:            make(map[string]int64),
-		CustomMetrics:           make(map[string]interface{}),
-		Alerts:                  make([]Alert, len(cm.Alerts)),
+		SessionID:              cm.SessionID,
+		StartTime:              cm.StartTime,
+		LastUpdateTime:         cm.LastUpdateTime,
+		TotalSnapshots:         cm.TotalSnapshots,
+		SnapshotsDeleted:       cm.SnapshotsDeleted,
+		SnapshotsFailed:        cm.SnapshotsFailed,
+		TaskLevelCleanups:      cm.TaskLevelCleanups,
+		SessionLevelCleanups:   cm.SessionLevelCleanups,
+		EmergencyCleanups:      cm.EmergencyCleanups,
+		CircuitBreakerTrips:    cm.CircuitBreakerTrips,
+		RetryAttempts:          cm.RetryAttempts,
+		SuccessfulRetries:      cm.SuccessfulRetries,
+		HealthCheckFailures:    cm.HealthCheckFailures,
+		AverageCleanupDuration: cm.AverageCleanupDuration,
+		ErrorsByType:           make(map[string]int64),
+		CustomMetrics:          make(map[string]interface{}),
+		Alerts:                 make([]Alert, len(cm.Alerts)),
 	}
 
 	// Copy maps and slices
@@ -364,7 +364,7 @@ type HealthThresholds struct {
 // DefaultHealthThresholds returns sensible default health thresholds
 func DefaultHealthThresholds() HealthThresholds {
 	return HealthThresholds{
-		MaxFailureRate:     0.1,  // 10% failure rate
+		MaxFailureRate:     0.1, // 10% failure rate
 		MaxCleanupDuration: 10 * time.Minute,
 		MaxRetryAttempts:   10,
 		HealthCheckWindow:  5 * time.Minute,
@@ -377,11 +377,11 @@ type LogAlertHandler struct{}
 // HandleAlert logs the alert
 func (lah *LogAlertHandler) HandleAlert(alert Alert) error {
 	logFields := map[string]interface{}{
-		"alert_id":    alert.ID,
-		"level":       alert.Level.String(),
-		"component":   alert.Component,
-		"session_id":  alert.SessionID,
-		"timestamp":   alert.Timestamp,
+		"alert_id":   alert.ID,
+		"level":      alert.Level.String(),
+		"component":  alert.Component,
+		"session_id": alert.SessionID,
+		"timestamp":  alert.Timestamp,
 	}
 
 	for k, v := range alert.Metadata {
@@ -436,7 +436,7 @@ func (cm *CleanupMonitor) RecordCircuitBreakerTrip() {
 // checkHealthAndAlert evaluates health and triggers alerts if needed
 func (cm *CleanupMonitor) checkHealthAndAlert() {
 	metrics := cm.metrics.GetMetrics()
-	
+
 	// Check failure rate
 	if metrics.TotalSnapshots > 0 {
 		failureRate := float64(metrics.SnapshotsFailed) / float64(metrics.TotalSnapshots)

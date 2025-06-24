@@ -6,10 +6,10 @@ import (
 	"strings"
 	"time"
 
+	computepb "cloud.google.com/go/compute/apiv1/computepb"
 	"github.com/maxkimambo/pd/internal/gcp"
 	"github.com/maxkimambo/pd/internal/migrator"
 	"github.com/maxkimambo/pd/internal/utils"
-	computepb "cloud.google.com/go/compute/apiv1/computepb"
 )
 
 // DiscoveryTask wraps instance/disk discovery operations
@@ -36,7 +36,7 @@ func NewDiscoveryTask(id string, config *migrator.Config, gcpClient *gcp.Clients
 func (t *DiscoveryTask) Execute(ctx context.Context) (*TaskResult, error) {
 	result := NewTaskResult(t.GetID(), t.GetName())
 	result.MarkStarted()
-	
+
 	var err error
 	switch t.resourceType {
 	case "disks":
@@ -60,7 +60,7 @@ func (t *DiscoveryTask) Execute(ctx context.Context) (*TaskResult, error) {
 		result.MarkFailed(err)
 		return result, err
 	}
-	
+
 	result.MarkCompleted()
 	return result, nil
 }
@@ -73,15 +73,15 @@ func (t *DiscoveryTask) GetDiscoveredResources() interface{} {
 // SnapshotTask wraps snapshot creation operations
 type SnapshotTask struct {
 	*BaseTask
-	projectID     string
-	zone          string
-	diskName      string
-	snapshotName  string
-	gcpClient     *gcp.Clients
-	config        *migrator.Config
-	sessionID     string
-	cleanupAfter  time.Duration
-	created       bool
+	projectID    string
+	zone         string
+	diskName     string
+	snapshotName string
+	gcpClient    *gcp.Clients
+	config       *migrator.Config
+	sessionID    string
+	cleanupAfter time.Duration
+	created      bool
 }
 
 // NewSnapshotTask creates a new snapshot task
@@ -95,7 +95,7 @@ func NewSnapshotTask(id, projectID, zone, diskName, snapshotName string, gcpClie
 		snapshotName: snapshotName,
 		gcpClient:    gcpClient,
 		config:       config,
-		sessionID:    "", // Will be set by the task factory or orchestrator
+		sessionID:    "",             // Will be set by the task factory or orchestrator
 		cleanupAfter: 24 * time.Hour, // Default cleanup after 24 hours
 		created:      false,
 	}
@@ -126,28 +126,28 @@ func (t *SnapshotTask) Execute(ctx context.Context) (*TaskResult, error) {
 	result.AddMetadata("snapshot_name", t.snapshotName)
 	result.AddMetadata("project_id", t.projectID)
 	result.AddMetadata("zone", t.zone)
-	
+
 	kmsParams := t.config.PopulateKmsParams()
-	
+
 	// Use enhanced snapshot creation if session ID is available
 	if t.sessionID != "" && t.cleanupAfter > 0 {
 		// Create snapshot metadata
 		metadata := gcp.NewSnapshotMetadata(t.sessionID, t.GetID(), t.diskName, t.cleanupAfter)
-		
+
 		// Get disk labels to include in snapshot metadata
 		disk, err := t.gcpClient.DiskClient.GetDisk(ctx, t.projectID, t.zone, t.diskName)
 		if err != nil {
 			result.MarkFailed(fmt.Errorf("failed to get disk for snapshot: %w", err))
 			return result, err
 		}
-		
+
 		// Add disk labels to metadata
 		if disk.GetLabels() != nil {
 			for k, v := range disk.GetLabels() {
 				metadata.Labels[k] = v
 			}
 		}
-		
+
 		err = t.gcpClient.SnapshotClient.CreateSnapshotWithMetadata(ctx, t.projectID, t.zone, t.diskName, t.snapshotName, kmsParams, metadata)
 		if err != nil {
 			result.MarkFailed(err)
@@ -161,7 +161,7 @@ func (t *SnapshotTask) Execute(ctx context.Context) (*TaskResult, error) {
 			result.MarkFailed(fmt.Errorf("failed to get disk for snapshot: %w", err))
 			return result, err
 		}
-		
+
 		err = t.gcpClient.SnapshotClient.CreateSnapshot(ctx, t.projectID, t.zone, t.diskName, t.snapshotName, kmsParams, disk.GetLabels())
 		if err != nil {
 			result.MarkFailed(err)
@@ -169,7 +169,7 @@ func (t *SnapshotTask) Execute(ctx context.Context) (*TaskResult, error) {
 		}
 		result.AddMetric("with_metadata", false)
 	}
-	
+
 	t.created = true
 	result.AddMetric("snapshot_created", true)
 	result.MarkCompleted()
@@ -214,17 +214,17 @@ func (t *InstanceStateTask) Execute(ctx context.Context) (*TaskResult, error) {
 	result.AddMetadata("action", t.action)
 	result.AddMetadata("project_id", t.projectID)
 	result.AddMetadata("zone", t.zone)
-	
+
 	// Get current state first
 	instance, err := t.gcpClient.ComputeClient.GetInstance(ctx, t.projectID, t.zone, t.instanceName)
 	if err != nil {
 		result.MarkFailed(err)
 		return result, err
 	}
-	
+
 	t.previousState = instance.GetStatus()
 	result.AddMetadata("previous_state", t.previousState)
-	
+
 	// Perform the requested action
 	switch t.action {
 	case "stop":
@@ -256,11 +256,10 @@ func (t *InstanceStateTask) Execute(ctx context.Context) (*TaskResult, error) {
 		result.MarkFailed(err)
 		return result, err
 	}
-	
+
 	result.MarkCompleted()
 	return result, nil
 }
-
 
 // DiskMigrationTask wraps disk migration operations
 type DiskMigrationTask struct {
@@ -283,19 +282,19 @@ func NewDiskMigrationTask(id, projectID, zone, diskName, targetType, snapshotNam
 	if !config.RetainName {
 		newDiskName = utils.AddSuffix(diskName, 4)
 	}
-	
+
 	return &DiskMigrationTask{
 		BaseTask:     NewBaseTask(id, fmt.Sprintf("Migrate disk %s to %s", diskName, targetType), "DiskMigration"),
-		projectID:      projectID,
-		zone:           zone,
-		diskName:       diskName,
-		newDiskName:    newDiskName,
-		targetType:     targetType,
-		snapshotName:   snapshotName,
-		gcpClient:      gcpClient,
-		config:         config,
-		disk:           disk,
-		migrated:       false,
+		projectID:    projectID,
+		zone:         zone,
+		diskName:     diskName,
+		newDiskName:  newDiskName,
+		targetType:   targetType,
+		snapshotName: snapshotName,
+		gcpClient:    gcpClient,
+		config:       config,
+		disk:         disk,
+		migrated:     false,
 	}
 }
 
@@ -310,7 +309,7 @@ func (t *DiskMigrationTask) Execute(ctx context.Context) (*TaskResult, error) {
 	result.AddMetadata("project_id", t.projectID)
 	result.AddMetadata("zone", t.zone)
 	result.AddMetadata("retain_name", fmt.Sprintf("%t", t.config.RetainName))
-	
+
 	// Delete original disk if retaining name
 	if t.config.RetainName {
 		err := t.gcpClient.DiskClient.DeleteDisk(ctx, t.projectID, t.zone, t.diskName)
@@ -323,14 +322,14 @@ func (t *DiskMigrationTask) Execute(ctx context.Context) (*TaskResult, error) {
 	} else {
 		result.AddMetric("original_disk_deleted", false)
 	}
-	
+
 	// Create new disk from snapshot
 	newDiskLabels := t.disk.GetLabels()
 	if newDiskLabels == nil {
 		newDiskLabels = make(map[string]string)
 	}
 	newDiskLabels["migration"] = "success"
-	
+
 	storagePoolUrl := utils.GetStoragePoolURL(t.config.StoragePoolId, t.projectID, t.zone)
 	err := t.gcpClient.DiskClient.CreateNewDiskFromSnapshot(
 		ctx, t.projectID, t.zone, t.newDiskName, t.targetType, t.snapshotName,
@@ -340,7 +339,7 @@ func (t *DiskMigrationTask) Execute(ctx context.Context) (*TaskResult, error) {
 		result.MarkFailed(migErr)
 		return result, migErr
 	}
-	
+
 	t.migrated = true
 	result.AddMetric("disk_migrated", true)
 	result.AddMetric("disk_size_gb", *t.disk.SizeGb)
@@ -350,11 +349,10 @@ func (t *DiskMigrationTask) Execute(ctx context.Context) (*TaskResult, error) {
 	if t.config.Throughput > 0 {
 		result.AddMetric("throughput", t.config.Throughput)
 	}
-	
+
 	result.MarkCompleted()
 	return result, nil
 }
-
 
 // GetNewDiskName returns the name of the newly created disk
 func (t *DiskMigrationTask) GetNewDiskName() string {
@@ -378,14 +376,14 @@ type DiskAttachmentTask struct {
 func NewDiskAttachmentTask(id, projectID, zone, instanceName, diskName, deviceName, action string, gcpClient *gcp.Clients) *DiskAttachmentTask {
 	return &DiskAttachmentTask{
 		BaseTask:     NewBaseTask(id, fmt.Sprintf("%s disk %s to instance %s", strings.ToUpper(action[:1])+action[1:], diskName, instanceName), "DiskAttachment"),
-		projectID:      projectID,
-		zone:           zone,
-		instanceName:   instanceName,
-		diskName:       diskName,
-		deviceName:     deviceName,
-		action:         action,
-		gcpClient:      gcpClient,
-		executed:       false,
+		projectID:    projectID,
+		zone:         zone,
+		instanceName: instanceName,
+		diskName:     diskName,
+		deviceName:   deviceName,
+		action:       action,
+		gcpClient:    gcpClient,
+		executed:     false,
 	}
 }
 
@@ -399,7 +397,7 @@ func (t *DiskAttachmentTask) Execute(ctx context.Context) (*TaskResult, error) {
 	result.AddMetadata("action", t.action)
 	result.AddMetadata("project_id", t.projectID)
 	result.AddMetadata("zone", t.zone)
-	
+
 	switch t.action {
 	case "attach":
 		err := t.gcpClient.ComputeClient.AttachDisk(ctx, t.projectID, t.zone, t.instanceName, t.diskName, t.deviceName)
@@ -420,12 +418,11 @@ func (t *DiskAttachmentTask) Execute(ctx context.Context) (*TaskResult, error) {
 		result.MarkFailed(err)
 		return result, err
 	}
-	
+
 	t.executed = true
 	result.MarkCompleted()
 	return result, nil
 }
-
 
 // CleanupTask wraps cleanup operations
 type CleanupTask struct {
@@ -440,10 +437,10 @@ type CleanupTask struct {
 func NewCleanupTask(id, projectID, resourceType, resourceID string, gcpClient *gcp.Clients) *CleanupTask {
 	return &CleanupTask{
 		BaseTask:     NewBaseTask(id, fmt.Sprintf("Clean up %s %s", resourceType, resourceID), "Cleanup"),
-		projectID:      projectID,
-		resourceID:     resourceID,
-		resourceType:   resourceType,
-		gcpClient:      gcpClient,
+		projectID:    projectID,
+		resourceID:   resourceID,
+		resourceType: resourceType,
+		gcpClient:    gcpClient,
 	}
 }
 
@@ -454,7 +451,7 @@ func (t *CleanupTask) Execute(ctx context.Context) (*TaskResult, error) {
 	result.AddMetadata("resource_type", t.resourceType)
 	result.AddMetadata("resource_id", t.resourceID)
 	result.AddMetadata("project_id", t.projectID)
-	
+
 	switch t.resourceType {
 	case "snapshot":
 		err := t.gcpClient.SnapshotClient.DeleteSnapshot(ctx, t.projectID, t.resourceID)
@@ -468,11 +465,10 @@ func (t *CleanupTask) Execute(ctx context.Context) (*TaskResult, error) {
 		result.MarkFailed(err)
 		return result, err
 	}
-	
+
 	result.MarkCompleted()
 	return result, nil
 }
-
 
 // EnhancedCleanupTask wraps multi-level cleanup operations
 type EnhancedCleanupTask struct {
@@ -523,10 +519,10 @@ func (t *EnhancedCleanupTask) Execute(ctx context.Context) (*TaskResult, error) 
 	if t.snapshotName != "" {
 		taskResult.AddMetadata("snapshot_name", t.snapshotName)
 	}
-	
+
 	var cleanupResult *migrator.CleanupResult
 	var err error
-	
+
 	switch t.cleanupLevel {
 	case migrator.CleanupLevelTask:
 		cleanupResult = t.cleanupManager.CleanupTaskSnapshot(ctx, t.taskID, t.snapshotName)
@@ -539,13 +535,13 @@ func (t *EnhancedCleanupTask) Execute(ctx context.Context) (*TaskResult, error) 
 		taskResult.MarkFailed(err)
 		return taskResult, err
 	}
-	
+
 	// Add cleanup metrics to task result
 	taskResult.AddMetric("snapshots_found", cleanupResult.SnapshotsFound)
 	taskResult.AddMetric("snapshots_deleted", cleanupResult.SnapshotsDeleted)
 	taskResult.AddMetric("snapshots_failed", len(cleanupResult.SnapshotsFailed))
 	taskResult.AddMetric("duration_seconds", cleanupResult.Duration.Seconds())
-	
+
 	// Check if cleanup had any errors
 	if len(cleanupResult.Errors) > 0 {
 		// Return the first error, but log all errors
@@ -557,11 +553,10 @@ func (t *EnhancedCleanupTask) Execute(ctx context.Context) (*TaskResult, error) 
 		taskResult.MarkFailed(err)
 		return taskResult, err
 	}
-	
+
 	taskResult.MarkCompleted()
 	return taskResult, nil
 }
-
 
 // GetCleanupResult returns the result of the last cleanup operation
 func (t *EnhancedCleanupTask) GetCleanupResult() *migrator.CleanupResult {

@@ -7,8 +7,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/maxkimambo/pd/internal/logger"
 	computepb "cloud.google.com/go/compute/apiv1/computepb"
+	"github.com/maxkimambo/pd/internal/logger"
 )
 
 // ResourceType represents the type of resource being locked
@@ -22,10 +22,10 @@ const (
 
 // ResourceID represents a unique resource identifier
 type ResourceID struct {
-	Type     ResourceType
-	Project  string
-	Zone     string
-	Name     string
+	Type    ResourceType
+	Project string
+	Zone    string
+	Name    string
 }
 
 // String returns a string representation of the resource ID
@@ -35,10 +35,10 @@ func (r ResourceID) String() string {
 
 // ResourceLock represents a lock on a specific resource
 type ResourceLock struct {
-	ResourceID    ResourceID
-	LockedAt      time.Time
-	LockedBy      string
-	JobID         string
+	ResourceID ResourceID
+	LockedAt   time.Time
+	LockedBy   string
+	JobID      string
 }
 
 // ResourceLocker provides distributed resource locking to prevent conflicts
@@ -65,13 +65,13 @@ func (rl *ResourceLocker) LockResources(ctx context.Context, resources []Resourc
 		key := resource.String()
 		if lock, exists := rl.locks[key]; exists {
 			logger.Op.WithFields(map[string]interface{}{
-				"resourceID":     key,
-				"currentJobID":   jobID,
-				"conflictJobID":  lock.JobID,
-				"lockedBy":       lock.LockedBy,
-				"lockedAt":       lock.LockedAt,
+				"resourceID":    key,
+				"currentJobID":  jobID,
+				"conflictJobID": lock.JobID,
+				"lockedBy":      lock.LockedBy,
+				"lockedAt":      lock.LockedAt,
 			}).Warn("Resource conflict detected - resource already locked")
-			
+
 			return fmt.Errorf("resource %s is already locked by job %s", key, lock.JobID)
 		}
 	}
@@ -86,7 +86,7 @@ func (rl *ResourceLocker) LockResources(ctx context.Context, resources []Resourc
 	// Acquire all locks atomically
 	lockedBy := fmt.Sprintf("job-%s", jobID)
 	now := time.Now()
-	
+
 	for _, resource := range resources {
 		key := resource.String()
 		rl.locks[key] = &ResourceLock{
@@ -95,7 +95,7 @@ func (rl *ResourceLocker) LockResources(ctx context.Context, resources []Resourc
 			LockedBy:   lockedBy,
 			JobID:      jobID,
 		}
-		
+
 		logger.Op.WithFields(map[string]interface{}{
 			"resourceID": key,
 			"jobID":      jobID,
@@ -104,9 +104,9 @@ func (rl *ResourceLocker) LockResources(ctx context.Context, resources []Resourc
 	}
 
 	logger.Op.WithFields(map[string]interface{}{
-		"jobID":           jobID,
-		"resourceCount":   len(resources),
-		"lockedBy":        lockedBy,
+		"jobID":         jobID,
+		"resourceCount": len(resources),
+		"lockedBy":      lockedBy,
 	}).Info("Successfully locked all resources")
 
 	return nil
@@ -128,9 +128,9 @@ func (rl *ResourceLocker) UnlockResources(resources []ResourceID, jobID string) 
 				}).Debug("Resource unlocked")
 			} else {
 				logger.Op.WithFields(map[string]interface{}{
-					"resourceID":    key,
-					"jobID":         jobID,
-					"actualJobID":   lock.JobID,
+					"resourceID":  key,
+					"jobID":       jobID,
+					"actualJobID": lock.JobID,
 				}).Warn("Attempted to unlock resource locked by different job")
 			}
 		}

@@ -17,7 +17,6 @@ import (
 func TestListDetachedDisks_WithTestifyMock(t *testing.T) {
 	// Initialize logger (required for operations)
 	logger.Setup(false, false, false)
-	
 
 	tests := []struct {
 		name          string
@@ -126,11 +125,11 @@ func TestGetDisk_WithTestifyMock(t *testing.T) {
 			zone:      "us-west1-a",
 			diskName:  "test-disk",
 			mockResponse: &computepb.Disk{
-				Name:     proto.String("test-disk"),
-				Zone:     proto.String("projects/test-project/zones/us-west1-a"),
-				SizeGb:   proto.Int64(100),
-				Status:   proto.String("READY"),
-				Type:     proto.String("projects/test-project/zones/us-west1-a/diskTypes/pd-standard"),
+				Name:   proto.String("test-disk"),
+				Zone:   proto.String("projects/test-project/zones/us-west1-a"),
+				SizeGb: proto.Int64(100),
+				Status: proto.String("READY"),
+				Type:   proto.String("projects/test-project/zones/us-west1-a/diskTypes/pd-standard"),
 			},
 			mockError:   nil,
 			expectError: false,

@@ -66,14 +66,14 @@ func DefaultCleanupStrategy() *CleanupStrategy {
 
 // CleanupResult represents the result of a cleanup operation
 type CleanupResult struct {
-	Level           CleanupLevel
-	SessionID       string
-	TaskID          string
-	SnapshotsFound  int
+	Level            CleanupLevel
+	SessionID        string
+	TaskID           string
+	SnapshotsFound   int
 	SnapshotsDeleted int
 	SnapshotsFailed  []string
-	Errors          []error
-	Duration        time.Duration
+	Errors           []error
+	Duration         time.Duration
 }
 
 // MultiLevelCleanupManager handles comprehensive snapshot cleanup across multiple levels
@@ -92,10 +92,10 @@ func NewMultiLevelCleanupManager(config *Config, gcpClient *gcp.Clients, strateg
 	if strategy == nil {
 		strategy = DefaultCleanupStrategy()
 	}
-	
+
 	// Create monitoring with default health thresholds
 	monitor := NewCleanupMonitor(sessionID, DefaultHealthThresholds())
-	
+
 	return &MultiLevelCleanupManager{
 		config:          config,
 		gcpClient:       gcpClient,
@@ -111,7 +111,7 @@ func (m *MultiLevelCleanupManager) RegisterSnapshot(snapshotName string) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.activeSnapshots[snapshotName] = true
-	
+
 	logFields := map[string]interface{}{
 		"sessionID":    m.sessionID,
 		"snapshotName": snapshotName,
@@ -125,7 +125,7 @@ func (m *MultiLevelCleanupManager) UnregisterSnapshot(snapshotName string) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	delete(m.activeSnapshots, snapshotName)
-	
+
 	logFields := map[string]interface{}{
 		"sessionID":    m.sessionID,
 		"snapshotName": snapshotName,
@@ -143,7 +143,7 @@ func (m *MultiLevelCleanupManager) CleanupTaskSnapshot(ctx context.Context, task
 			TaskID:    taskID,
 		}
 	}
-	
+
 	logFields := map[string]interface{}{
 		"sessionID":    m.sessionID,
 		"taskID":       taskID,
@@ -151,14 +151,14 @@ func (m *MultiLevelCleanupManager) CleanupTaskSnapshot(ctx context.Context, task
 		"level":        "task",
 	}
 	logger.Op.WithFields(logFields).Info("Starting task-level snapshot cleanup...")
-	
+
 	startTime := time.Now()
 	result := &CleanupResult{
 		Level:     CleanupLevelTask,
 		SessionID: m.sessionID,
 		TaskID:    taskID,
 	}
-	
+
 	// Attempt cleanup with retries
 	var lastErr error
 	for attempt := 0; attempt <= m.strategy.RetryAttempts; attempt++ {
@@ -166,11 +166,11 @@ func (m *MultiLevelCleanupManager) CleanupTaskSnapshot(ctx context.Context, task
 			logger.Op.WithFields(logFields).Infof("Retrying task snapshot cleanup (attempt %d/%d)", attempt, m.strategy.RetryAttempts)
 			time.Sleep(m.strategy.RetryDelay)
 		}
-		
+
 		ctxWithTimeout, cancel := context.WithTimeout(ctx, m.strategy.CleanupTimeout)
 		err := m.gcpClient.SnapshotClient.DeleteSnapshot(ctxWithTimeout, m.config.ProjectID, snapshotName)
 		cancel()
-		
+
 		if err == nil {
 			result.SnapshotsFound = 1
 			result.SnapshotsDeleted = 1
@@ -178,22 +178,22 @@ func (m *MultiLevelCleanupManager) CleanupTaskSnapshot(ctx context.Context, task
 			logger.Op.WithFields(logFields).Info("Task snapshot cleanup completed successfully")
 			break
 		}
-		
+
 		lastErr = err
 		logger.Op.WithFields(logFields).WithError(err).Warnf("Task snapshot cleanup attempt %d failed", attempt+1)
 	}
-	
+
 	if lastErr != nil {
 		result.SnapshotsFailed = []string{snapshotName}
 		result.Errors = []error{lastErr}
 		logger.Op.WithFields(logFields).WithError(lastErr).Error("Task snapshot cleanup failed after all retry attempts")
 	}
-	
+
 	result.Duration = time.Since(startTime)
-	
+
 	// Record result in monitoring system
 	m.monitor.RecordCleanupResult(result)
-	
+
 	return result
 }
 
@@ -205,95 +205,95 @@ func (m *MultiLevelCleanupManager) CleanupSessionSnapshots(ctx context.Context) 
 			SessionID: m.sessionID,
 		}
 	}
-	
+
 	logFields := map[string]interface{}{
 		"sessionID": m.sessionID,
 		"level":     "session",
 	}
 	logger.Op.WithFields(logFields).Info("Starting session-level snapshot cleanup...")
-	
+
 	startTime := time.Now()
 	result := &CleanupResult{
 		Level:     CleanupLevelSession,
 		SessionID: m.sessionID,
 	}
-	
+
 	// Get all snapshots for this session
 	ctxWithTimeout, cancel := context.WithTimeout(ctx, m.strategy.CleanupTimeout)
 	snapshots, err := m.gcpClient.SnapshotClient.ListSnapshotsBySessionID(ctxWithTimeout, m.config.ProjectID, m.sessionID)
 	cancel()
-	
+
 	if err != nil {
 		result.Errors = []error{fmt.Errorf("failed to list session snapshots: %w", err)}
 		result.Duration = time.Since(startTime)
 		logger.Op.WithFields(logFields).WithError(err).Error("Failed to list session snapshots for cleanup")
 		return result
 	}
-	
+
 	result.SnapshotsFound = len(snapshots)
 	logger.Op.WithFields(logFields).Infof("Found %d snapshots for session cleanup", result.SnapshotsFound)
-	
+
 	if result.SnapshotsFound == 0 {
 		logger.Op.WithFields(logFields).Info("No snapshots found for session cleanup")
 		result.Duration = time.Since(startTime)
 		return result
 	}
-	
+
 	// Perform parallel deletion with concurrency control
 	concurrencyLimit := m.config.Concurrency
 	if concurrencyLimit <= 0 || concurrencyLimit > 50 {
 		concurrencyLimit = 10
 	}
-	
+
 	semaphore := make(chan struct{}, concurrencyLimit)
 	var wg sync.WaitGroup
 	deleteErrors := &sync.Map{}
 	deletedCount := int64(0)
-	
+
 	for _, snapshot := range snapshots {
 		wg.Add(1)
 		semaphore <- struct{}{}
-		
+
 		go func(snapshotName string) {
 			defer wg.Done()
 			defer func() { <-semaphore }()
-			
+
 			snapshotLogFields := map[string]interface{}{
 				"sessionID":    m.sessionID,
 				"snapshotName": snapshotName,
 			}
-			
+
 			// Attempt deletion with retries
 			var lastErr error
 			for attempt := 0; attempt <= m.strategy.RetryAttempts; attempt++ {
 				if attempt > 0 {
 					time.Sleep(m.strategy.RetryDelay)
 				}
-				
+
 				ctxWithTimeout, cancel := context.WithTimeout(ctx, m.strategy.CleanupTimeout)
 				err := m.gcpClient.SnapshotClient.DeleteSnapshot(ctxWithTimeout, m.config.ProjectID, snapshotName)
 				cancel()
-				
+
 				if err == nil {
 					logger.Op.WithFields(snapshotLogFields).Info("Session snapshot deleted successfully")
 					m.UnregisterSnapshot(snapshotName)
 					deletedCount++
 					return
 				}
-				
+
 				lastErr = err
 				logger.Op.WithFields(snapshotLogFields).WithError(err).Warnf("Session snapshot deletion attempt %d failed", attempt+1)
 			}
-			
+
 			deleteErrors.Store(snapshotName, lastErr)
 			logger.Op.WithFields(snapshotLogFields).WithError(lastErr).Error("Session snapshot deletion failed after all retry attempts")
 		}(snapshot.GetName())
 	}
-	
+
 	wg.Wait()
-	
+
 	result.SnapshotsDeleted = int(deletedCount)
-	
+
 	// Collect errors
 	deleteErrors.Range(func(key, value interface{}) bool {
 		snapshotName := key.(string)
@@ -302,9 +302,9 @@ func (m *MultiLevelCleanupManager) CleanupSessionSnapshots(ctx context.Context) 
 		result.Errors = append(result.Errors, err)
 		return true
 	})
-	
+
 	result.Duration = time.Since(startTime)
-	
+
 	resultLogFields := map[string]interface{}{
 		"sessionID": m.sessionID,
 		"found":     result.SnapshotsFound,
@@ -312,16 +312,16 @@ func (m *MultiLevelCleanupManager) CleanupSessionSnapshots(ctx context.Context) 
 		"failed":    len(result.SnapshotsFailed),
 		"duration":  result.Duration,
 	}
-	
+
 	if len(result.SnapshotsFailed) > 0 {
 		logger.Op.WithFields(resultLogFields).Warnf("Session cleanup completed with %d failures", len(result.SnapshotsFailed))
 	} else {
 		logger.Op.WithFields(resultLogFields).Info("Session cleanup completed successfully")
 	}
-	
+
 	// Record result in monitoring system
 	m.monitor.RecordCleanupResult(result)
-	
+
 	return result
 }
 
@@ -333,92 +333,92 @@ func (m *MultiLevelCleanupManager) CleanupExpiredSnapshots(ctx context.Context) 
 			SessionID: m.sessionID,
 		}
 	}
-	
+
 	logFields := map[string]interface{}{
 		"level": "emergency",
 	}
 	logger.Op.WithFields(logFields).Info("Starting emergency cleanup of expired snapshots...")
-	
+
 	startTime := time.Now()
 	result := &CleanupResult{
 		Level:     CleanupLevelEmergency,
 		SessionID: m.sessionID,
 	}
-	
+
 	// Get all expired snapshots
 	ctxWithTimeout, cancel := context.WithTimeout(ctx, m.strategy.CleanupTimeout)
 	expiredSnapshots, err := m.gcpClient.SnapshotClient.ListExpiredSnapshots(ctxWithTimeout, m.config.ProjectID)
 	cancel()
-	
+
 	if err != nil {
 		result.Errors = []error{fmt.Errorf("failed to list expired snapshots: %w", err)}
 		result.Duration = time.Since(startTime)
 		logger.Op.WithFields(logFields).WithError(err).Error("Failed to list expired snapshots for emergency cleanup")
 		return result
 	}
-	
+
 	result.SnapshotsFound = len(expiredSnapshots)
 	logger.Op.WithFields(logFields).Infof("Found %d expired snapshots for emergency cleanup", result.SnapshotsFound)
-	
+
 	if result.SnapshotsFound == 0 {
 		logger.Op.WithFields(logFields).Info("No expired snapshots found for emergency cleanup")
 		result.Duration = time.Since(startTime)
 		return result
 	}
-	
+
 	// Perform parallel deletion with concurrency control
 	concurrencyLimit := m.config.Concurrency
 	if concurrencyLimit <= 0 || concurrencyLimit > 50 {
 		concurrencyLimit = 10
 	}
-	
+
 	semaphore := make(chan struct{}, concurrencyLimit)
 	var wg sync.WaitGroup
 	deleteErrors := &sync.Map{}
 	deletedCount := int64(0)
-	
+
 	for _, snapshot := range expiredSnapshots {
 		wg.Add(1)
 		semaphore <- struct{}{}
-		
+
 		go func(snapshotName string) {
 			defer wg.Done()
 			defer func() { <-semaphore }()
-			
+
 			snapshotLogFields := map[string]interface{}{
 				"snapshotName": snapshotName,
 			}
-			
+
 			// Attempt deletion with retries
 			var lastErr error
 			for attempt := 0; attempt <= m.strategy.RetryAttempts; attempt++ {
 				if attempt > 0 {
 					time.Sleep(m.strategy.RetryDelay)
 				}
-				
+
 				ctxWithTimeout, cancel := context.WithTimeout(ctx, m.strategy.CleanupTimeout)
 				err := m.gcpClient.SnapshotClient.DeleteSnapshot(ctxWithTimeout, m.config.ProjectID, snapshotName)
 				cancel()
-				
+
 				if err == nil {
 					logger.Op.WithFields(snapshotLogFields).Info("Expired snapshot deleted successfully")
 					deletedCount++
 					return
 				}
-				
+
 				lastErr = err
 				logger.Op.WithFields(snapshotLogFields).WithError(err).Warnf("Expired snapshot deletion attempt %d failed", attempt+1)
 			}
-			
+
 			deleteErrors.Store(snapshotName, lastErr)
 			logger.Op.WithFields(snapshotLogFields).WithError(lastErr).Error("Expired snapshot deletion failed after all retry attempts")
 		}(snapshot.GetName())
 	}
-	
+
 	wg.Wait()
-	
+
 	result.SnapshotsDeleted = int(deletedCount)
-	
+
 	// Collect errors
 	deleteErrors.Range(func(key, value interface{}) bool {
 		snapshotName := key.(string)
@@ -427,25 +427,25 @@ func (m *MultiLevelCleanupManager) CleanupExpiredSnapshots(ctx context.Context) 
 		result.Errors = append(result.Errors, err)
 		return true
 	})
-	
+
 	result.Duration = time.Since(startTime)
-	
+
 	resultLogFields := map[string]interface{}{
 		"found":    result.SnapshotsFound,
 		"deleted":  result.SnapshotsDeleted,
 		"failed":   len(result.SnapshotsFailed),
 		"duration": result.Duration,
 	}
-	
+
 	if len(result.SnapshotsFailed) > 0 {
 		logger.Op.WithFields(resultLogFields).Warnf("Emergency cleanup completed with %d failures", len(result.SnapshotsFailed))
 	} else {
 		logger.Op.WithFields(resultLogFields).Info("Emergency cleanup completed successfully")
 	}
-	
+
 	// Record result in monitoring system
 	m.monitor.RecordCleanupResult(result)
-	
+
 	return result
 }
 
@@ -453,7 +453,7 @@ func (m *MultiLevelCleanupManager) CleanupExpiredSnapshots(ctx context.Context) 
 func (m *MultiLevelCleanupManager) GetActiveSnapshots() []string {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	
+
 	snapshots := make([]string, 0, len(m.activeSnapshots))
 	for snapshot := range m.activeSnapshots {
 		snapshots = append(snapshots, snapshot)

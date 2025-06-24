@@ -37,6 +37,7 @@ func Execute() error {
 
 func init() {
 	rootCmd.Version = version
+	rootCmd.PersistentFlags().StringVarP(&projectID, "project", "p", "", "GCP Project ID (required)")
 	rootCmd.PersistentFlags().BoolVar(&debug, "debug", false, "Enable debug logging")
 	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "Enable verbose logging")
 	rootCmd.PersistentFlags().BoolVar(&jsonLogs, "json", false, "Output logs in JSON format")

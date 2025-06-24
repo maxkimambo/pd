@@ -13,19 +13,19 @@ type MigrationErrorCategory string
 const (
 	// ErrorCategoryRetryable indicates a temporary error that can be retried
 	ErrorCategoryRetryable MigrationErrorCategory = "RETRYABLE"
-	
+
 	// ErrorCategoryPermanent indicates a permanent error that should not be retried
 	ErrorCategoryPermanent MigrationErrorCategory = "PERMANENT"
-	
+
 	// ErrorCategoryResourceConflict indicates a resource conflict that may resolve later
 	ErrorCategoryResourceConflict MigrationErrorCategory = "RESOURCE_CONFLICT"
-	
+
 	// ErrorCategoryUserInput indicates an error due to invalid user input
 	ErrorCategoryUserInput MigrationErrorCategory = "USER_INPUT"
-	
+
 	// ErrorCategoryCancelled indicates the operation was cancelled
 	ErrorCategoryCancelled MigrationErrorCategory = "CANCELLED"
-	
+
 	// ErrorCategoryThrottled indicates the operation was throttled and should be retried with backoff
 	ErrorCategoryThrottled MigrationErrorCategory = "THROTTLED"
 )
@@ -43,27 +43,27 @@ const (
 // EnhancedMigrationError provides detailed error information suitable for worker environments
 type EnhancedMigrationError struct {
 	// Basic error information
-	Message     string
-	Cause       error
-	Timestamp   time.Time
-	
+	Message   string
+	Cause     error
+	Timestamp time.Time
+
 	// Categorization for proper handling
-	Category    MigrationErrorCategory
-	Severity    MigrationErrorSeverity
-	Phase       MigrationPhase
-	
+	Category MigrationErrorCategory
+	Severity MigrationErrorSeverity
+	Phase    MigrationPhase
+
 	// Context information
-	JobID       string
-	InstanceID  string
-	ResourceID  string
-	
+	JobID      string
+	InstanceID string
+	ResourceID string
+
 	// Retry information
 	IsRetryable bool
 	RetryDelay  time.Duration
-	
+
 	// Additional context
-	ErrorCode   string
-	Details     map[string]interface{}
+	ErrorCode string
+	Details   map[string]interface{}
 }
 
 // Error implements the error interface
@@ -121,7 +121,7 @@ func (e *EnhancedMigrationError) ToLogFields() map[string]interface{} {
 		"error_timestamp": e.Timestamp,
 		"is_retryable":    e.IsRetryable,
 	}
-	
+
 	if e.JobID != "" {
 		fields["job_id"] = e.JobID
 	}
@@ -140,12 +140,12 @@ func (e *EnhancedMigrationError) ToLogFields() map[string]interface{} {
 	if e.Cause != nil {
 		fields["underlying_error"] = e.Cause.Error()
 	}
-	
+
 	// Add custom details
 	for k, v := range e.Details {
 		fields[fmt.Sprintf("detail_%s", k)] = v
 	}
-	
+
 	return fields
 }
 
@@ -231,7 +231,7 @@ func CategorizeError(err error, phase MigrationPhase) *EnhancedMigrationError {
 	}
 
 	message := err.Error()
-	
+
 	// Try to categorize based on error message patterns
 	switch {
 	case isContextCancelledError(err):

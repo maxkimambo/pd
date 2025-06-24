@@ -7,7 +7,6 @@ import (
 
 	computepb "cloud.google.com/go/compute/apiv1/computepb"
 
-
 	mock "github.com/stretchr/testify/mock"
 )
 

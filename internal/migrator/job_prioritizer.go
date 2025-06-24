@@ -10,7 +10,7 @@ import (
 type JobPrioritizer interface {
 	// AssignPriority determines the priority for a given instance
 	AssignPriority(instance *computepb.Instance, disks []*AttachedDiskInfo) JobPriority
-	
+
 	// Compare compares two jobs and returns:
 	// -1 if job1 has higher priority than job2
 	//  0 if they have equal priority
@@ -25,7 +25,7 @@ type DefaultJobPrioritizer struct {
 	considerDiskCount   bool
 	considerDiskSize    bool
 	considerLabels      bool
-	
+
 	// Priority labels that indicate high priority instances
 	highPriorityLabels   map[string]string
 	mediumPriorityLabels map[string]string
@@ -62,7 +62,7 @@ func NewCustomJobPrioritizer(
 	if mediumPriorityLabels == nil {
 		mediumPriorityLabels = make(map[string]string)
 	}
-	
+
 	return &DefaultJobPrioritizer{
 		considerMachineType:  considerMachineType,
 		considerDiskCount:    considerDiskCount,
@@ -76,7 +76,7 @@ func NewCustomJobPrioritizer(
 // AssignPriority determines the priority for a given instance based on multiple factors
 func (p *DefaultJobPrioritizer) AssignPriority(instance *computepb.Instance, disks []*AttachedDiskInfo) JobPriority {
 	priority := LowPriority
-	
+
 	// Check labels first (highest precedence)
 	if p.considerLabels && instance.GetLabels() != nil {
 		labelPriority := p.getPriorityFromLabels(instance.GetLabels())
@@ -84,7 +84,7 @@ func (p *DefaultJobPrioritizer) AssignPriority(instance *computepb.Instance, dis
 			priority = labelPriority
 		}
 	}
-	
+
 	// Consider machine type
 	if p.considerMachineType {
 		machineTypePriority := p.getPriorityFromMachineType(instance.GetMachineType())
@@ -92,7 +92,7 @@ func (p *DefaultJobPrioritizer) AssignPriority(instance *computepb.Instance, dis
 			priority = machineTypePriority
 		}
 	}
-	
+
 	// Consider disk count
 	if p.considerDiskCount {
 		diskCountPriority := p.getPriorityFromDiskCount(len(disks))
@@ -100,7 +100,7 @@ func (p *DefaultJobPrioritizer) AssignPriority(instance *computepb.Instance, dis
 			priority = diskCountPriority
 		}
 	}
-	
+
 	// Consider total disk size
 	if p.considerDiskSize {
 		diskSizePriority := p.getPriorityFromDiskSize(disks)
@@ -108,7 +108,7 @@ func (p *DefaultJobPrioritizer) AssignPriority(instance *computepb.Instance, dis
 			priority = diskSizePriority
 		}
 	}
-	
+
 	return priority
 }
 
@@ -120,14 +120,14 @@ func (p *DefaultJobPrioritizer) getPriorityFromLabels(labels map[string]string) 
 			return HighPriority
 		}
 	}
-	
+
 	// Check for medium priority labels
 	for key, value := range p.mediumPriorityLabels {
 		if instanceValue, exists := labels[key]; exists && instanceValue == value {
 			return MediumPriority
 		}
 	}
-	
+
 	return LowPriority
 }
 
@@ -137,31 +137,31 @@ func (p *DefaultJobPrioritizer) getPriorityFromMachineType(machineType string) J
 	if machineType == "" {
 		return LowPriority
 	}
-	
+
 	// Extract machine type name from full URL if necessary
 	typeName := strings.ToLower(extractMachineTypeName(machineType))
-	
+
 	// If extraction failed, return low priority
 	if typeName == "" {
 		return LowPriority
 	}
-	
+
 	// High priority: Small instances (migrate quickly)
 	if strings.Contains(typeName, "micro") || strings.Contains(typeName, "small") {
 		return HighPriority
 	}
-	
+
 	// Medium priority: Standard instances
 	if strings.Contains(typeName, "standard") || strings.Contains(typeName, "medium") {
 		return MediumPriority
 	}
-	
+
 	// Low priority: Large instances (take longer, less urgent)
-	if strings.Contains(typeName, "large") || strings.Contains(typeName, "xlarge") || 
-	   strings.Contains(typeName, "highmem") || strings.Contains(typeName, "highcpu") {
+	if strings.Contains(typeName, "large") || strings.Contains(typeName, "xlarge") ||
+		strings.Contains(typeName, "highmem") || strings.Contains(typeName, "highcpu") {
 		return LowPriority
 	}
-	
+
 	// Default to medium priority for unknown types
 	return MediumPriority
 }
@@ -181,16 +181,16 @@ func (p *DefaultJobPrioritizer) getPriorityFromDiskCount(diskCount int) JobPrior
 // getPriorityFromDiskSize determines priority based on total size of all disks
 func (p *DefaultJobPrioritizer) getPriorityFromDiskSize(disks []*AttachedDiskInfo) JobPriority {
 	var totalSize int64
-	
+
 	for _, disk := range disks {
 		if disk.DiskDetails != nil && disk.DiskDetails.SizeGb != nil {
 			totalSize += *disk.DiskDetails.SizeGb
 		}
 	}
-	
+
 	// Convert GB to TB for easier threshold checking
 	totalSizeTB := float64(totalSize) / 1024.0
-	
+
 	switch {
 	case totalSizeTB >= 10.0:
 		return LowPriority // Very large disks take longer, lower priority
@@ -221,21 +221,21 @@ func (p *DefaultJobPrioritizer) Compare(job1, job2 *MigrationJob) int {
 	} else if job1.Priority < job2.Priority {
 		return 1
 	}
-	
+
 	// Secondary comparison: creation time (earlier jobs first for same priority)
 	if job1.CreatedAt.Before(job2.CreatedAt) {
 		return -1
 	} else if job1.CreatedAt.After(job2.CreatedAt) {
 		return 1
 	}
-	
+
 	// Tertiary comparison: instance name for deterministic ordering
 	if job1.GetInstanceName() < job2.GetInstanceName() {
 		return -1
 	} else if job1.GetInstanceName() > job2.GetInstanceName() {
 		return 1
 	}
-	
+
 	return 0
 }
 
@@ -252,7 +252,7 @@ func NewPriorityJobQueue(queueSize int, prioritizer JobPrioritizer) *PriorityJob
 	if prioritizer == nil {
 		prioritizer = NewDefaultJobPrioritizer()
 	}
-	
+
 	return &PriorityJobQueue{
 		JobQueue:    NewJobQueue(queueSize),
 		prioritizer: prioritizer,
@@ -265,19 +265,19 @@ func NewPriorityJobQueue(queueSize int, prioritizer JobPrioritizer) *PriorityJob
 func (q *PriorityJobQueue) Enqueue(job *MigrationJob) error {
 	q.mu.Lock()
 	defer q.mu.Unlock()
-	
+
 	if q.closed {
 		return q.JobQueue.Enqueue(job) // Fall back to base implementation
 	}
-	
+
 	// Insert job in priority order
 	insertIndex := q.findInsertPosition(job)
-	
+
 	// Insert at the correct position
 	q.jobs = append(q.jobs, nil)
 	copy(q.jobs[insertIndex+1:], q.jobs[insertIndex:])
 	q.jobs[insertIndex] = job
-	
+
 	// Try to send to channel if there's space
 	select {
 	case q.jobChan <- job:
@@ -285,7 +285,7 @@ func (q *PriorityJobQueue) Enqueue(job *MigrationJob) error {
 	default:
 		// Channel full, job will be retrieved from slice during dequeue
 	}
-	
+
 	return q.JobQueue.Enqueue(job) // Also track in base queue for metrics
 }
 
@@ -293,11 +293,11 @@ func (q *PriorityJobQueue) Enqueue(job *MigrationJob) error {
 func (q *PriorityJobQueue) findInsertPosition(newJob *MigrationJob) int {
 	// Binary search for insertion point
 	left, right := 0, len(q.jobs)
-	
+
 	for left < right {
 		mid := (left + right) / 2
 		comparison := q.prioritizer.Compare(newJob, q.jobs[mid])
-		
+
 		if comparison < 0 {
 			// newJob has higher priority, insert before mid
 			right = mid
@@ -306,7 +306,7 @@ func (q *PriorityJobQueue) findInsertPosition(newJob *MigrationJob) int {
 			left = mid + 1
 		}
 	}
-	
+
 	return left
 }
 
@@ -314,18 +314,18 @@ func (q *PriorityJobQueue) findInsertPosition(newJob *MigrationJob) int {
 func (q *PriorityJobQueue) Dequeue() (*MigrationJob, error) {
 	q.mu.Lock()
 	defer q.mu.Unlock()
-	
+
 	if q.closed {
 		return q.JobQueue.Dequeue() // Fall back to base implementation
 	}
-	
+
 	// Try to get from priority-ordered slice first
 	if len(q.jobs) > 0 {
 		job := q.jobs[0]
 		q.jobs = q.jobs[1:]
 		return job, nil
 	}
-	
+
 	// Fall back to channel if slice is empty
 	select {
 	case job := <-q.jobChan:
@@ -340,7 +340,7 @@ func SortJobs(jobs []*MigrationJob, prioritizer JobPrioritizer) {
 	if prioritizer == nil {
 		prioritizer = NewDefaultJobPrioritizer()
 	}
-	
+
 	// Use a simple but stable sort algorithm
 	for i := 0; i < len(jobs)-1; i++ {
 		for j := i + 1; j < len(jobs); j++ {

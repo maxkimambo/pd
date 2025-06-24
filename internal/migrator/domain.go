@@ -2,6 +2,7 @@ package migrator
 
 import (
 	"context"
+
 	computepb "cloud.google.com/go/compute/apiv1/computepb"
 )
 
@@ -54,7 +55,6 @@ type MigrationReport struct {
 	FailedDisks         int
 	InstanceResults     []*InstanceMigration
 }
-
 
 type InstanceMigrationService interface {
 	DiscoverInstances(ctx context.Context, config *Config) ([]*InstanceMigration, error)

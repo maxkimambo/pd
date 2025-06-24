@@ -23,11 +23,11 @@ type mockComputeClient struct {
 	GetInstanceCalled         bool
 	ListInstancesInZoneCalled bool
 
-	LastGetProjectID     string
-	LastGetZone          string
-	LastGetInstanceName  string
-	LastListProjectID    string
-	LastListZone         string
+	LastGetProjectID    string
+	LastGetZone         string
+	LastGetInstanceName string
+	LastListProjectID   string
+	LastListZone        string
 }
 
 func (m *mockComputeClient) GetInstance(ctx context.Context, projectID, zone, instanceName string) (*computepb.Instance, error) {
@@ -173,7 +173,7 @@ func TestInstanceDiscovery_DiscoverByNames(t *testing.T) {
 		assert.Len(t, migrations, 1)
 		assert.True(t, computeClient.GetInstanceCalled)
 		assert.True(t, diskClient.GetDiskCalled)
-		
+
 		migration := migrations[0]
 		assert.Equal(t, instance, migration.Instance)
 		assert.Equal(t, InstanceStateRunning, migration.InitialState)
@@ -227,7 +227,7 @@ func TestInstanceDiscovery_DiscoverByNames(t *testing.T) {
 		assert.Len(t, migrations, 1)
 		assert.True(t, computeClient.GetInstanceCalled)
 		assert.True(t, diskClient.GetDiskCalled)
-		
+
 		migration := migrations[0]
 		assert.Len(t, migration.Errors, 1)
 		assert.Equal(t, ErrorTypePermanent, migration.Errors[0].Type)
@@ -278,7 +278,7 @@ func TestInstanceDiscovery_DiscoverByZone(t *testing.T) {
 		assert.True(t, computeClient.ListInstancesInZoneCalled)
 		assert.Equal(t, projectID, computeClient.LastListProjectID)
 		assert.Equal(t, zone, computeClient.LastListZone)
-		
+
 		assert.Equal(t, InstanceStateRunning, migrations[0].InitialState)
 		assert.Equal(t, InstanceStateStopped, migrations[1].InitialState)
 	})

@@ -37,14 +37,14 @@ func (b *BaseNode) Execute(ctx context.Context) error {
 	now := time.Now()
 	b.startTime = &now
 	b.mutex.Unlock()
-	
+
 	taskResult, err := b.task.Execute(ctx)
-	
+
 	b.mutex.Lock()
 	end := time.Now()
 	b.endTime = &end
 	b.taskResult = taskResult
-	
+
 	if err != nil {
 		b.status = StatusFailed
 		b.err = err
@@ -53,7 +53,7 @@ func (b *BaseNode) Execute(ctx context.Context) error {
 		b.err = nil
 	}
 	b.mutex.Unlock()
-	
+
 	return err
 }
 
