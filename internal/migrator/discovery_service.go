@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"strings"
 
+	computepb "cloud.google.com/go/compute/apiv1/computepb"
 	"github.com/maxkimambo/pd/internal/gcp"
 	"github.com/maxkimambo/pd/internal/logger"
 	"github.com/maxkimambo/pd/internal/utils"
-	computepb "cloud.google.com/go/compute/apiv1/computepb"
 )
 
 // InstanceDiscovery provides instance discovery functionality for migration
@@ -48,7 +48,7 @@ func (d *InstanceDiscovery) DiscoverByNames(ctx context.Context, config *Config)
 
 	for _, name := range config.Instances {
 		logger.User.Infof("Getting instance: %s", name)
-		
+
 		instance, err := d.computeClient.GetInstance(ctx, config.ProjectID, config.Zone, name)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get instance %s in zone %s: %w", name, config.Zone, err)
@@ -70,7 +70,7 @@ func (d *InstanceDiscovery) DiscoverByNames(ctx context.Context, config *Config)
 // DiscoverByZone discovers all instances in the specified zone
 func (d *InstanceDiscovery) DiscoverByZone(ctx context.Context, config *Config) ([]*InstanceMigration, error) {
 	logger.User.Infof("Discovering instances in zone: %s", config.Zone)
-	
+
 	instances, err := d.computeClient.ListInstancesInZone(ctx, config.ProjectID, config.Zone)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list instances in zone %s: %w", config.Zone, err)
@@ -118,7 +118,7 @@ func (d *InstanceDiscovery) createInstanceMigration(ctx context.Context, instanc
 	// Process attached disks
 	for _, attachedDisk := range instance.GetDisks() {
 		diskName := extractDiskNameFromSource(attachedDisk.GetSource())
-		
+
 		logger.Op.WithFields(map[string]interface{}{
 			"instance": instance.GetName(),
 			"disk":     diskName,
@@ -132,7 +132,7 @@ func (d *InstanceDiscovery) createInstanceMigration(ctx context.Context, instanc
 				"disk":     diskName,
 				"error":    err.Error(),
 			}).Error("Failed to get disk details")
-			
+
 			// Add error to migration but continue with other disks
 			migration.Errors = append(migration.Errors, MigrationError{
 				Type:   ErrorTypePermanent,
@@ -150,7 +150,7 @@ func (d *InstanceDiscovery) createInstanceMigration(ctx context.Context, instanc
 		}
 
 		migration.Disks = append(migration.Disks, diskInfo)
-		
+
 		logger.Op.WithFields(map[string]interface{}{
 			"instance": instance.GetName(),
 			"disk":     diskName,
