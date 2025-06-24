@@ -166,8 +166,28 @@ func (w *MigrationWorker) Start() {
 				case <-w.ctx.Done():
 					return
 				default:
-					job, err := w.jobQueue.Dequeue()
-					if err != nil {
+					// Use a timeout channel to avoid blocking indefinitely
+					jobChan := make(chan *MigrationJob, 1)
+					errChan := make(chan error, 1)
+					
+					go func() {
+						job, err := w.jobQueue.Dequeue()
+						if err != nil {
+							errChan <- err
+						} else {
+							jobChan <- job
+						}
+					}()
+					
+					var job *MigrationJob
+					var err error
+					
+					select {
+					case <-w.ctx.Done():
+						return
+					case job = <-jobChan:
+						// Got a job successfully
+					case err = <-errChan:
 						if w.ctx.Err() != nil {
 							// Context cancelled, normal shutdown
 							return
@@ -183,6 +203,18 @@ func (w *MigrationWorker) Start() {
 						case <-time.After(100 * time.Millisecond):
 							continue
 						}
+					case <-time.After(1 * time.Second):
+						// Timeout - check context and continue
+						select {
+						case <-w.ctx.Done():
+							return
+						default:
+							continue
+						}
+					}
+					
+					if job == nil {
+						continue
 					}
 
 					// Process the job

@@ -248,20 +248,22 @@ func (m *DiskMigrator) waitForSnapshotReady(ctx context.Context, project, snapsh
 	}).Info("Waiting for snapshot to be ready")
 
 	for attempts := 0; attempts < 30; attempts++ {
+		// Check context cancellation
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
-		case <-time.After(10 * time.Second):
-			snapshot, err := m.snapshotClient.GetSnapshot(ctx, project, snapshotName)
-			if err != nil {
-				logger.Op.WithFields(map[string]interface{}{
-					"snapshot": snapshotName,
-					"attempt":  attempts + 1,
-					"error":    err.Error(),
-				}).Warn("Failed to get snapshot status")
-				continue
-			}
+		default:
+		}
 
+		// Check snapshot status
+		snapshot, err := m.snapshotClient.GetSnapshot(ctx, project, snapshotName)
+		if err != nil {
+			logger.Op.WithFields(map[string]interface{}{
+				"snapshot": snapshotName,
+				"attempt":  attempts + 1,
+				"error":    err.Error(),
+			}).Warn("Failed to get snapshot status")
+		} else {
 			status := snapshot.GetStatus()
 			logger.Op.WithFields(map[string]interface{}{
 				"snapshot": snapshotName,
@@ -275,6 +277,16 @@ func (m *DiskMigrator) waitForSnapshotReady(ctx context.Context, project, snapsh
 					"attempts": attempts + 1,
 				}).Info("Snapshot is ready")
 				return nil
+			}
+		}
+
+		// If not ready and not the last attempt, wait before retrying
+		if attempts < 29 {
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case <-time.After(10 * time.Second):
+				// Continue to next iteration
 			}
 		}
 	}
