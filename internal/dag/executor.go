@@ -99,7 +99,12 @@ func NewExecutor(dag *DAG, config *ExecutorConfig) *Executor {
 // Execute runs the DAG to completion
 func (e *Executor) Execute(ctx context.Context) (*ExecutionResult, error) {
 	e.startTime = time.Now()
+	
+	// Set context with proper synchronization
+	e.mutex.Lock()
 	e.ctx, e.cancel = context.WithCancel(ctx)
+	e.mutex.Unlock()
+	
 	defer e.cancel()
 	
 	// Validate DAG before execution
@@ -149,8 +154,12 @@ func (e *Executor) Execute(ctx context.Context) (*ExecutionResult, error) {
 
 // Cancel cancels the DAG execution
 func (e *Executor) Cancel() {
-	if e.cancel != nil {
-		e.cancel()
+	e.mutex.RLock()
+	cancel := e.cancel
+	e.mutex.RUnlock()
+	
+	if cancel != nil {
+		cancel()
 	}
 }
 
@@ -231,7 +240,7 @@ func (e *Executor) executeNode(nodeID string) {
 	// Log task start
 	if logger.User != nil {
 		task := node.GetTask()
-		logger.User.Infof("Starting task: %s (%s)", nodeID, task.GetType())
+		logger.User.Infof("Starting task: %s (%s)", nodeID, GetTaskType(task))
 	}
 	
 	err = node.Execute(nodeCtx)
@@ -242,7 +251,7 @@ func (e *Executor) executeNode(nodeID string) {
 			logger.User.Errorf("Task failed: %s - %v", nodeID, err)
 		} else {
 			task := node.GetTask()
-			logger.User.Successf("Task completed: %s (%s)", nodeID, task.GetType())
+			logger.User.Successf("Task completed: %s (%s)", nodeID, GetTaskType(task))
 		}
 	}
 	
@@ -471,12 +480,16 @@ func (e *Executor) buildResult() *ExecutionResult {
 
 // IsRunning returns true if the executor is currently running
 func (e *Executor) IsRunning() bool {
-	if e.ctx == nil {
+	e.mutex.RLock()
+	ctx := e.ctx
+	e.mutex.RUnlock()
+	
+	if ctx == nil {
 		return false
 	}
 	
 	select {
-	case <-e.ctx.Done():
+	case <-ctx.Done():
 		return false
 	default:
 		return true

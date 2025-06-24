@@ -12,8 +12,7 @@ import (
 // mockTask is a test implementation of the Task interface
 type mockTask struct {
 	*BaseTask
-	executeFunc func(ctx context.Context) error
-	rollbackFunc func(ctx context.Context) error
+	executeFunc func(ctx context.Context) (*TaskResult, error)
 }
 
 func newMockTask(id, taskType, description string) *mockTask {
@@ -22,18 +21,14 @@ func newMockTask(id, taskType, description string) *mockTask {
 	}
 }
 
-func (m *mockTask) Execute(ctx context.Context) error {
+func (m *mockTask) Execute(ctx context.Context) (*TaskResult, error) {
 	if m.executeFunc != nil {
 		return m.executeFunc(ctx)
 	}
-	return nil
-}
-
-func (m *mockTask) Rollback(ctx context.Context) error {
-	if m.rollbackFunc != nil {
-		return m.rollbackFunc(ctx)
-	}
-	return nil
+	result := NewTaskResult(m.GetID(), m.GetName())
+	result.MarkStarted()
+	result.MarkCompleted()
+	return result, nil
 }
 
 // mockNode is a test implementation of the Node interface

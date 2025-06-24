@@ -27,9 +27,9 @@ func TestTaskCreation(t *testing.T) {
 		task := NewDiscoveryTask("disc-1", config, gcpClient, "disks")
 		
 		assert.Equal(t, "disc-1", task.GetID())
-		assert.Equal(t, "Discovery", task.GetType())
-		assert.Equal(t, "Discover disks", task.GetDescription())
-		assert.NoError(t, task.Validate())
+		assert.Equal(t, "Discovery", GetTaskType(task))
+		assert.Equal(t, "Discover disks", GetTaskDescription(task))
+		// Validate() method removed from simplified interface
 		assert.Equal(t, "disks", task.resourceType)
 	})
 
@@ -38,9 +38,9 @@ func TestTaskCreation(t *testing.T) {
 		task := NewSnapshotTask("snap-1", "test-project", "us-central1-a", "test-disk", "test-snapshot", gcpClient, config)
 		
 		assert.Equal(t, "snap-1", task.GetID())
-		assert.Equal(t, "Snapshot", task.GetType())
-		assert.Equal(t, "Create snapshot test-snapshot of disk test-disk", task.GetDescription())
-		assert.NoError(t, task.Validate())
+		assert.Equal(t, "Snapshot", GetTaskType(task))
+		assert.Equal(t, "Create snapshot test-snapshot of disk test-disk", GetTaskDescription(task))
+		// Validate() method removed from simplified interface
 		assert.Equal(t, "test-project", task.projectID)
 		assert.Equal(t, "us-central1-a", task.zone)
 		assert.Equal(t, "test-disk", task.diskName)
@@ -53,9 +53,9 @@ func TestTaskCreation(t *testing.T) {
 		task := NewInstanceStateTask("inst-1", "test-project", "us-central1-a", "test-instance", "stop", gcpClient)
 		
 		assert.Equal(t, "inst-1", task.GetID())
-		assert.Equal(t, "InstanceState", task.GetType())
-		assert.Equal(t, "Stop instance test-instance", task.GetDescription())
-		assert.NoError(t, task.Validate())
+		assert.Equal(t, "InstanceState", GetTaskType(task))
+		assert.Equal(t, "Stop instance test-instance", GetTaskDescription(task))
+		// Validate() method removed from simplified interface
 		assert.Equal(t, "stop", task.action)
 		assert.False(t, task.stateChanged)
 	})
@@ -66,9 +66,9 @@ func TestTaskCreation(t *testing.T) {
 		task := NewDiskMigrationTask("mig-1", "test-project", "us-central1-a", "test-disk", "pd-ssd", "test-snapshot", gcpClient, config, disk)
 		
 		assert.Equal(t, "mig-1", task.GetID())
-		assert.Equal(t, "DiskMigration", task.GetType())
-		assert.Equal(t, "Migrate disk test-disk to pd-ssd", task.GetDescription())
-		assert.NoError(t, task.Validate())
+		assert.Equal(t, "DiskMigration", GetTaskType(task))
+		assert.Equal(t, "Migrate disk test-disk to pd-ssd", GetTaskDescription(task))
+		// Validate() method removed from simplified interface
 		assert.Equal(t, "test-disk", task.newDiskName) // Should retain name
 		assert.False(t, task.migrated)
 	})
@@ -79,9 +79,9 @@ func TestTaskCreation(t *testing.T) {
 		task := NewDiskMigrationTask("mig-2", "test-project", "us-central1-a", "test-disk", "pd-ssd", "test-snapshot", gcpClient, config, disk)
 		
 		assert.Equal(t, "mig-2", task.GetID())
-		assert.Equal(t, "DiskMigration", task.GetType())
-		assert.Equal(t, "Migrate disk test-disk to pd-ssd", task.GetDescription())
-		assert.NoError(t, task.Validate())
+		assert.Equal(t, "DiskMigration", GetTaskType(task))
+		assert.Equal(t, "Migrate disk test-disk to pd-ssd", GetTaskDescription(task))
+		// Validate() method removed from simplified interface
 		assert.NotEqual(t, "test-disk", task.newDiskName) // Should have new name
 		assert.Contains(t, task.newDiskName, "test-disk") // Should contain original name
 		assert.False(t, task.migrated)
@@ -92,9 +92,9 @@ func TestTaskCreation(t *testing.T) {
 		task := NewDiskAttachmentTask("attach-1", "test-project", "us-central1-a", "test-instance", "test-disk", "sdb", "attach", gcpClient)
 		
 		assert.Equal(t, "attach-1", task.GetID())
-		assert.Equal(t, "DiskAttachment", task.GetType())
-		assert.Equal(t, "Attach disk test-disk to instance test-instance", task.GetDescription())
-		assert.NoError(t, task.Validate())
+		assert.Equal(t, "DiskAttachment", GetTaskType(task))
+		assert.Equal(t, "Attach disk test-disk to instance test-instance", GetTaskDescription(task))
+		// Validate() method removed from simplified interface
 		assert.Equal(t, "attach", task.action)
 		assert.False(t, task.executed)
 	})
@@ -104,9 +104,9 @@ func TestTaskCreation(t *testing.T) {
 		task := NewCleanupTask("cleanup-1", "test-project", "snapshot", "test-snapshot", gcpClient)
 		
 		assert.Equal(t, "cleanup-1", task.GetID())
-		assert.Equal(t, "Cleanup", task.GetType())
-		assert.Equal(t, "Clean up snapshot test-snapshot", task.GetDescription())
-		assert.NoError(t, task.Validate())
+		assert.Equal(t, "Cleanup", GetTaskType(task))
+		assert.Equal(t, "Clean up snapshot test-snapshot", GetTaskDescription(task))
+		// Validate() method removed from simplified interface
 		assert.Equal(t, "snapshot", task.resourceType)
 		assert.Equal(t, "test-snapshot", task.resourceID)
 	})
@@ -132,9 +132,9 @@ func TestTaskInterface(t *testing.T) {
 	
 	for _, task := range tasks {
 		assert.NotEmpty(t, task.GetID())
-		assert.NotEmpty(t, task.GetType())
-		assert.NotEmpty(t, task.GetDescription())
-		assert.NoError(t, task.Validate())
+		assert.NotEmpty(t, GetTaskType(task))
+		assert.NotEmpty(t, GetTaskDescription(task))
+		// Validate() method removed from simplified interface
 	}
 }
 

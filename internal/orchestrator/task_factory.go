@@ -121,9 +121,9 @@ func (f *TaskFactory) CreateInstanceWorkflow(instance *computepb.Instance) ([]da
 		
 		// Startup depends on all disk operations completing
 		for _, node := range nodes {
-			if node.GetTask().GetType() == "DiskAttachment" && 
-			   node.GetTask().GetDescription() != "" && 
-			   fmt.Sprintf("Attach disk") == node.GetTask().GetDescription()[:10] {
+			if dag.GetTaskType(node.GetTask()) == "DiskAttachment" && 
+			   dag.GetTaskDescription(node.GetTask()) != "" && 
+			   fmt.Sprintf("Attach disk") == dag.GetTaskDescription(node.GetTask())[:10] {
 				dependencies[startupNodeID] = append(dependencies[startupNodeID], node.ID())
 			}
 		}
@@ -194,7 +194,8 @@ func (f *TaskFactory) createDiskMigrationWorkflow(instanceName, diskName, device
 func (f *TaskFactory) createDiskMigrationWrapper(diskName, snapshotName string) dag.Node {
 	id := fmt.Sprintf("migrate_%s", diskName)
 	task := &DiskMigrationWrapper{
-		BaseTask:     dag.NewBaseTask(id, "DiskMigration", fmt.Sprintf("Migrate disk %s to %s", diskName, f.config.TargetDiskType)),
+		id:           id,
+		name:         fmt.Sprintf("Migrate disk %s to %s", diskName, f.config.TargetDiskType),
 		factory:      f,
 		diskName:     diskName,
 		snapshotName: snapshotName,
@@ -206,7 +207,8 @@ func (f *TaskFactory) createDiskMigrationWrapper(diskName, snapshotName string) 
 func (f *TaskFactory) CreateBatchSnapshotTask(diskNames []string) dag.Node {
 	id := fmt.Sprintf("batch_snapshot_%d_disks", len(diskNames))
 	task := &BatchSnapshotTask{
-		BaseTask:  dag.NewBaseTask(id, "BatchSnapshot", fmt.Sprintf("Create snapshots for %d disks", len(diskNames))),
+		id:        id,
+		name:      fmt.Sprintf("Create snapshots for %d disks", len(diskNames)),
 		factory:   f,
 		diskNames: diskNames,
 	}

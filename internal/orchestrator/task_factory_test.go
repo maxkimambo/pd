@@ -3,6 +3,7 @@ package orchestrator
 import (
 	"testing"
 
+	"github.com/maxkimambo/pd/internal/dag"
 	"github.com/maxkimambo/pd/internal/gcp"
 	"github.com/maxkimambo/pd/internal/migrator"
 	"github.com/stretchr/testify/assert"
@@ -38,8 +39,8 @@ func TestCreateDiscoveryTask(t *testing.T) {
 	
 	assert.NotNil(t, node)
 	assert.Equal(t, "discover_disks_us-central1-a", node.ID())
-	assert.Equal(t, "Discovery", node.GetTask().GetType())
-	assert.Contains(t, node.GetTask().GetDescription(), "Discover disks")
+	assert.Equal(t, "Discovery", dag.GetTaskType(node.GetTask()))
+	assert.Contains(t, dag.GetTaskDescription(node.GetTask()), "Discover disks")
 }
 
 func TestCreateSnapshotTask(t *testing.T) {
@@ -55,8 +56,8 @@ func TestCreateSnapshotTask(t *testing.T) {
 	
 	assert.NotNil(t, node)
 	assert.Equal(t, "snapshot_test-disk", node.ID())
-	assert.Equal(t, "Snapshot", node.GetTask().GetType())
-	assert.Contains(t, node.GetTask().GetDescription(), "Create snapshot test-snapshot of disk test-disk")
+	assert.Equal(t, "Snapshot", dag.GetTaskType(node.GetTask()))
+	assert.Contains(t, dag.GetTaskDescription(node.GetTask()), "Create snapshot test-snapshot of disk test-disk")
 }
 
 func TestCreateInstanceStateTask(t *testing.T) {
@@ -97,8 +98,8 @@ func TestCreateInstanceStateTask(t *testing.T) {
 			
 			assert.NotNil(t, node)
 			assert.Equal(t, tt.expectedID, node.ID())
-			assert.Equal(t, "InstanceState", node.GetTask().GetType())
-			assert.Equal(t, tt.expectedDesc, node.GetTask().GetDescription())
+			assert.Equal(t, "InstanceState", dag.GetTaskType(node.GetTask()))
+			assert.Equal(t, tt.expectedDesc, dag.GetTaskDescription(node.GetTask()))
 		})
 	}
 }
@@ -147,8 +148,8 @@ func TestCreateDiskAttachmentTask(t *testing.T) {
 			
 			assert.NotNil(t, node)
 			assert.Equal(t, tt.expectedID, node.ID())
-			assert.Equal(t, "DiskAttachment", node.GetTask().GetType())
-			assert.Equal(t, tt.expectedDesc, node.GetTask().GetDescription())
+			assert.Equal(t, "DiskAttachment", dag.GetTaskType(node.GetTask()))
+			assert.Equal(t, tt.expectedDesc, dag.GetTaskDescription(node.GetTask()))
 		})
 	}
 }
@@ -171,8 +172,8 @@ func TestCreateDiskMigrationTask(t *testing.T) {
 	
 	assert.NotNil(t, node)
 	assert.Equal(t, "migrate_test-disk", node.ID())
-	assert.Equal(t, "DiskMigration", node.GetTask().GetType())
-	assert.Contains(t, node.GetTask().GetDescription(), "Migrate disk test-disk to pd-ssd")
+	assert.Equal(t, "DiskMigration", dag.GetTaskType(node.GetTask()))
+	assert.Contains(t, dag.GetTaskDescription(node.GetTask()), "Migrate disk test-disk to pd-ssd")
 }
 
 func TestCreateCleanupTask(t *testing.T) {
@@ -188,8 +189,8 @@ func TestCreateCleanupTask(t *testing.T) {
 	
 	assert.NotNil(t, node)
 	assert.Equal(t, "cleanup_snapshot_test-snapshot", node.ID())
-	assert.Equal(t, "Cleanup", node.GetTask().GetType())
-	assert.Equal(t, "Clean up snapshot test-snapshot", node.GetTask().GetDescription())
+	assert.Equal(t, "Cleanup", dag.GetTaskType(node.GetTask()))
+	assert.Equal(t, "Clean up snapshot test-snapshot", dag.GetTaskDescription(node.GetTask()))
 }
 
 func TestCreateBatchSnapshotTask(t *testing.T) {
@@ -206,8 +207,8 @@ func TestCreateBatchSnapshotTask(t *testing.T) {
 	
 	assert.NotNil(t, node)
 	assert.Equal(t, "batch_snapshot_3_disks", node.ID())
-	assert.Equal(t, "BatchSnapshot", node.GetTask().GetType())
-	assert.Equal(t, "Create snapshots for 3 disks", node.GetTask().GetDescription())
+	assert.Equal(t, "BatchSnapshot", dag.GetTaskType(node.GetTask()))
+	assert.Equal(t, "Create snapshots for 3 disks", dag.GetTaskDescription(node.GetTask()))
 }
 
 func TestCreateValidationTask(t *testing.T) {
@@ -248,8 +249,8 @@ func TestCreateValidationTask(t *testing.T) {
 			
 			assert.NotNil(t, node)
 			assert.Equal(t, tt.expectedID, node.ID())
-			assert.Equal(t, "Validation", node.GetTask().GetType())
-			assert.Equal(t, tt.expectedDesc, node.GetTask().GetDescription())
+			assert.Equal(t, "Validation", dag.GetTaskType(node.GetTask()))
+			assert.Equal(t, tt.expectedDesc, dag.GetTaskDescription(node.GetTask()))
 		})
 	}
 }
@@ -268,8 +269,8 @@ func TestCreatePreflightCheckTask(t *testing.T) {
 	
 	assert.NotNil(t, node)
 	assert.Equal(t, "preflight_check_2_instances", node.ID())
-	assert.Equal(t, "PreflightCheck", node.GetTask().GetType())
-	assert.Equal(t, "Preflight check for 2 instances", node.GetTask().GetDescription())
+	assert.Equal(t, "PreflightCheck", dag.GetTaskType(node.GetTask()))
+	assert.Equal(t, "Preflight check for 2 instances", dag.GetTaskDescription(node.GetTask()))
 }
 
 func TestFactoryGetters(t *testing.T) {
@@ -362,10 +363,10 @@ func TestTaskFactoryIntegration(t *testing.T) {
 	}
 	
 	// Verify task types are correct
-	assert.Equal(t, "Discovery", discoveryNode.GetTask().GetType())
-	assert.Equal(t, "Snapshot", snapshotNode.GetTask().GetType())
-	assert.Equal(t, "InstanceState", stateNode.GetTask().GetType())
-	assert.Equal(t, "Cleanup", cleanupNode.GetTask().GetType())
+	assert.Equal(t, "Discovery", dag.GetTaskType(discoveryNode.GetTask()))
+	assert.Equal(t, "Snapshot", dag.GetTaskType(snapshotNode.GetTask()))
+	assert.Equal(t, "InstanceState", dag.GetTaskType(stateNode.GetTask()))
+	assert.Equal(t, "Cleanup", dag.GetTaskType(cleanupNode.GetTask()))
 }
 
 func TestTaskFactoryConfigurationMapping(t *testing.T) {

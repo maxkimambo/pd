@@ -40,8 +40,11 @@ func TestBaseNode_Execute_Success(t *testing.T) {
 func TestBaseNode_Execute_Failure(t *testing.T) {
 	task := newMockTask("test-1", "test", "Test task")
 	expectedErr := errors.New("execution failed")
-	task.executeFunc = func(ctx context.Context) error {
-		return expectedErr
+	task.executeFunc = func(ctx context.Context) (*TaskResult, error) {
+		result := NewTaskResult("test-1", "Test task")
+		result.MarkStarted()
+		result.MarkFailed(expectedErr)
+		return result, expectedErr
 	}
 	
 	node := NewBaseNode(task)
@@ -58,9 +61,12 @@ func TestBaseNode_Execute_Failure(t *testing.T) {
 
 func TestBaseNode_Execute_WithDelay(t *testing.T) {
 	task := newMockTask("test-1", "test", "Test task")
-	task.executeFunc = func(ctx context.Context) error {
+	task.executeFunc = func(ctx context.Context) (*TaskResult, error) {
 		time.Sleep(10 * time.Millisecond) // Small delay to test timing
-		return nil
+		result := NewTaskResult("test-1", "Test task")
+		result.MarkStarted()
+		result.MarkCompleted()
+		return result, nil
 	}
 	
 	node := NewBaseNode(task)
@@ -88,40 +94,14 @@ func TestBaseNode_Execute_WithDelay(t *testing.T) {
 }
 
 func TestBaseNode_Rollback(t *testing.T) {
-	tests := []struct {
-		name         string
-		rollbackFunc func(ctx context.Context) error
-		expectError  bool
-	}{
-		{
-			name:         "Success",
-			rollbackFunc: nil, // Default returns nil
-			expectError:  false,
-		},
-		{
-			name: "Error",
-			rollbackFunc: func(ctx context.Context) error {
-				return errors.New("rollback failed")
-			},
-			expectError: true,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			task := newMockTask("test-1", "test", "Test task")
-			task.rollbackFunc = tt.rollbackFunc
-			node := NewBaseNode(task)
-			
-			err := node.Rollback(context.Background())
-			
-			if tt.expectError {
-				assert.Error(t, err)
-			} else {
-				assert.NoError(t, err)
-			}
-		})
-	}
+	// Rollback is now a no-op in the simplified Task interface
+	task := newMockTask("test-1", "test", "Test task")
+	node := NewBaseNode(task)
+	
+	err := node.Rollback(context.Background())
+	
+	// Should always return nil (no-op)
+	assert.NoError(t, err)
 }
 
 func TestBaseNode_StatusTransitions(t *testing.T) {
@@ -143,11 +123,14 @@ func TestBaseNode_StatusTransitions(t *testing.T) {
 	
 	// Use a task that we can control timing on
 	executed := false
-	task.executeFunc = func(ctx context.Context) error {
+	task.executeFunc = func(ctx context.Context) (*TaskResult, error) {
 		// At this point, status should be Running
 		assert.Equal(t, StatusRunning, node.GetStatus())
 		executed = true
-		return nil
+		result := NewTaskResult(task.GetID(), task.GetName())
+		result.MarkStarted()
+		result.MarkCompleted()
+		return result, nil
 	}
 	
 	err := node.Execute(ctx)
@@ -228,14 +211,19 @@ func TestBaseNode_ContextCancellation(t *testing.T) {
 	// Create a context that will be cancelled
 	ctx, cancel := context.WithCancel(context.Background())
 	
-	task.executeFunc = func(ctx context.Context) error {
+	task.executeFunc = func(ctx context.Context) (*TaskResult, error) {
 		// Simulate some work then check if cancelled
 		time.Sleep(10 * time.Millisecond)
+		result := NewTaskResult(task.GetID(), task.GetName())
+		result.MarkStarted()
 		select {
 		case <-ctx.Done():
-			return ctx.Err()
+			err := ctx.Err()
+			result.MarkFailed(err)
+			return result, err
 		default:
-			return nil
+			result.MarkCompleted()
+			return result, nil
 		}
 	}
 	

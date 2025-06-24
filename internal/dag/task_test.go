@@ -9,72 +9,60 @@ import (
 )
 
 func TestNewBaseTask(t *testing.T) {
-	task := NewBaseTask("test-1", "migration", "Test migration task")
+	task := NewBaseTask("test-1", "Test migration task", "migration")
 	
 	assert.Equal(t, "test-1", task.GetID())
+	assert.Equal(t, "Test migration task", task.GetName())
 	assert.Equal(t, "migration", task.GetType())
-	assert.Equal(t, "Test migration task", task.GetDescription())
 }
 
 func TestBaseTask_GetID(t *testing.T) {
-	task := NewBaseTask("unique-id", "test", "description")
+	task := NewBaseTask("unique-id", "Test task", "description")
 	assert.Equal(t, "unique-id", task.GetID())
 }
 
 func TestBaseTask_GetType(t *testing.T) {
-	task := NewBaseTask("id", "snapshot", "description")
+	task := NewBaseTask("id", "Task name", "snapshot")
 	assert.Equal(t, "snapshot", task.GetType())
 }
 
 func TestBaseTask_GetDescription(t *testing.T) {
-	task := NewBaseTask("id", "type", "Human readable description")
+	task := NewBaseTask("id", "Human readable description", "type")
 	assert.Equal(t, "Human readable description", task.GetDescription())
 }
 
-func TestBaseTask_Validate(t *testing.T) {
-	task := NewBaseTask("id", "type", "description")
-	err := task.Validate()
-	assert.NoError(t, err)
-}
-
-func TestBaseTask_Execute_Panics(t *testing.T) {
-	task := NewBaseTask("id", "type", "description")
-	
-	assert.Panics(t, func() {
-		task.Execute(context.Background())
-	})
-}
-
-func TestBaseTask_Rollback_Panics(t *testing.T) {
-	task := NewBaseTask("id", "type", "description")
-	
-	assert.Panics(t, func() {
-		task.Rollback(context.Background())
-	})
-}
+// BaseTask is now just a helper for embedding, it doesn't implement Execute
+// The actual task implementations should be tested individually
 
 func TestMockTask_Execute(t *testing.T) {
 	tests := []struct {
 		name        string
-		executeFunc func(ctx context.Context) error
+		executeFunc func(ctx context.Context) (*TaskResult, error)
 		expectError bool
 	}{
 		{
 			name:        "Success",
-			executeFunc: nil, // Default returns nil
+			executeFunc: nil, // Default returns success
 			expectError: false,
 		},
 		{
 			name: "Error",
-			executeFunc: func(ctx context.Context) error {
-				return errors.New("execution failed")
+			executeFunc: func(ctx context.Context) (*TaskResult, error) {
+				result := NewTaskResult("id", "type")
+				result.MarkStarted()
+				err := errors.New("execution failed")
+				result.MarkFailed(err)
+				return result, err
 			},
 			expectError: true,
 		},
 		{
 			name: "Success with custom function",
-			executeFunc: func(ctx context.Context) error {
-				return nil
+			executeFunc: func(ctx context.Context) (*TaskResult, error) {
+				result := NewTaskResult("id", "type") 
+				result.MarkStarted()
+				result.MarkCompleted()
+				return result, nil
 			},
 			expectError: false,
 		},
@@ -85,70 +73,35 @@ func TestMockTask_Execute(t *testing.T) {
 			task := newMockTask("test-1", "test", "Test task")
 			task.executeFunc = tt.executeFunc
 			
-			err := task.Execute(context.Background())
+			result, err := task.Execute(context.Background())
 			
+			assert.NotNil(t, result)
 			if tt.expectError {
 				assert.Error(t, err)
+				assert.Equal(t, TaskStatusFailed, result.Status)
 			} else {
 				assert.NoError(t, err)
+				assert.Equal(t, TaskStatusCompleted, result.Status)
 			}
 		})
 	}
 }
 
-func TestMockTask_Rollback(t *testing.T) {
-	tests := []struct {
-		name         string
-		rollbackFunc func(ctx context.Context) error
-		expectError  bool
-	}{
-		{
-			name:         "Success",
-			rollbackFunc: nil, // Default returns nil
-			expectError:  false,
-		},
-		{
-			name: "Error",
-			rollbackFunc: func(ctx context.Context) error {
-				return errors.New("rollback failed")
-			},
-			expectError: true,
-		},
-		{
-			name: "Success with custom function",
-			rollbackFunc: func(ctx context.Context) error {
-				return nil
-			},
-			expectError: false,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			task := newMockTask("test-1", "test", "Test task")
-			task.rollbackFunc = tt.rollbackFunc
-			
-			err := task.Rollback(context.Background())
-			
-			if tt.expectError {
-				assert.Error(t, err)
-			} else {
-				assert.NoError(t, err)
-			}
-		})
-	}
-}
+// Rollback functionality has been removed from the simplified Task interface
 
 func TestTask_InterfaceCompliance(t *testing.T) {
-	// Verify that mockTask implements Task interface
-	var task Task = newMockTask("test", "type", "description")
+	// Verify that mockTask implements Task interface  
+	var task Task = newMockTask("test", "description", "type")
 	
 	assert.Equal(t, "test", task.GetID())
-	assert.Equal(t, "type", task.GetType())
-	assert.Equal(t, "description", task.GetDescription())
-	assert.NoError(t, task.Validate())
-	assert.NoError(t, task.Execute(context.Background()))
-	assert.NoError(t, task.Rollback(context.Background()))
+	assert.Equal(t, "description", task.GetName())
+	
+	// Test Execute method returns TaskResult
+	result, err := task.Execute(context.Background())
+	assert.NoError(t, err)
+	assert.NotNil(t, result)
+	assert.Equal(t, "test", result.TaskID)
+	assert.Equal(t, "description", result.TaskName)
 }
 
 func TestTask_ContextCancellation(t *testing.T) {
@@ -158,14 +111,20 @@ func TestTask_ContextCancellation(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel() // Cancel immediately
 	
-	task.executeFunc = func(ctx context.Context) error {
+	task.executeFunc = func(ctx context.Context) (*TaskResult, error) {
+		result := NewTaskResult("test-1", "Test task")
+		result.MarkStarted()
 		if ctx.Err() != nil {
-			return ctx.Err()
+			result.MarkFailed(ctx.Err())
+			return result, ctx.Err()
 		}
-		return nil
+		result.MarkCompleted()
+		return result, nil
 	}
 	
-	err := task.Execute(ctx)
+	result, err := task.Execute(ctx)
 	assert.Error(t, err)
 	assert.Equal(t, context.Canceled, err)
+	assert.NotNil(t, result)
+	assert.Equal(t, TaskStatusFailed, result.Status)
 }

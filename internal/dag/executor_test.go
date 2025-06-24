@@ -14,8 +14,7 @@ import (
 // controllableTask allows precise control over execution behavior for testing
 type controllableTask struct {
 	*BaseTask
-	executeFunc  func(ctx context.Context) error
-	rollbackFunc func(ctx context.Context) error
+	executeFunc  func(ctx context.Context) (*TaskResult, error)
 	delay        time.Duration
 	shouldFail   bool
 	executed     bool
@@ -24,47 +23,47 @@ type controllableTask struct {
 
 func newControllableTask(id, taskType, description string, delay time.Duration) *controllableTask {
 	return &controllableTask{
-		BaseTask: NewBaseTask(id, taskType, description),
+		BaseTask: NewBaseTask(id, description, taskType),
 		delay:    delay,
 	}
 }
 
-func (c *controllableTask) Execute(ctx context.Context) error {
+func (c *controllableTask) Execute(ctx context.Context) (*TaskResult, error) {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 	
+	result := NewTaskResult(c.GetID(), c.GetName())
+	result.MarkStarted()
+	
 	if c.executed {
-		return errors.New("task already executed")
+		err := errors.New("task already executed")
+		result.MarkFailed(err)
+		return result, err
 	}
 	
 	if c.delay > 0 {
 		select {
 		case <-time.After(c.delay):
 		case <-ctx.Done():
-			return ctx.Err()
+			err := ctx.Err()
+			result.MarkFailed(err)
+			return result, err
 		}
 	}
 	
 	if c.executeFunc != nil {
-		err := c.executeFunc(ctx)
-		if err != nil {
-			return err
-		}
+		return c.executeFunc(ctx)
 	}
 	
 	if c.shouldFail {
-		return errors.New("task configured to fail")
+		err := errors.New("task configured to fail")
+		result.MarkFailed(err)
+		return result, err
 	}
 	
 	c.executed = true
-	return nil
-}
-
-func (c *controllableTask) Rollback(ctx context.Context) error {
-	if c.rollbackFunc != nil {
-		return c.rollbackFunc(ctx)
-	}
-	return nil
+	result.MarkCompleted()
+	return result, nil
 }
 
 func (c *controllableTask) WasExecuted() bool {
@@ -507,6 +506,12 @@ func TestExecutor_Execute_ComplexDAG(t *testing.T) {
 	result, err := executor.Execute(context.Background())
 	
 	assert.NoError(t, err)
+	if !result.Success {
+		t.Logf("Execution failed. Error: %v", result.Error)
+		for nodeID, nodeResult := range result.NodeResults {
+			t.Logf("Node %s: Success=%v, Error=%v", nodeID, nodeResult.Success, nodeResult.Error)
+		}
+	}
 	assert.True(t, result.Success)
 	assert.Len(t, result.NodeResults, 4)
 	

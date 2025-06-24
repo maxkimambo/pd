@@ -8,12 +8,13 @@ import (
 
 // BaseNode provides a basic implementation of the Node interface that can be embedded
 type BaseNode struct {
-	task      Task
-	status    NodeStatus
-	err       error
-	startTime *time.Time
-	endTime   *time.Time
-	mutex     sync.RWMutex
+	task       Task
+	status     NodeStatus
+	err        error
+	startTime  *time.Time
+	endTime    *time.Time
+	taskResult *TaskResult
+	mutex      sync.RWMutex
 }
 
 // NewBaseNode creates a new BaseNode with the given task
@@ -37,11 +38,12 @@ func (b *BaseNode) Execute(ctx context.Context) error {
 	b.startTime = &now
 	b.mutex.Unlock()
 	
-	err := b.task.Execute(ctx)
+	taskResult, err := b.task.Execute(ctx)
 	
 	b.mutex.Lock()
 	end := time.Now()
 	b.endTime = &end
+	b.taskResult = taskResult
 	
 	if err != nil {
 		b.status = StatusFailed
@@ -55,9 +57,18 @@ func (b *BaseNode) Execute(ctx context.Context) error {
 	return err
 }
 
-// Rollback performs cleanup if execution fails
+// GetTaskResult returns the TaskResult from the last execution
+func (b *BaseNode) GetTaskResult() *TaskResult {
+	b.mutex.RLock()
+	defer b.mutex.RUnlock()
+	return b.taskResult
+}
+
+// Rollback is a no-op for the simplified Task interface
+// Rollback functionality has been removed as part of the interface simplification
 func (b *BaseNode) Rollback(ctx context.Context) error {
-	return b.task.Rollback(ctx)
+	// Rollback is not supported in the simplified Task interface
+	return nil
 }
 
 // GetStatus returns the current execution status of the node

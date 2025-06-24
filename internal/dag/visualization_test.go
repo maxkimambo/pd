@@ -415,12 +415,15 @@ type MockTask struct {
 	id          string
 	taskType    string
 	description string
-	executeFunc func(context.Context) error
-	rollbackFunc func(context.Context) error
+	executeFunc func(context.Context) (*TaskResult, error)
 }
 
 func (m *MockTask) GetID() string {
 	return m.id
+}
+
+func (m *MockTask) GetName() string {
+	return m.description
 }
 
 func (m *MockTask) GetType() string {
@@ -431,18 +434,14 @@ func (m *MockTask) GetDescription() string {
 	return m.description
 }
 
-func (m *MockTask) Execute(ctx context.Context) error {
+func (m *MockTask) Execute(ctx context.Context) (*TaskResult, error) {
 	if m.executeFunc != nil {
 		return m.executeFunc(ctx)
 	}
-	return nil
-}
-
-func (m *MockTask) Rollback(ctx context.Context) error {
-	if m.rollbackFunc != nil {
-		return m.rollbackFunc(ctx)
-	}
-	return nil
+	result := NewTaskResult(m.GetID(), m.GetName())
+	result.MarkStarted()
+	result.MarkCompleted()
+	return result, nil
 }
 
 func (m *MockTask) Validate() error {

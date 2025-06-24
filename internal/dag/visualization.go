@@ -111,8 +111,8 @@ func (v *DAGVisualization) GenerateDAGInfo() (*DAGInfo, error) {
 		
 		nodeInfo := NodeInfo{
 			ID:          id,
-			Type:        task.GetType(),
-			Description: task.GetDescription(),
+			Type:        GetTaskType(task),
+			Description: GetTaskDescription(task),
 			Status:      status,
 			StartTime:   startTime,
 			EndTime:     endTime,
