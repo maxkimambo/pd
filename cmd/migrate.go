@@ -12,6 +12,15 @@ This command supports both detached disks and disks attached to GCE instances.`,
 }
 
 func init() {
+	// Register new DAG-based commands as default
 	migrateCmd.AddCommand(diskCmd)
 	migrateCmd.AddCommand(computeCmd)
+	
+	// Register legacy commands as hidden fallbacks
+	diskCmdLegacy.Hidden = true
+	computeCmdLegacy.Hidden = true
+	diskCmdLegacy.Use = "disk-legacy"
+	computeCmdLegacy.Use = "compute-legacy"
+	migrateCmd.AddCommand(diskCmdLegacy)
+	migrateCmd.AddCommand(computeCmdLegacy)
 }

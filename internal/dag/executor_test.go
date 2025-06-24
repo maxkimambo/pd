@@ -77,7 +77,6 @@ func TestDefaultExecutorConfig(t *testing.T) {
 	config := DefaultExecutorConfig()
 	
 	assert.Equal(t, 10, config.MaxParallelTasks)
-	assert.Equal(t, 30*time.Minute, config.DependencyTimeout)
 	assert.Equal(t, 15*time.Minute, config.TaskTimeout)
 	assert.Equal(t, 100*time.Millisecond, config.PollInterval)
 }
@@ -129,10 +128,9 @@ func TestNewExecutor(t *testing.T) {
 	
 	t.Run("with custom config", func(t *testing.T) {
 		config := &ExecutorConfig{
-			MaxParallelTasks:  5,
-			DependencyTimeout: 10 * time.Minute,
-			TaskTimeout:       5 * time.Minute,
-			PollInterval:      50 * time.Millisecond,
+			MaxParallelTasks: 5,
+			TaskTimeout:      5 * time.Minute,
+			PollInterval:     50 * time.Millisecond,
 		}
 		
 		executor := NewExecutor(dag, config)

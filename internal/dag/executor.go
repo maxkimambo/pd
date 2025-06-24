@@ -3,6 +3,7 @@ package dag
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 )
@@ -12,10 +13,7 @@ type ExecutorConfig struct {
 	// MaxParallelTasks is the maximum number of tasks to run in parallel
 	MaxParallelTasks int
 	
-	// DependencyTimeout is how long to wait for dependencies to complete
-	DependencyTimeout time.Duration
-	
-	// TaskTimeout is the default timeout for individual tasks
+	// TaskTimeout is the timeout for both individual tasks and dependencies
 	TaskTimeout time.Duration
 	
 	// PollInterval is how often to check dependency completion
@@ -25,10 +23,9 @@ type ExecutorConfig struct {
 // DefaultExecutorConfig returns a default configuration
 func DefaultExecutorConfig() *ExecutorConfig {
 	return &ExecutorConfig{
-		MaxParallelTasks:  10,
-		DependencyTimeout: 30 * time.Minute,
-		TaskTimeout:       15 * time.Minute,
-		PollInterval:      100 * time.Millisecond,
+		MaxParallelTasks: 10,
+		TaskTimeout:      15 * time.Minute,
+		PollInterval:     100 * time.Millisecond,
 	}
 }
 
@@ -70,15 +67,19 @@ type NodeResult struct {
 
 // Executor handles the execution of a DAG
 type Executor struct {
-	dag         *DAG
-	config      *ExecutorConfig
-	workers     chan struct{}
-	results     map[string]*NodeResult
-	mutex       sync.RWMutex
-	ctx         context.Context
-	cancel      context.CancelFunc
-	wg          sync.WaitGroup
-	startTime   time.Time
+	dag           *DAG
+	config        *ExecutorConfig
+	workers       chan struct{}
+	results       map[string]*NodeResult
+	mutex         sync.RWMutex
+	ctx           context.Context
+	cancel        context.CancelFunc
+	wg            sync.WaitGroup
+	startTime     time.Time
+	visualization *DAGVisualization
+	visualizeFile string
+	visualizeTicker *time.Ticker
+	finished      chan struct{}
 }
 
 // NewExecutor creates a new DAG executor
@@ -88,10 +89,12 @@ func NewExecutor(dag *DAG, config *ExecutorConfig) *Executor {
 	}
 	
 	return &Executor{
-		dag:     dag,
-		config:  config,
-		workers: make(chan struct{}, config.MaxParallelTasks),
-		results: make(map[string]*NodeResult),
+		dag:           dag,
+		config:        config,
+		workers:       make(chan struct{}, config.MaxParallelTasks),
+		results:       make(map[string]*NodeResult),
+		visualization: NewDAGVisualization(dag),
+		finished:      make(chan struct{}),
 	}
 }
 
@@ -127,6 +130,17 @@ func (e *Executor) Execute(ctx context.Context) (*ExecutionResult, error) {
 	
 	// Wait for all nodes to complete
 	e.wg.Wait()
+	
+	// Signal that execution is finished
+	close(e.finished)
+	
+	// Stop visualization updates if running
+	if e.visualizeTicker != nil {
+		e.visualizeTicker.Stop()
+	}
+	
+	// Final visualization update
+	e.updateVisualization()
 	
 	return e.buildResult(), nil
 }
@@ -237,7 +251,7 @@ func (e *Executor) waitForDependencies(nodeID string) bool {
 		return true
 	}
 	
-	timeout := time.After(e.config.DependencyTimeout)
+	timeout := time.After(e.config.TaskTimeout)
 	ticker := time.NewTicker(e.config.PollInterval)
 	defer ticker.Stop()
 	
@@ -406,4 +420,48 @@ func (e *Executor) IsRunning() bool {
 	default:
 		return true
 	}
+}
+
+// EnableVisualization turns on visualization with periodic updates
+func (e *Executor) EnableVisualization(filename string, updateInterval time.Duration) {
+	e.visualizeFile = filename
+	
+	// Start a goroutine to periodically update the visualization
+	go func() {
+		e.visualizeTicker = time.NewTicker(updateInterval)
+		defer e.visualizeTicker.Stop()
+		
+		for {
+			select {
+			case <-e.finished:
+				// Final visualization update
+				e.updateVisualization()
+				return
+			case <-e.visualizeTicker.C:
+				// Periodic visualization update
+				e.updateVisualization()
+			}
+		}
+	}()
+}
+
+// updateVisualization exports the current state to the visualization file
+func (e *Executor) updateVisualization() {
+	if e.visualizeFile == "" {
+		return
+	}
+	
+	// Determine file type and export accordingly
+	if strings.HasSuffix(e.visualizeFile, ".json") {
+		e.visualization.ExportToJSON(e.visualizeFile)
+	} else if strings.HasSuffix(e.visualizeFile, ".dot") {
+		e.visualization.ExportToDOT(e.visualizeFile)
+	} else if strings.HasSuffix(e.visualizeFile, ".txt") {
+		e.visualization.ExportToText(e.visualizeFile)
+	}
+}
+
+// GetVisualization returns the visualization helper for manual export
+func (e *Executor) GetVisualization() *DAGVisualization {
+	return e.visualization
 }

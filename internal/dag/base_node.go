@@ -109,3 +109,17 @@ func (b *BaseNode) GetEndTime() *time.Time {
 	defer b.mutex.RUnlock()
 	return b.endTime
 }
+
+// SetStartTime sets the execution start time
+func (b *BaseNode) SetStartTime(t *time.Time) {
+	b.mutex.Lock()
+	defer b.mutex.Unlock()
+	b.startTime = t
+}
+
+// SetEndTime sets the execution end time
+func (b *BaseNode) SetEndTime(t *time.Time) {
+	b.mutex.Lock()
+	defer b.mutex.Unlock()
+	b.endTime = t
+}

@@ -39,11 +39,11 @@ go.work
 
 # Logs
 *.log
-
+.* 
 # OS generated files
 .DS_Store
 Thumbs.db
-
+AGENTS.md
 # Added by Task Master AI
 logs
 npm-debug.log*
@@ -63,6 +63,7 @@ node_modules/
 *.sln
 *.sw?
 # OS specific
+
 # Task files
-tasks.json
-tasks/ 
+# tasks.json
+# tasks/ 

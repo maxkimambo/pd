@@ -253,22 +253,31 @@ func (o *DAGOrchestrator) addDiskMigrationWorkflow(d *dag.DAG, instanceName, zon
 	return operations, nil
 }
 
-// ExecuteMigrationDAG runs the migration workflow
-func (o *DAGOrchestrator) ExecuteMigrationDAG(ctx context.Context, migrationDAG *dag.DAG) (*dag.ExecutionResult, error) {
+// ExecuteWithVisualization executes a DAG with optional visualization
+func (o *DAGOrchestrator) ExecuteWithVisualization(ctx context.Context, migrationDAG *dag.DAG, visualizeFile string) (*dag.ExecutionResult, error) {
 	if logger.User != nil {
 		logger.User.Info("Executing migration DAG")
 	}
 	
-	// Create executor config from migration config
-	executorConfig := &dag.ExecutorConfig{
-		MaxParallelTasks:  o.config.Concurrency,
-		DependencyTimeout: 30 * time.Minute,
-		TaskTimeout:       15 * time.Minute,
-		PollInterval:      100 * time.Millisecond,
-	}
+	// Apply defaults to config before creating executor
+	o.config.ApplyDefaults()
 	
-	// Create and run the executor
-	executor := dag.NewExecutor(migrationDAG, executorConfig)
+	// Create DAG executor
+	executor := dag.NewExecutor(migrationDAG, &dag.ExecutorConfig{
+		MaxParallelTasks: o.config.MaxParallelTasks,
+		TaskTimeout:      o.config.TaskTimeout,
+		PollInterval:     100 * time.Millisecond,
+	})
+
+	// Enable visualization if requested
+	if visualizeFile != "" {
+		o.EnableVisualization(executor, visualizeFile)
+		if logger.User != nil {
+			logger.User.Infof("DAG visualization enabled: updates will be written to %s every 5 seconds", visualizeFile)
+		}
+	}
+
+	// Execute the DAG
 	result, err := executor.Execute(ctx)
 	if err != nil {
 		if logger.Op != nil {
@@ -278,7 +287,7 @@ func (o *DAGOrchestrator) ExecuteMigrationDAG(ctx context.Context, migrationDAG 
 		}
 		return result, fmt.Errorf("DAG execution failed: %w", err)
 	}
-	
+
 	if logger.User != nil {
 		logger.User.Infof("DAG execution completed. Success: %t, Duration: %v", result.Success, result.ExecutionTime)
 	}
@@ -294,8 +303,69 @@ func (o *DAGOrchestrator) ExecuteMigrationDAG(ctx context.Context, migrationDAG 
 			}
 		}
 	}
-	
+
+	// Final visualization export if requested
+	if visualizeFile != "" && result != nil {
+		if logger.User != nil {
+			logger.User.Infof("Exporting final DAG visualization to: %s", visualizeFile)
+		}
+		
+		// Export final state using the executor's visualization
+		visualization := executor.GetVisualization()
+		if strings.HasSuffix(visualizeFile, ".json") {
+			if err := visualization.ExportToJSON(visualizeFile); err != nil {
+				if logger.User != nil {
+					logger.User.Warnf("Failed to export final JSON visualization: %v", err)
+				}
+			}
+		} else if strings.HasSuffix(visualizeFile, ".dot") {
+			if err := visualization.ExportToDOT(visualizeFile); err != nil {
+				if logger.User != nil {
+					logger.User.Warnf("Failed to export final DOT visualization: %v", err)
+				}
+			}
+		} else if strings.HasSuffix(visualizeFile, ".txt") {
+			if err := visualization.ExportToText(visualizeFile); err != nil {
+				if logger.User != nil {
+					logger.User.Warnf("Failed to export final text visualization: %v", err)
+				}
+			}
+		} else {
+			// Default to JSON if no extension or unknown extension
+			jsonFile := visualizeFile
+			if !strings.Contains(visualizeFile, ".") {
+				jsonFile += ".json"
+			}
+			if err := visualization.ExportToJSON(jsonFile); err != nil {
+				if logger.User != nil {
+					logger.User.Warnf("Failed to export final JSON visualization: %v", err)
+				}
+			}
+		}
+	}
+
 	return result, nil
+}
+
+// EnableVisualization sets up DAG execution visualization
+func (o *DAGOrchestrator) EnableVisualization(executor *dag.Executor, visualizeFile string) {
+	if visualizeFile == "" {
+		return
+	}
+
+	if logger.User != nil {
+		logger.User.Infof("Enabling DAG visualization: %s", visualizeFile)
+	}
+
+	// Enable visualization with 5-second update intervals
+	executor.EnableVisualization(visualizeFile, 5*time.Second)
+}
+
+// ExecuteMigrationDAG runs the migration workflow (backward compatibility wrapper)
+func (o *DAGOrchestrator) ExecuteMigrationDAG(ctx context.Context, migrationDAG *dag.DAG) (*dag.ExecutionResult, error) {
+	// Use the new visualization-enabled execution without visualization file
+	// This maintains backward compatibility while leveraging the new infrastructure
+	return o.ExecuteWithVisualization(ctx, migrationDAG, "")
 }
 
 // filterDisksForMigration returns only disks that need to be migrated

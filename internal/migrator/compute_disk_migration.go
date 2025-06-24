@@ -173,15 +173,62 @@ func MigrateInstanceNonBootDisks(ctx context.Context, config *Config, instance *
 	return results, nil
 }
 
-// HandleInstanceDiskMigration coordinates the migration of non-boot disks for a given instance.
-// For each instance:
-//  1. Check the instance state (running or stopped).
-//  2. If running, stop the instance.
-//  3. Create an incremental snapshot of all disks attached to the instance.
-//  4. Migrate non-boot disks:
-//  5. If the instance was running, start it again after migration.
+// DAGOrchestrator defines the interface for DAG-based migration orchestration
+type DAGOrchestrator interface {
+	BuildMigrationDAG(ctx context.Context, instances []*computepb.Instance) (interface{}, error)
+	ExecuteMigrationDAG(ctx context.Context, migrationDAG interface{}) (interface{}, error)
+}
 
+// ComputeDiskMigrator handles migration of disks attached to compute instances using DAG orchestration
+type ComputeDiskMigrator struct {
+	config       *Config
+	gcpClient    *gcp.Clients
+	orchestrator DAGOrchestrator
+}
+
+// NewComputeDiskMigrator creates a new compute disk migrator
+func NewComputeDiskMigrator(config *Config, gcpClient *gcp.Clients, orchestrator DAGOrchestrator) *ComputeDiskMigrator {
+	return &ComputeDiskMigrator{
+		config:       config,
+		gcpClient:    gcpClient,
+		orchestrator: orchestrator,
+	}
+}
+
+// MigrateInstanceDisks migrates all eligible disks for the specified instances using DAG orchestration
+func (m *ComputeDiskMigrator) MigrateInstanceDisks(ctx context.Context, instances []*computepb.Instance) (interface{}, error) {
+	if logger.User != nil {
+		logger.User.Infof("Starting DAG-based migration for %d instances", len(instances))
+	}
+	
+	// Build the migration DAG
+	migrationDAG, err := m.orchestrator.BuildMigrationDAG(ctx, instances)
+	if err != nil {
+		return nil, fmt.Errorf("failed to build migration DAG: %w", err)
+	}
+	
+	// Execute the DAG
+	if logger.User != nil {
+		logger.User.Info("Executing migration DAG")
+	}
+	result, err := m.orchestrator.ExecuteMigrationDAG(ctx, migrationDAG)
+	if err != nil {
+		return result, fmt.Errorf("migration DAG execution failed: %w", err)
+	}
+	
+	if logger.User != nil {
+		logger.User.Successf("DAG-based migration completed successfully for %d instances", len(instances))
+	}
+	return result, nil
+}
+
+// HandleInstanceDiskMigration coordinates the migration of non-boot disks for a given instance.
+// This method maintains backward compatibility with the existing linear workflow
+// For now, it falls back to the original implementation until we can fully integrate the DAG orchestrator
 func HandleInstanceDiskMigration(ctx context.Context, config *Config, instance *computepb.Instance, gcpClient *gcp.Clients) error {
+	// For backward compatibility, use the original linear workflow for now
+	// This avoids the import cycle while maintaining existing functionality
+	
 	// coordinate the disk migration process for the given instance
 	defer removeInstanceState(instance)
 
@@ -200,7 +247,9 @@ func HandleInstanceDiskMigration(ctx context.Context, config *Config, instance *
 	}
 
 	if isRunning {
-		logger.User.Infof("Instance %s in zone %s is running, stopping it before migration", instance.GetName(), zone)
+		if logger.User != nil {
+			logger.User.Infof("Instance %s in zone %s is running, stopping it before migration", instance.GetName(), zone)
+		}
 		if err := gcpClient.ComputeClient.StopInstance(ctx, config.ProjectID, zone, instance.GetName()); err != nil {
 			return fmt.Errorf("failed to stop instance %s in zone %s: %w", instance.GetName(), zone, err)
 		}
@@ -213,22 +262,58 @@ func HandleInstanceDiskMigration(ctx context.Context, config *Config, instance *
 
 	for _, result := range migrationResult {
 		if result.ErrorMessage != "" {
-			logger.User.Errorf("Failed to migrate disk %s: %v  continuing with the next disk", result.DiskName, result.ErrorMessage)
+			if logger.User != nil {
+				logger.User.Errorf("Failed to migrate disk %s: %v  continuing with the next disk", result.DiskName, result.ErrorMessage)
+			}
 		}
 	}
 	previousInstanceState, err := GetInstanceState(ctx, instance, gcpClient)
 	if previousInstanceState == RUNNING_STATE && err == nil {
-		logger.User.Infof("Instance %s in zone %s was running, starting it after migration", instance.GetName(), zone)
+		if logger.User != nil {
+			logger.User.Infof("Instance %s in zone %s was running, starting it after migration", instance.GetName(), zone)
+		}
 		if err := gcpClient.ComputeClient.StartInstance(ctx, config.ProjectID, zone, instance.GetName()); err != nil {
 			return fmt.Errorf("failed to start instance %s in zone %s: %w", instance.GetName(), zone, err)
 		}
 	}
-	logger.User.Successf("All disks migrated successfully for instance %s", instance.GetName())
+	if logger.User != nil {
+		logger.User.Successf("All disks migrated successfully for instance %s", instance.GetName())
+	}
 	return nil
 }
 
+
+// MigrateAllInstanceDisks discovers and migrates disks for all matching instances using DAG orchestration
+func (m *ComputeDiskMigrator) MigrateAllInstanceDisks(ctx context.Context) (interface{}, error) {
+	// Discover instances first using proper arguments
+	discovery := NewInstanceDiscovery(m.gcpClient.ComputeClient, m.gcpClient.DiskClient)
+	instances, err := discovery.DiscoverInstances(ctx, m.config)
+	if err != nil {
+		return nil, fmt.Errorf("failed to discover instances: %w", err)
+	}
+	
+	if len(instances) == 0 {
+		if logger.User != nil {
+			logger.User.Info("No instances found matching the criteria")
+		}
+		// Return a simple success indicator
+		return map[string]interface{}{"success": true}, nil
+	}
+	
+	// Convert InstanceMigration to computepb.Instance
+	instanceList := make([]*computepb.Instance, len(instances))
+	for i, instMig := range instances {
+		instanceList[i] = instMig.Instance
+	}
+	
+	// Use DAG orchestration for migration
+	return m.MigrateInstanceDisks(ctx, instanceList)
+}
+
 func IncrementalSnapshotDisk(ctx context.Context, config *Config, disk *computepb.Disk, gcpClient *gcp.Clients) error {
-	logger.User.Infof("Creating incremental snapshot for disk %s in zone %s", disk.GetName(), disk.GetZone())
+	if logger.User != nil {
+		logger.User.Infof("Creating incremental snapshot for disk %s in zone %s", disk.GetName(), disk.GetZone())
+	}
 
 	snapshotName := fmt.Sprintf("%s-snapshot", utils.AddSuffix(disk.GetName(), 3))
 	kmsParams := &gcp.SnapshotKmsParams{
@@ -242,6 +327,8 @@ func IncrementalSnapshotDisk(ctx context.Context, config *Config, disk *computep
 		return fmt.Errorf("failed to create incremental snapshot for disk %s: %w", disk.GetName(), err)
 	}
 
-	logger.User.Infof("Incremental snapshot %s created successfully for disk %s", snapshotName, disk.GetName())
+	if logger.User != nil {
+		logger.User.Infof("Incremental snapshot %s created successfully for disk %s", snapshotName, disk.GetName())
+	}
 	return nil
 }
