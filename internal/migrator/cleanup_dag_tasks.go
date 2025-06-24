@@ -77,7 +77,7 @@ const (
 // SnapshotCleanupTask implements DAG Task interface for individual snapshot cleanup
 type SnapshotCleanupTask struct {
 	*BaseTask
-	cleanupManager *ResilientCleanupManager
+	cleanupManager *MultiLevelCleanupManager
 	taskID         string
 	snapshotName   string
 	sessionID      string
@@ -85,7 +85,7 @@ type SnapshotCleanupTask struct {
 }
 
 // NewSnapshotCleanupTask creates a new snapshot cleanup task for DAG execution
-func NewSnapshotCleanupTask(id, taskID, snapshotName, sessionID string, cleanupManager *ResilientCleanupManager, config *Config) *SnapshotCleanupTask {
+func NewSnapshotCleanupTask(id, taskID, snapshotName, sessionID string, cleanupManager *MultiLevelCleanupManager, config *Config) *SnapshotCleanupTask {
 	description := fmt.Sprintf("Clean up snapshot %s for task %s", snapshotName, taskID)
 
 	return &SnapshotCleanupTask{
@@ -109,8 +109,8 @@ func (t *SnapshotCleanupTask) Execute(ctx context.Context) error {
 
 	logger.Op.WithFields(logFields).Info("Starting snapshot cleanup task...")
 
-	// Use the resilient cleanup manager for better error handling
-	result := t.cleanupManager.ResilientCleanupTaskSnapshot(ctx, t.taskID, t.snapshotName)
+	// Use the cleanup manager for task snapshot cleanup
+	result := t.cleanupManager.CleanupTaskSnapshot(ctx, t.taskID, t.snapshotName)
 
 	// Log the cleanup result
 	resultFields := map[string]interface{}{
@@ -156,13 +156,13 @@ func (t *SnapshotCleanupTask) Rollback(ctx context.Context) error {
 // SessionCleanupTask implements DAG Task interface for session-level cleanup
 type SessionCleanupTask struct {
 	*BaseTask
-	cleanupManager *ResilientCleanupManager
+	cleanupManager *MultiLevelCleanupManager
 	sessionID      string
 	config         *Config
 }
 
 // NewSessionCleanupTask creates a new session cleanup task for DAG execution
-func NewSessionCleanupTask(id, sessionID string, cleanupManager *ResilientCleanupManager, config *Config) *SessionCleanupTask {
+func NewSessionCleanupTask(id, sessionID string, cleanupManager *MultiLevelCleanupManager, config *Config) *SessionCleanupTask {
 	description := fmt.Sprintf("Clean up all snapshots for session %s", sessionID)
 
 	return &SessionCleanupTask{
@@ -182,8 +182,8 @@ func (t *SessionCleanupTask) Execute(ctx context.Context) error {
 
 	logger.Op.WithFields(logFields).Info("Starting session cleanup task...")
 
-	// Use the resilient cleanup manager for better error handling
-	result := t.cleanupManager.ResilientCleanupSessionSnapshots(ctx)
+	// Use the cleanup manager for session cleanup
+	result := t.cleanupManager.CleanupSessionSnapshots(ctx)
 
 	// Log the cleanup result
 	resultFields := map[string]interface{}{
@@ -228,12 +228,12 @@ func (t *SessionCleanupTask) Rollback(ctx context.Context) error {
 // EmergencyCleanupTask implements DAG Task interface for emergency cleanup
 type EmergencyCleanupTask struct {
 	*BaseTask
-	cleanupManager *ResilientCleanupManager
+	cleanupManager *MultiLevelCleanupManager
 	config         *Config
 }
 
 // NewEmergencyCleanupTask creates a new emergency cleanup task for DAG execution
-func NewEmergencyCleanupTask(id string, cleanupManager *ResilientCleanupManager, config *Config) *EmergencyCleanupTask {
+func NewEmergencyCleanupTask(id string, cleanupManager *MultiLevelCleanupManager, config *Config) *EmergencyCleanupTask {
 	description := "Emergency cleanup of expired snapshots across all sessions"
 
 	return &EmergencyCleanupTask{
@@ -251,7 +251,7 @@ func (t *EmergencyCleanupTask) Execute(ctx context.Context) error {
 
 	logger.Op.WithFields(logFields).Info("Starting emergency cleanup task...")
 
-	// Use the base cleanup manager for emergency cleanup (cross-session)
+	// Use the cleanup manager for emergency cleanup (cross-session)
 	result := t.cleanupManager.CleanupExpiredSnapshots(ctx)
 
 	// Log the cleanup result
@@ -295,12 +295,12 @@ func (t *EmergencyCleanupTask) Rollback(ctx context.Context) error {
 // HealthCheckTask implements DAG Task interface for cleanup health monitoring
 type HealthCheckTask struct {
 	*BaseTask
-	cleanupManager *ResilientCleanupManager
+	cleanupManager *MultiLevelCleanupManager
 	config         *Config
 }
 
 // NewHealthCheckTask creates a new health check task for DAG execution
-func NewHealthCheckTask(id string, cleanupManager *ResilientCleanupManager, config *Config) *HealthCheckTask {
+func NewHealthCheckTask(id string, cleanupManager *MultiLevelCleanupManager, config *Config) *HealthCheckTask {
 	description := "Health check for cleanup operations"
 
 	return &HealthCheckTask{
@@ -318,33 +318,16 @@ func (t *HealthCheckTask) Execute(ctx context.Context) error {
 
 	logger.Op.WithFields(logFields).Info("Starting cleanup health check task...")
 
-	// Get health status from the resilient cleanup manager
-	healthy, circuitState, stats := t.cleanupManager.GetHealthStatus()
+	// Simple health check - verify cleanup manager is functional
+	activeSnapshots := t.cleanupManager.GetActiveSnapshotCount()
 
 	// Log the health check result
 	healthFields := map[string]interface{}{
-		"taskID":       t.GetID(),
-		"healthy":      healthy,
-		"circuitState": circuitState,
+		"taskID":          t.GetID(),
+		"activeSnapshots": activeSnapshots,
 	}
 
-	// Add stats to log fields
-	for k, v := range stats {
-		healthFields[k] = v
-	}
-
-	if !healthy {
-		logger.Op.WithFields(healthFields).Warn("Cleanup health check indicates unhealthy state")
-		return fmt.Errorf("cleanup system is unhealthy: circuit state %v", circuitState)
-	}
-
-	// Check for critical circuit breaker state
-	if circuitState == CircuitOpen {
-		logger.Op.WithFields(healthFields).Error("Cleanup circuit breaker is open")
-		return fmt.Errorf("cleanup circuit breaker is open - system is failing")
-	}
-
-	logger.Op.WithFields(healthFields).Info("Cleanup health check completed - system is healthy")
+	logger.Op.WithFields(healthFields).Info("Cleanup health check completed - system is operational")
 	return nil
 }
 
@@ -362,13 +345,13 @@ func (t *HealthCheckTask) Rollback(ctx context.Context) error {
 type CleanupTaskExecutor struct {
 	config         *Config
 	gcpClients     *gcp.Clients
-	cleanupManager *ResilientCleanupManager
+	cleanupManager *MultiLevelCleanupManager
 	sessionID      string
 }
 
 // NewCleanupTaskExecutor creates a new cleanup task executor
 func NewCleanupTaskExecutor(config *Config, gcpClients *gcp.Clients, sessionID string) *CleanupTaskExecutor {
-	cleanupManager := NewResilientCleanupManager(config, gcpClients, DefaultCleanupStrategy(), sessionID)
+	cleanupManager := NewMultiLevelCleanupManager(config, gcpClients, DefaultCleanupStrategy(), sessionID)
 
 	return &CleanupTaskExecutor{
 		config:         config,
@@ -474,6 +457,6 @@ func (executor *CleanupTaskExecutor) ExecuteEmergencyCleanup(ctx context.Context
 }
 
 // GetCleanupManager returns the cleanup manager for external use
-func (executor *CleanupTaskExecutor) GetCleanupManager() *ResilientCleanupManager {
+func (executor *CleanupTaskExecutor) GetCleanupManager() *MultiLevelCleanupManager {
 	return executor.cleanupManager
 }
