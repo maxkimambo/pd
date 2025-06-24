@@ -13,8 +13,8 @@ func TestExecutor_ProgressLogging(t *testing.T) {
 	dag := NewDAG()
 	
 	// Create a simple linear DAG
-	task1 := &MockTask{id: "task1", taskType: "TestTask", description: "First task"}
-	task2 := &MockTask{id: "task2", taskType: "TestTask", description: "Second task"}
+	task1 := newMockTask("task1", "TestTask", "First task")
+	task2 := newMockTask("task2", "TestTask", "Second task")
 	
 	node1 := NewBaseNode(task1)
 	node2 := NewBaseNode(task2)

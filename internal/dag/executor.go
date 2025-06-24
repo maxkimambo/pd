@@ -193,6 +193,19 @@ func (e *Executor) initializeResults() {
 
 // scheduleNode schedules a node for execution
 func (e *Executor) scheduleNode(nodeID string) {
+	e.mutex.Lock()
+	defer e.mutex.Unlock()
+	
+	// Check if already scheduled/started to prevent double scheduling
+	result := e.results[nodeID]
+	if result.StartTime != nil {
+		return // Already scheduled or started
+	}
+	
+	// Mark as started immediately to prevent race conditions
+	now := time.Now()
+	result.StartTime = &now
+	
 	e.wg.Add(1)
 	go e.executeNode(nodeID)
 }
@@ -407,8 +420,11 @@ func (e *Executor) setNodeStarted(nodeID string) {
 	defer e.mutex.Unlock()
 	
 	if result, exists := e.results[nodeID]; exists {
-		now := time.Now()
-		result.StartTime = &now
+		// Only set StartTime if not already set (to preserve scheduling time)
+		if result.StartTime == nil {
+			now := time.Now()
+			result.StartTime = &now
+		}
 	}
 }
 
