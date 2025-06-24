@@ -35,46 +35,79 @@ var (
 
 var computeCmd = &cobra.Command{
 	Use:   "compute",
-	Short: "Migrate attached persistent disks on GCE instances to a new disk type",
-	Long: `Performs migration of persistent disks attached to specified GCE instances using task orchestration.
+	Short: "Migrate persistent disks attached to Compute Engine instances",
+	Long: `Migrate persistent disks attached to Compute Engine instances to new disk types with minimal downtime.
 
-Identifies instances and their disks based on project, location (zone or region), and instance names.
-For each targeted disk, it will:
-1. Optionally stop the instance.
-2. Detach the disk.
-3. Create a snapshot (with optional KMS encryption).
-4. Delete the original disk (if retaining name).
-5. Recreate the disk from the snapshot with the target type.
-6. Attach the new disk to the instance.
-7. Optionally restart the instance.
-8. Clean up snapshots afterwards.
+WHAT THIS COMMAND DOES:
+Migrates non-boot persistent disks attached to Compute Engine instances by orchestrating
+a series of operations designed to minimize service interruption.
 
-The orchestration provides improved parallelism and dependency management with detailed progress logging.
+MIGRATION PROCESS:
+1. Discovery: Find instances and validate their attached disks
+2. Compatibility Check: Verify machine types support target disk type
+3. Instance Management: Stop instances if required for disk operations
+4. Disk Operations: Detach → Snapshot → Recreate → Reattach disks
+5. Instance Restart: Start instances after successful disk migration
+6. Cleanup: Remove intermediate snapshots automatically
 
-Example:
-pd migrate compute --project my-gcp-project --zone us-central1-a --instances vm1,vm2.. vm.N --target-disk-type hyperdisk-balanced
-pd migrate compute --project my-gcp-project --region us-central1 --instances "*" --target-disk-type hyperdisk-balanced --auto-approve
+⚠️  IMPORTANT LIMITATIONS & WARNINGS:
+• BOOT DISKS ARE NOT MIGRATED (requires special procedures)
+• Instance downtime is required for disk detachment/reattachment
+• All attached disks on target instances will be processed
+• Machine type must be compatible with target disk type
+• Regional persistent disks are NOT SUPPORTED
+
+INSTANCE TARGETING:
+• Specific instances: --instances vm1,vm2,vm3
+• All instances in scope: --instances "*" (use quotes)
+• Zone-based: Targets instances in specified zone only
+• Region-based: Targets instances across all zones in region
+
+DOWNTIME CONSIDERATIONS:
+• Instances are stopped during disk operations (typically 5-15 minutes)
+• Applications should be gracefully shut down before migration
+• Consider maintenance windows for production workloads
+• Persistent disk data is preserved throughout the process
+
+COMPATIBILITY REQUIREMENTS:
+• Machine types must support target disk type (validated automatically)
+• Sufficient quota for snapshots and new disks
+• No conflicting disk names in target project/zone
+• Instance service accounts need appropriate permissions
+
+EXAMPLES:
+# Migrate specific instances in a zone
+pd migrate compute --project my-project --zone us-central1-a --instances "web-server-1,web-server-2" --target-disk-type pd-ssd
+
+# Migrate all instances in a region (with confirmation)
+pd migrate compute --project my-project --region us-central1 --instances "*" --target-disk-type hyperdisk-balanced
+
+# Production migration with custom settings
+pd migrate compute --project prod-project --zone us-east1-b --instances "app-cluster-*" --target-disk-type hyperdisk-throughput --throughput 500 --max-concurrency 3
+
+# Safe migration keeping original disks (testing)
+pd migrate compute --project test-project --zone europe-west1-c --instances "test-vm" --target-disk-type pd-ssd --retain-name=false --auto-approve=false
 `,
 	PreRunE: validateComputeCmdFlags,
 	RunE:    runGceConvert,
 }
 
 func init() {
-	computeCmd.Flags().StringVarP(&projectID, "project", "p", "", "GCP Project ID (required)")
-	computeCmd.Flags().StringVarP(&gceTargetDiskType, "target-disk-type", "t", "", "Target disk type (e.g., pd-ssd, hyperdisk-balanced) (required)")
-	computeCmd.Flags().StringVar(&gceLabelFilter, "label", "", "Label filter for disks in key=value format (optional)")
-	computeCmd.Flags().StringVar(&gceKmsKey, "kms-key", "", "KMS Key name for snapshot encryption (optional)")
-	computeCmd.Flags().StringVar(&gceKmsKeyRing, "kms-keyring", "", "KMS KeyRing name (required if kms-key is set)")
-	computeCmd.Flags().StringVar(&gceKmsLocation, "kms-location", "", "KMS Key location (required if kms-key is set)")
-	computeCmd.Flags().StringVar(&gceKmsProject, "kms-project", "", "KMS Project ID (defaults to --project if not set, required if kms-key is set)")
-	computeCmd.Flags().StringVar(&gceRegion, "region", "", "GCP region (required if zone is not set)")
-	computeCmd.Flags().StringVar(&gceZone, "zone", "", "GCP zone (required if region is not set)")
-	computeCmd.Flags().StringSliceVar(&gceInstances, "instances", nil, "Comma-separated list of instance names, or '*' for all instances in the scope (required)")
-	computeCmd.Flags().BoolVar(&gceAutoApprove, "auto-approve", false, "Skip all interactive prompts")
-	computeCmd.Flags().IntVar(&gceMaxConcurrency, "max-concurrency", 5, "Maximum number of disks/instances to process concurrently (1-50)")
-	computeCmd.Flags().BoolVar(&gceRetainName, "retain-name", true, "Reuse original disk name. If false, keep original and suffix new name.")
-	computeCmd.Flags().Int64Var(&gceThroughput, "throughput", 150, "Throughput for the new disk in MiB/s (optional, default is 150)")
-	computeCmd.Flags().Int64Var(&gceIops, "iops", 3000, "IOPS for the new disk (optional, default is 3000)")
+	computeCmd.Flags().StringVarP(&projectID, "project", "p", "", "GCP Project ID where instances are located (required)")
+	computeCmd.Flags().StringVarP(&gceTargetDiskType, "target-disk-type", "t", "", "Target disk type (pd-ssd, hyperdisk-balanced, etc.) (required)")
+	computeCmd.Flags().StringVar(&gceLabelFilter, "label", "", "Filter instance disks by label in key=value format")
+	computeCmd.Flags().StringVar(&gceKmsKey, "kms-key", "", "KMS key name for snapshot encryption (enhances security)")
+	computeCmd.Flags().StringVar(&gceKmsKeyRing, "kms-keyring", "", "KMS key ring name (required when using --kms-key)")
+	computeCmd.Flags().StringVar(&gceKmsLocation, "kms-location", "", "KMS key location/region (required when using --kms-key)")
+	computeCmd.Flags().StringVar(&gceKmsProject, "kms-project", "", "KMS project ID (defaults to --project if not specified)")
+	computeCmd.Flags().StringVar(&gceRegion, "region", "", "GCP region to search for instances (mutually exclusive with --zone)")
+	computeCmd.Flags().StringVar(&gceZone, "zone", "", "GCP zone to search for instances (mutually exclusive with --region)")
+	computeCmd.Flags().StringSliceVar(&gceInstances, "instances", nil, "Instance names (comma-separated) or '*' for all instances (required)")
+	computeCmd.Flags().BoolVar(&gceAutoApprove, "auto-approve", false, "Skip interactive confirmations (default: false for safety)")
+	computeCmd.Flags().IntVar(&gceMaxConcurrency, "max-concurrency", 5, "Maximum instances to process simultaneously (1-50, default: 5)")
+	computeCmd.Flags().BoolVar(&gceRetainName, "retain-name", true, "Reuse original disk name by deleting original (default: true, irreversible)")
+	computeCmd.Flags().Int64Var(&gceThroughput, "throughput", 150, "Disk throughput in MiB/s (applicable to hyperdisk types, default: 150)")
+	computeCmd.Flags().Int64Var(&gceIops, "iops", 3000, "Disk IOPS limit (applicable to hyperdisk types, default: 3000)")
 
 	_ = computeCmd.MarkFlagRequired("target-disk-type")
 	_ = computeCmd.MarkFlagRequired("instances")

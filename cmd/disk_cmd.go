@@ -32,41 +32,65 @@ var (
 
 var diskCmd = &cobra.Command{
 	Use:   "disk",
-	Short: "Migrate detached persistent disks to a new disk type",
-	Long: `Performs bulk migration of detached Google Cloud persistent disks using task orchestration.
+	Short: "Migrate detached persistent disks to new disk types",
+	Long: `Migrate detached Google Cloud persistent disks to new disk types using task orchestration.
 
-Identifies detached disks based on location (zone or region) and optional label filter.
-Migrates disks by:
-1. Creating a snapshot (with optional KMS encryption).
-2. Deleting the original disk (optional, controlled by --retain-name).
-3. Recreating the disk from the snapshot with the target type.
-4. Cleaning up snapshots afterwards.
+WHAT ARE DETACHED DISKS?
+Detached disks are persistent disks that are not currently attached to any Compute Engine 
+instance. These can be migrated safely without affecting running workloads.
 
-The orchestration provides improved parallelism and dependency management with detailed progress logging.
+MIGRATION PROCESS:
+1. Discovery: Find detached disks matching location and label criteria
+2. Validation: Verify disks can be migrated to target type
+3. Snapshot: Create snapshots with optional KMS encryption
+4. Recreation: Create new disks from snapshots with target specifications
+5. Cleanup: Remove intermediate snapshots automatically
+6. Reporting: Provide detailed migration results
 
-Example:
-pd migrate disk --project my-gcp-project --zone us-central1-a --target-disk-type pd-ssd --label env=staging --max-concurrency 20
-pd migrate disk --project my-gcp-project --region us-central1 --target-disk-type hyperdisk-balanced --auto-approve --retain-name=false
+IMPORTANT CONSIDERATIONS:
+⚠️  Backup Recommendation: Ensure additional backups exist before migration
+⚠️  Quota Requirements: Temporary snapshots require additional storage quota
+⚠️  Cost Impact: Snapshots incur storage costs during migration window
+⚠️  Disk Names: --retain-name=true deletes original disks (irreversible)
+
+COMMON USE CASES:
+• Upgrade pd-standard to pd-ssd for better performance
+• Migrate to hyperdisk-balanced for improved IOPS and throughput
+• Consolidate disks to newer storage pool technologies
+• Optimize costs by moving to appropriate disk types
+
+EXAMPLES:
+# Migrate staging disks in a specific zone
+pd migrate disk --project my-project --zone us-central1-a --target-disk-type pd-ssd --label env=staging
+
+# Bulk migrate all detached disks in a region (interactive confirmation)
+pd migrate disk --project my-project --region us-central1 --target-disk-type hyperdisk-balanced
+
+# High-throughput migration with custom settings
+pd migrate disk --project my-project --zone us-west1-b --target-disk-type hyperdisk-throughput --throughput 2000 --concurrency 15
+
+# Safe migration keeping original disks
+pd migrate disk --project my-project --zone europe-west1-c --target-disk-type pd-ssd --retain-name=false --auto-approve=false
 `,
 	PreRunE: validateDiskCmdFlags,
 	RunE:    runConvert,
 }
 
 func init() {
-	diskCmd.Flags().StringVarP(&targetDiskType, "target-disk-type", "t", "", "Target disk type (e.g. pd-ssd, hyperdisk-balanced) (required)")
-	diskCmd.Flags().StringVar(&labelFilter, "label", "", "Label filter in key=value format (optional)")
-	diskCmd.Flags().StringVar(&kmsKey, "kms-key", "", "KMS Key name for snapshot encryption (optional)")
-	diskCmd.Flags().StringVar(&kmsKeyRing, "kms-keyring", "", "KMS KeyRing name (required if kms-key is set)")
-	diskCmd.Flags().StringVar(&kmsLocation, "kms-location", "", "KMS Key location (required if kms-key is set)")
-	diskCmd.Flags().StringVar(&kmsProject, "kms-project", "", "KMS Project ID (defaults to --project if not set, required if kms-key is set)")
-	diskCmd.Flags().StringVar(&region, "region", "", "GCP region (required if zone is not set)")
-	diskCmd.Flags().StringVar(&zone, "zone", "", "GCP zone (required if region is not set)")
-	diskCmd.Flags().BoolVar(&autoApprove, "auto-approve", true, "Skip all interactive prompts")
-	diskCmd.Flags().IntVar(&concurrency, "concurrency", 10, "Number of disks to process concurrently (1-200), default: 10")
-	diskCmd.Flags().BoolVar(&retainName, "retain-name", true, "Reuse original disk name (delete original). If false, keep original and suffix new name.")
-	diskCmd.Flags().Int64Var(&throughput, "throughput", 140, "Throughput in MB/s to set (optional, default: 140 MiB/s)")
-	diskCmd.Flags().Int64Var(&iops, "iops", 2000, "IOPS to set(optional, default: 2000 IOPS)")
-	diskCmd.Flags().StringVarP(&storagePoolId, "pool-id", "s", "", "Storage pool ID to use for the new disks (optional)")
+	diskCmd.Flags().StringVarP(&targetDiskType, "target-disk-type", "t", "", "Target disk type (pd-ssd, pd-standard, hyperdisk-balanced, etc.) (required)")
+	diskCmd.Flags().StringVar(&labelFilter, "label", "", "Filter disks by label in key=value format (e.g., env=prod)")
+	diskCmd.Flags().StringVar(&kmsKey, "kms-key", "", "KMS key name for snapshot encryption (enhances security)")
+	diskCmd.Flags().StringVar(&kmsKeyRing, "kms-keyring", "", "KMS key ring name (required when using --kms-key)")
+	diskCmd.Flags().StringVar(&kmsLocation, "kms-location", "", "KMS key location/region (required when using --kms-key)")
+	diskCmd.Flags().StringVar(&kmsProject, "kms-project", "", "KMS project ID (defaults to --project if not specified)")
+	diskCmd.Flags().StringVar(&region, "region", "", "GCP region to search for disks (mutually exclusive with --zone)")
+	diskCmd.Flags().StringVar(&zone, "zone", "", "GCP zone to search for disks (mutually exclusive with --region)")
+	diskCmd.Flags().BoolVar(&autoApprove, "auto-approve", true, "Skip interactive confirmations (default: true for automation)")
+	diskCmd.Flags().IntVar(&concurrency, "concurrency", 10, "Number of disks to process simultaneously (1-200, default: 10)")
+	diskCmd.Flags().BoolVar(&retainName, "retain-name", true, "Reuse original disk name by deleting original (default: true, irreversible)")
+	diskCmd.Flags().Int64Var(&throughput, "throughput", 140, "Disk throughput in MiB/s (applicable to hyperdisk types, default: 140)")
+	diskCmd.Flags().Int64Var(&iops, "iops", 2000, "Disk IOPS limit (applicable to hyperdisk types, default: 2000)")
+	diskCmd.Flags().StringVarP(&storagePoolId, "pool-id", "s", "", "Storage pool ID for new disks (advanced feature for storage pools)")
 
 	_ = diskCmd.MarkFlagRequired("target-disk-type")
 }
@@ -94,14 +118,14 @@ func validateDiskCmdFlags(cmd *cobra.Command, args []string) error {
 	}
 
 	if concurrency < 1 || concurrency > 200 {
-		return fmt.Errorf("--max-concurrency must be between 1 and 200, got %d", concurrency)
+		return fmt.Errorf("--concurrency must be between 1 and 200, got %d", concurrency)
 	}
 	if throughput < 140 || throughput > 5000 {
-		return fmt.Errorf("--throughput must be between 0 and 5000 MB/s, got %d", throughput)
+		return fmt.Errorf("--throughput must be between 140 and 5000 MiB/s, got %d", throughput)
 	}
 
 	if iops < 2000 || iops > 350000 {
-		return fmt.Errorf("--iops must be between 3000 and 350,000, got %d", iops)
+		return fmt.Errorf("--iops must be between 2000 and 350,000, got %d", iops)
 	}
 
 	return nil
