@@ -82,7 +82,7 @@ func getShortDiskTypeName(typeURL string) string {
 }
 
 func DiscoverInstances(ctx context.Context, config *Config, gcpClient *gcp.Clients) ([]*computepb.Instance, error) {
-	logger.User.Info("--- Phase 1: Discovering Instances ---")
+	logger.User.Info("--- Phase 1: Instance Discovery ---")
 
 	var discoveredInstances []*computepb.Instance
 	var err error

@@ -23,7 +23,7 @@ func (t *DiskMigrationWrapper) Execute(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to get disk %s for migration: %w", t.diskName, err)
 	}
-	
+
 	// Create the actual migration task and execute it
 	migrationTask := dag.NewDiskMigrationTask(
 		t.GetID(),
@@ -36,7 +36,7 @@ func (t *DiskMigrationWrapper) Execute(ctx context.Context) error {
 		t.factory.config,
 		disk,
 	)
-	
+
 	return migrationTask.Execute(ctx)
 }
 
@@ -58,16 +58,16 @@ func (t *BatchSnapshotTask) Execute(ctx context.Context) error {
 	if len(t.diskNames) == 0 {
 		return nil
 	}
-	
+
 	var wg sync.WaitGroup
 	errChan := make(chan error, len(t.diskNames))
-	
+
 	// Create snapshots in parallel
 	for _, diskName := range t.diskNames {
 		wg.Add(1)
 		go func(disk string) {
 			defer wg.Done()
-			
+
 			snapshotName := fmt.Sprintf("pd-migrate-%s-batch", disk)
 			snapshotTask := dag.NewSnapshotTask(
 				fmt.Sprintf("snapshot_%s", disk),
@@ -78,23 +78,23 @@ func (t *BatchSnapshotTask) Execute(ctx context.Context) error {
 				t.factory.gcpClient,
 				t.factory.config,
 			)
-			
+
 			if err := snapshotTask.Execute(ctx); err != nil {
 				errChan <- fmt.Errorf("failed to create snapshot for disk %s: %w", disk, err)
 			}
 		}(diskName)
 	}
-	
+
 	wg.Wait()
 	close(errChan)
-	
+
 	// Check for any errors
 	for err := range errChan {
 		if err != nil {
 			return err
 		}
 	}
-	
+
 	return nil
 }
 
@@ -142,16 +142,16 @@ func (t *ValidationTask) validateDisk(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to get disk %s: %w", t.resourceID, err)
 	}
-	
+
 	// Check if disk is already the target type
 	currentType := extractDiskNameFromSource(disk.GetType())
 	if currentType == t.factory.config.TargetDiskType {
 		return fmt.Errorf("disk %s is already of type %s", t.resourceID, t.factory.config.TargetDiskType)
 	}
-	
+
 	// Check if disk is attached (for detached disk migration)
 	// This would need additional logic to check attachment status
-	
+
 	return nil
 }
 
@@ -161,12 +161,12 @@ func (t *ValidationTask) validateInstance(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to get instance %s: %w", t.resourceID, err)
 	}
-	
+
 	// Check if instance has disks that need migration
-	if instance.Disks == nil || len(instance.Disks) == 0 {
+	if len(instance.Disks) == 0 {
 		return fmt.Errorf("instance %s has no disks", t.resourceID)
 	}
-	
+
 	// Check if any non-boot disks need migration
 	hasNonBootDisks := false
 	for _, disk := range instance.Disks {
@@ -175,11 +175,11 @@ func (t *ValidationTask) validateInstance(ctx context.Context) error {
 			break
 		}
 	}
-	
+
 	if !hasNonBootDisks {
 		return fmt.Errorf("instance %s has no non-boot disks to migrate", t.resourceID)
 	}
-	
+
 	return nil
 }
 
@@ -213,12 +213,12 @@ func (t *PreflightCheckTask) Execute(ctx context.Context) error {
 	if err := t.checkProjectPermissions(ctx); err != nil {
 		return fmt.Errorf("project permissions check failed: %w", err)
 	}
-	
+
 	// Check quota availability
 	if err := t.checkQuotas(ctx); err != nil {
 		return fmt.Errorf("quota check failed: %w", err)
 	}
-	
+
 	// Validate all instances
 	for _, instanceName := range t.instances {
 		validationTask := &ValidationTask{
@@ -227,12 +227,12 @@ func (t *PreflightCheckTask) Execute(ctx context.Context) error {
 			resourceType: "instance",
 			resourceID:   instanceName,
 		}
-		
+
 		if err := validationTask.Execute(ctx); err != nil {
 			return fmt.Errorf("validation failed for instance %s: %w", instanceName, err)
 		}
 	}
-	
+
 	return nil
 }
 
@@ -244,7 +244,7 @@ func (t *PreflightCheckTask) checkProjectPermissions(ctx context.Context) error 
 	if err != nil {
 		return fmt.Errorf("insufficient permissions to list instances: %w", err)
 	}
-	
+
 	return nil
 }
 

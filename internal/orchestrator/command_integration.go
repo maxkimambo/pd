@@ -6,9 +6,9 @@ import (
 	"strings"
 	"time"
 
+	computepb "cloud.google.com/go/compute/apiv1/computepb"
 	"github.com/maxkimambo/pd/internal/dag"
 	"github.com/maxkimambo/pd/internal/logger"
-	computepb "cloud.google.com/go/compute/apiv1/computepb"
 )
 
 // ExecuteInstanceMigrations orchestrates compute instance migrations using DAG
@@ -20,7 +20,7 @@ func (o *DAGOrchestrator) ExecuteInstanceMigrations(ctx context.Context, instanc
 // ExecuteInstanceMigrationsWithVisualization orchestrates compute instance migrations using DAG with optional visualization
 func (o *DAGOrchestrator) ExecuteInstanceMigrationsWithVisualization(ctx context.Context, instances []*computepb.Instance, visualizeFile string) (*dag.ExecutionResult, error) {
 	if logger.User != nil {
-		logger.User.Infof("Starting DAG-based migration for %d instance(s)", len(instances))
+		logger.User.Info("--- Phase 2: Migration of GCE Attached Disks ---")
 	}
 
 	// Build DAG from instances
@@ -31,7 +31,7 @@ func (o *DAGOrchestrator) ExecuteInstanceMigrationsWithVisualization(ctx context
 
 	if logger.User != nil {
 		allNodes := migrationDAG.GetAllNodes()
-		logger.User.Infof("Built migration DAG with %d tasks", len(allNodes))
+		logger.User.Infof("Built migration graph of %d tasks", len(allNodes))
 	}
 
 	// Execute DAG with visualization
@@ -51,7 +51,7 @@ func (o *DAGOrchestrator) ExecuteInstanceMigrationsWithVisualization(ctx context
 				failed++
 			}
 		}
-		
+
 		if result.Success {
 			logger.User.Successf("DAG execution completed successfully: %d tasks completed", completed)
 		} else {
@@ -75,7 +75,7 @@ func (o *DAGOrchestrator) ExecuteDiskMigrationsWithVisualization(ctx context.Con
 		return nil, fmt.Errorf("orchestrator not properly initialized")
 	}
 	if logger.User != nil {
-		logger.User.Infof("Starting DAG-based migration for %d disk(s)", len(disks))
+		logger.User.Infof("Starting migration for %d disk(s)", len(disks))
 	}
 
 	// Build DAG from disks
@@ -86,13 +86,13 @@ func (o *DAGOrchestrator) ExecuteDiskMigrationsWithVisualization(ctx context.Con
 
 	if logger.User != nil {
 		allNodes := migrationDAG.GetAllNodes()
-		logger.User.Infof("Built disk migration DAG with %d tasks", len(allNodes))
+		logger.User.Infof("Built disk migration graph with %d tasks", len(allNodes))
 	}
 
 	// Execute DAG with visualization
 	result, err := o.ExecuteWithVisualization(ctx, migrationDAG, visualizeFile)
 	if err != nil {
-		return nil, fmt.Errorf("DAG execution failed: %w", err)
+		return nil, fmt.Errorf("graph execution failed: %w", err)
 	}
 
 	// Log execution summary
@@ -106,7 +106,7 @@ func (o *DAGOrchestrator) ExecuteDiskMigrationsWithVisualization(ctx context.Con
 				failed++
 			}
 		}
-		
+
 		if result.Success {
 			logger.User.Successf("Disk migration completed successfully: %d tasks completed", completed)
 		} else {
@@ -120,7 +120,7 @@ func (o *DAGOrchestrator) ExecuteDiskMigrationsWithVisualization(ctx context.Con
 // BuildDiskMigrationDAG creates a DAG for standalone disk migrations
 func (o *DAGOrchestrator) BuildDiskMigrationDAG(ctx context.Context, disks []*computepb.Disk) (*dag.DAG, error) {
 	if logger.User != nil {
-		logger.User.Info("Building migration DAG for standalone disk migration")
+		logger.User.Info("Building migration graph for standalone disk migration")
 	}
 
 	// Create a new DAG
@@ -198,7 +198,6 @@ func (o *DAGOrchestrator) BuildDiskMigrationDAG(ctx context.Context, disks []*co
 	return migrationDAG, nil
 }
 
-
 // ProcessExecutionResults handles the results from DAG execution
 func (o *DAGOrchestrator) ProcessExecutionResults(result *dag.ExecutionResult) error {
 	if result == nil {
@@ -208,12 +207,12 @@ func (o *DAGOrchestrator) ProcessExecutionResults(result *dag.ExecutionResult) e
 	// Report detailed results
 	if logger.User != nil {
 		logger.User.Infof("Migration execution completed in %v", result.ExecutionTime)
-		
+
 		if result.Success {
 			logger.User.Success("All migration tasks completed successfully")
 		} else {
 			logger.User.Error("Migration completed with errors")
-			
+
 			// Report failed tasks
 			for nodeID, nodeResult := range result.NodeResults {
 				if nodeResult.Error != nil {
@@ -236,13 +235,13 @@ func extractZoneFromSelfLink(selfLink string) string {
 	if selfLink == "" {
 		return ""
 	}
-	
+
 	parts := strings.Split(selfLink, "/")
 	for i, part := range parts {
 		if part == "zones" && i+1 < len(parts) {
 			return parts[i+1]
 		}
 	}
-	
+
 	return ""
 }

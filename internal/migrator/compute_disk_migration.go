@@ -68,7 +68,7 @@ func SnapshotInstanceDisks(ctx context.Context, config *Config, instance *comput
 
 		diskName := attachedDisk.GetDeviceName()
 
- 		disk, err := gcpClient.DiskClient.GetDisk(ctx, config.ProjectID, zone, diskName)
+		disk, err := gcpClient.DiskClient.GetDisk(ctx, config.ProjectID, zone, diskName)
 		if err != nil {
 			logger.User.Errorf("Failed to get disk %s in zone %s: %v", diskName, zone, err)
 			// return fmt.Errorf("failed to get disk %s in zone %s: %w", diskName, zone, err)
@@ -198,26 +198,26 @@ func NewComputeDiskMigrator(config *Config, gcpClient *gcp.Clients, orchestrator
 // MigrateInstanceDisks migrates all eligible disks for the specified instances using DAG orchestration
 func (m *ComputeDiskMigrator) MigrateInstanceDisks(ctx context.Context, instances []*computepb.Instance) (interface{}, error) {
 	if logger.User != nil {
-		logger.User.Infof("Starting DAG-based migration for %d instances", len(instances))
+		logger.User.Infof("Starting migration for %d instances", len(instances))
 	}
-	
+
 	// Build the migration DAG
 	migrationDAG, err := m.orchestrator.BuildMigrationDAG(ctx, instances)
 	if err != nil {
 		return nil, fmt.Errorf("failed to build migration DAG: %w", err)
 	}
-	
+
 	// Execute the DAG
 	if logger.User != nil {
-		logger.User.Info("Executing migration DAG")
+		logger.User.Info("Executing migration tasks ...")
 	}
 	result, err := m.orchestrator.ExecuteMigrationDAG(ctx, migrationDAG)
 	if err != nil {
 		return result, fmt.Errorf("migration DAG execution failed: %w", err)
 	}
-	
+
 	if logger.User != nil {
-		logger.User.Successf("DAG-based migration completed successfully for %d instances", len(instances))
+		logger.User.Successf("Migration completed successfully for %d instances", len(instances))
 	}
 	return result, nil
 }
@@ -228,7 +228,7 @@ func (m *ComputeDiskMigrator) MigrateInstanceDisks(ctx context.Context, instance
 func HandleInstanceDiskMigration(ctx context.Context, config *Config, instance *computepb.Instance, gcpClient *gcp.Clients) error {
 	// For backward compatibility, use the original linear workflow for now
 	// This avoids the import cycle while maintaining existing functionality
-	
+
 	// coordinate the disk migration process for the given instance
 	defer removeInstanceState(instance)
 
@@ -282,7 +282,6 @@ func HandleInstanceDiskMigration(ctx context.Context, config *Config, instance *
 	return nil
 }
 
-
 // MigrateAllInstanceDisks discovers and migrates disks for all matching instances using DAG orchestration
 func (m *ComputeDiskMigrator) MigrateAllInstanceDisks(ctx context.Context) (interface{}, error) {
 	// Discover instances first using proper arguments
@@ -291,7 +290,7 @@ func (m *ComputeDiskMigrator) MigrateAllInstanceDisks(ctx context.Context) (inte
 	if err != nil {
 		return nil, fmt.Errorf("failed to discover instances: %w", err)
 	}
-	
+
 	if len(instances) == 0 {
 		if logger.User != nil {
 			logger.User.Info("No instances found matching the criteria")
@@ -299,13 +298,13 @@ func (m *ComputeDiskMigrator) MigrateAllInstanceDisks(ctx context.Context) (inte
 		// Return a simple success indicator
 		return map[string]interface{}{"success": true}, nil
 	}
-	
+
 	// Convert InstanceMigration to computepb.Instance
 	instanceList := make([]*computepb.Instance, len(instances))
 	for i, instMig := range instances {
 		instanceList[i] = instMig.Instance
 	}
-	
+
 	// Use DAG orchestration for migration
 	return m.MigrateInstanceDisks(ctx, instanceList)
 }

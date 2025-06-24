@@ -74,10 +74,10 @@ func init() {
 	computeCmd.Flags().BoolVar(&gceRetainName, "retain-name", true, "Reuse original disk name. If false, keep original and suffix new name.")
 	computeCmd.Flags().Int64Var(&gceThroughput, "throughput", 150, "Throughput for the new disk in MiB/s (optional, default is 150)")
 	computeCmd.Flags().Int64Var(&gceIops, "iops", 3000, "IOPS for the new disk (optional, default is 3000)")
-	
+
 	// New DAG-specific flag for visualization
 	computeCmd.Flags().StringVar(&gceVisualize, "visualize", "", "Export DAG visualization to file (optional). Format auto-detected from extension (.json, .dot, .txt)")
-	
+
 	computeCmd.MarkFlagRequired("target-disk-type")
 	computeCmd.MarkFlagRequired("instances")
 }
@@ -122,33 +122,33 @@ func runGceConvertDAG(cmd *cobra.Command, args []string) error {
 	}
 	logger.Setup(verbose, jsonLogs, quiet)
 
-	logger.User.Starting("Starting DAG-based disk migration process...")
-	
+	logger.User.Starting("Starting disk migration process...")
+
 	// trim leading/trailing whitespace from instance names
 	for i, instance := range gceInstances {
 		gceInstances[i] = strings.TrimSpace(instance)
 	}
 
 	config := migrator.Config{
-		ProjectID:         projectID,
-		TargetDiskType:    gceTargetDiskType,
-		LabelFilter:       gceLabelFilter,
-		KmsKey:            gceKmsKey,
-		KmsKeyRing:        gceKmsKeyRing,
-		KmsLocation:       gceKmsLocation,
-		KmsProject:        gceKmsProject,
-		Region:            gceRegion,
-		Zone:              gceZone,
-		AutoApproveAll:    gceAutoApprove,
-		Concurrency:       gceMaxConcurrency,
-		MaxParallelTasks:  gceMaxConcurrency, // Map concurrency to DAG parallelism
-		RetainName:        gceRetainName,
-		Debug:             debug,
-		Instances:         gceInstances,
-		Throughput:        gceThroughput,
-		Iops:              gceIops,
+		ProjectID:        projectID,
+		TargetDiskType:   gceTargetDiskType,
+		LabelFilter:      gceLabelFilter,
+		KmsKey:           gceKmsKey,
+		KmsKeyRing:       gceKmsKeyRing,
+		KmsLocation:      gceKmsLocation,
+		KmsProject:       gceKmsProject,
+		Region:           gceRegion,
+		Zone:             gceZone,
+		AutoApproveAll:   gceAutoApprove,
+		Concurrency:      gceMaxConcurrency,
+		MaxParallelTasks: gceMaxConcurrency, // Map concurrency to DAG parallelism
+		RetainName:       gceRetainName,
+		Debug:            debug,
+		Instances:        gceInstances,
+		Throughput:       gceThroughput,
+		Iops:             gceIops,
 	}
-	
+
 	logger.Op.Debugf("Configuration: %+v", config)
 	logger.User.Infof("Project: %s", projectID)
 	if gceZone != "" {
@@ -162,7 +162,7 @@ func runGceConvertDAG(cmd *cobra.Command, args []string) error {
 		logger.User.Infof("Target: %s", strings.Join(gceInstances, ", "))
 	}
 	logger.User.Infof("Target disk type: %s", gceTargetDiskType)
-	
+
 	if gceVisualize != "" {
 		logger.User.Infof("Visualization will be exported to: %s", gceVisualize)
 	}
@@ -174,16 +174,12 @@ func runGceConvertDAG(cmd *cobra.Command, args []string) error {
 	}
 	defer gcpClient.Close()
 
-	// --- Phase 1: Instance Discovery ---
-	logger.User.Info("--- Phase 1: Instance Discovery ---")
 	discoveredInstances, err := migrator.DiscoverInstances(ctx, &config, gcpClient)
 	if err != nil {
 		return fmt.Errorf("failed to discover GCE instances: %w", err)
 	}
-	logger.User.Infof("Discovered %d instance(s) for migration.", len(discoveredInstances))
+	logger.User.Infof("Discovered %d instance(s) eligible for migration.", len(discoveredInstances))
 
-	// --- Phase 2: DAG-based Migration ---
-	logger.User.Info("--- Phase 2: DAG-based Migration (GCE Attached Disks) ---")
 
 	// Create DAG orchestrator
 	dagOrchestrator := orchestrator.NewDAGOrchestrator(&config, gcpClient)
