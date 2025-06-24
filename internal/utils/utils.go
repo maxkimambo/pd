@@ -7,20 +7,26 @@ import (
 )
 
 func ExtractZoneName(zone string) string {
-
-	parts := strings.Split(zone, "/")
-	if len(parts) < 9 {
-		return zone
+	if zone == "" {
+		return ""
 	}
+	parts := strings.Split(zone, "/")
 	return parts[len(parts)-1]
 }
 
 func ExtractDiskType(diskType string) string {
-
-	parts := strings.Split(diskType, "/")
-	if len(parts) < 9 {
-		return diskType
+	if diskType == "" {
+		return ""
 	}
+	parts := strings.Split(diskType, "/")
+	return parts[len(parts)-1]
+}
+
+func ExtractMachineType(machineType string) string {
+	if machineType == "" {
+		return ""
+	}
+	parts := strings.Split(machineType, "/")
 	return parts[len(parts)-1]
 }
 

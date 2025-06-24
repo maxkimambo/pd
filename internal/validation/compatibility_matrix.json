@@ -1,0 +1,150 @@
+{
+  "diskTypes": {
+    "pd-standard": {
+      "supportedMachineTypes": [
+        "f1-micro", "g1-small",
+        "n1-standard-1", "n1-standard-2", "n1-standard-4", "n1-standard-8", "n1-standard-16", "n1-standard-32", "n1-standard-64", "n1-standard-96",
+        "n1-highcpu-2", "n1-highcpu-4", "n1-highcpu-8", "n1-highcpu-16", "n1-highcpu-32", "n1-highcpu-64", "n1-highcpu-96",
+        "n1-highmem-2", "n1-highmem-4", "n1-highmem-8", "n1-highmem-16", "n1-highmem-32", "n1-highmem-64", "n1-highmem-96",
+        "n1-megamem-96", "n1-ultramem-40", "n1-ultramem-80", "n1-ultramem-160",
+        "n2-standard-2", "n2-standard-4", "n2-standard-8", "n2-standard-16", "n2-standard-32", "n2-standard-48", "n2-standard-64", "n2-standard-80", "n2-standard-96", "n2-standard-128",
+        "n2-highcpu-2", "n2-highcpu-4", "n2-highcpu-8", "n2-highcpu-16", "n2-highcpu-32", "n2-highcpu-48", "n2-highcpu-64", "n2-highcpu-80", "n2-highcpu-96",
+        "n2-highmem-2", "n2-highmem-4", "n2-highmem-8", "n2-highmem-16", "n2-highmem-32", "n2-highmem-48", "n2-highmem-64", "n2-highmem-80", "n2-highmem-96", "n2-highmem-128",
+        "n2d-standard-2", "n2d-standard-4", "n2d-standard-8", "n2d-standard-16", "n2d-standard-32", "n2d-standard-48", "n2d-standard-64", "n2d-standard-80", "n2d-standard-96", "n2d-standard-128", "n2d-standard-224",
+        "n2d-highcpu-2", "n2d-highcpu-4", "n2d-highcpu-8", "n2d-highcpu-16", "n2d-highcpu-32", "n2d-highcpu-48", "n2d-highcpu-64", "n2d-highcpu-80", "n2d-highcpu-96", "n2d-highcpu-128", "n2d-highcpu-224",
+        "n2d-highmem-2", "n2d-highmem-4", "n2d-highmem-8", "n2d-highmem-16", "n2d-highmem-32", "n2d-highmem-48", "n2d-highmem-64", "n2d-highmem-80", "n2d-highmem-96",
+        "e2-micro", "e2-small", "e2-medium",
+        "e2-standard-2", "e2-standard-4", "e2-standard-8", "e2-standard-16", "e2-standard-32",
+        "e2-highcpu-2", "e2-highcpu-4", "e2-highcpu-8", "e2-highcpu-16", "e2-highcpu-32",
+        "e2-highmem-2", "e2-highmem-4", "e2-highmem-8", "e2-highmem-16",
+        "t2a-standard-1", "t2a-standard-2", "t2a-standard-4", "t2a-standard-8", "t2a-standard-16", "t2a-standard-32", "t2a-standard-48",
+        "t2d-standard-1", "t2d-standard-2", "t2d-standard-4", "t2d-standard-8", "t2d-standard-16", "t2d-standard-32", "t2d-standard-48", "t2d-standard-60"
+      ]
+    },
+    "pd-balanced": {
+      "supportedMachineTypes": [
+        "e2-micro", "e2-small", "e2-medium",
+        "e2-standard-2", "e2-standard-4", "e2-standard-8", "e2-standard-16", "e2-standard-32",
+        "e2-highcpu-2", "e2-highcpu-4", "e2-highcpu-8", "e2-highcpu-16", "e2-highcpu-32",
+        "e2-highmem-2", "e2-highmem-4", "e2-highmem-8", "e2-highmem-16",
+        "n2-standard-2", "n2-standard-4", "n2-standard-8", "n2-standard-16", "n2-standard-32", "n2-standard-48", "n2-standard-64", "n2-standard-80", "n2-standard-96", "n2-standard-128",
+        "n2-highcpu-2", "n2-highcpu-4", "n2-highcpu-8", "n2-highcpu-16", "n2-highcpu-32", "n2-highcpu-48", "n2-highcpu-64", "n2-highcpu-80", "n2-highcpu-96",
+        "n2-highmem-2", "n2-highmem-4", "n2-highmem-8", "n2-highmem-16", "n2-highmem-32", "n2-highmem-48", "n2-highmem-64", "n2-highmem-80", "n2-highmem-96", "n2-highmem-128",
+        "n2d-standard-2", "n2d-standard-4", "n2d-standard-8", "n2d-standard-16", "n2d-standard-32", "n2d-standard-48", "n2d-standard-64", "n2d-standard-80", "n2d-standard-96", "n2d-standard-128", "n2d-standard-224",
+        "n2d-highcpu-2", "n2d-highcpu-4", "n2d-highcpu-8", "n2d-highcpu-16", "n2d-highcpu-32", "n2d-highcpu-48", "n2d-highcpu-64", "n2d-highcpu-80", "n2d-highcpu-96", "n2d-highcpu-128", "n2d-highcpu-224",
+        "n2d-highmem-2", "n2d-highmem-4", "n2d-highmem-8", "n2d-highmem-16", "n2d-highmem-32", "n2d-highmem-48", "n2d-highmem-64", "n2d-highmem-80", "n2d-highmem-96",
+        "c2d-standard-2", "c2d-standard-4", "c2d-standard-8", "c2d-standard-16", "c2d-standard-32", "c2d-standard-56", "c2d-standard-112",
+        "c2d-highcpu-2", "c2d-highcpu-4", "c2d-highcpu-8", "c2d-highcpu-16", "c2d-highcpu-32", "c2d-highcpu-56", "c2d-highcpu-112",
+        "c2d-highmem-2", "c2d-highmem-4", "c2d-highmem-8", "c2d-highmem-16", "c2d-highmem-32", "c2d-highmem-56", "c2d-highmem-112",
+        "m3-megamem-64", "m3-megamem-128", "m3-ultramem-32", "m3-ultramem-64", "m3-ultramem-128",
+        "t2a-standard-1", "t2a-standard-2", "t2a-standard-4", "t2a-standard-8", "t2a-standard-16", "t2a-standard-32", "t2a-standard-48",
+        "t2d-standard-1", "t2d-standard-2", "t2d-standard-4", "t2d-standard-8", "t2d-standard-16", "t2d-standard-32", "t2d-standard-48", "t2d-standard-60"
+      ]
+    },
+    "pd-ssd": {
+      "supportedMachineTypes": [
+        "n1-standard-1", "n1-standard-2", "n1-standard-4", "n1-standard-8", "n1-standard-16", "n1-standard-32", "n1-standard-64", "n1-standard-96",
+        "n1-highcpu-2", "n1-highcpu-4", "n1-highcpu-8", "n1-highcpu-16", "n1-highcpu-32", "n1-highcpu-64", "n1-highcpu-96",
+        "n1-highmem-2", "n1-highmem-4", "n1-highmem-8", "n1-highmem-16", "n1-highmem-32", "n1-highmem-64", "n1-highmem-96",
+        "n1-megamem-96", "n1-ultramem-40", "n1-ultramem-80", "n1-ultramem-160",
+        "n2-standard-2", "n2-standard-4", "n2-standard-8", "n2-standard-16", "n2-standard-32", "n2-standard-48", "n2-standard-64", "n2-standard-80", "n2-standard-96", "n2-standard-128",
+        "n2-highcpu-2", "n2-highcpu-4", "n2-highcpu-8", "n2-highcpu-16", "n2-highcpu-32", "n2-highcpu-48", "n2-highcpu-64", "n2-highcpu-80", "n2-highcpu-96",
+        "n2-highmem-2", "n2-highmem-4", "n2-highmem-8", "n2-highmem-16", "n2-highmem-32", "n2-highmem-48", "n2-highmem-64", "n2-highmem-80", "n2-highmem-96", "n2-highmem-128",
+        "n2d-standard-2", "n2d-standard-4", "n2d-standard-8", "n2d-standard-16", "n2d-standard-32", "n2d-standard-48", "n2d-standard-64", "n2d-standard-80", "n2d-standard-96", "n2d-standard-128", "n2d-standard-224",
+        "n2d-highcpu-2", "n2d-highcpu-4", "n2d-highcpu-8", "n2d-highcpu-16", "n2d-highcpu-32", "n2d-highcpu-48", "n2d-highcpu-64", "n2d-highcpu-80", "n2d-highcpu-96", "n2d-highcpu-128", "n2d-highcpu-224",
+        "n2d-highmem-2", "n2d-highmem-4", "n2d-highmem-8", "n2d-highmem-16", "n2d-highmem-32", "n2d-highmem-48", "n2d-highmem-64", "n2d-highmem-80", "n2d-highmem-96",
+        "e2-medium", "e2-standard-2", "e2-standard-4", "e2-standard-8", "e2-standard-16", "e2-standard-32",
+        "e2-highcpu-2", "e2-highcpu-4", "e2-highcpu-8", "e2-highcpu-16", "e2-highcpu-32",
+        "e2-highmem-2", "e2-highmem-4", "e2-highmem-8", "e2-highmem-16",
+        "c2-standard-4", "c2-standard-8", "c2-standard-16", "c2-standard-30", "c2-standard-60",
+        "c2d-standard-2", "c2d-standard-4", "c2d-standard-8", "c2d-standard-16", "c2d-standard-32", "c2d-standard-56", "c2d-standard-112",
+        "c2d-highcpu-2", "c2d-highcpu-4", "c2d-highcpu-8", "c2d-highcpu-16", "c2d-highcpu-32", "c2d-highcpu-56", "c2d-highcpu-112",
+        "c2d-highmem-2", "c2d-highmem-4", "c2d-highmem-8", "c2d-highmem-16", "c2d-highmem-32", "c2d-highmem-56", "c2d-highmem-112",
+        "m1-megamem-96", "m1-ultramem-40", "m1-ultramem-80", "m1-ultramem-160",
+        "m2-megamem-416", "m2-ultramem-208", "m2-ultramem-416", "m2-hypermem-416",
+        "t2a-standard-1", "t2a-standard-2", "t2a-standard-4", "t2a-standard-8", "t2a-standard-16", "t2a-standard-32", "t2a-standard-48",
+        "t2d-standard-1", "t2d-standard-2", "t2d-standard-4", "t2d-standard-8", "t2d-standard-16", "t2d-standard-32", "t2d-standard-48", "t2d-standard-60"
+      ]
+    },
+    "hyperdisk-balanced": {
+      "supportedMachineTypes": [
+        "c3-standard-4", "c3-standard-8", "c3-standard-22", "c3-standard-44", "c3-standard-88", "c3-standard-176", "c3-standard-192-metal",
+        "c3-standard-4-lssd", "c3-standard-8-lssd", "c3-standard-22-lssd", "c3-standard-44-lssd", "c3-standard-88-lssd", "c3-standard-176-lssd",
+        "c3-highcpu-4", "c3-highcpu-8", "c3-highcpu-22", "c3-highcpu-44", "c3-highcpu-88", "c3-highcpu-176", "c3-highcpu-192-metal",
+        "c3-highmem-4", "c3-highmem-8", "c3-highmem-22", "c3-highmem-44", "c3-highmem-88", "c3-highmem-176", "c3-highmem-192-metal",
+        "m2-megamem-416", "m3-megamem-64", "m3-megamem-128", "m3-ultramem-32", "m3-ultramem-64", "m3-ultramem-128"
+      ]
+    },
+    "hyperdisk-extreme": {
+      "supportedMachineTypes": [
+        "n2-standard-80", "n2-standard-96", "n2-standard-128",
+        "n2-highcpu-80", "n2-highcpu-96",
+        "n2-highmem-80", "n2-highmem-96", "n2-highmem-128",
+        "c2d-standard-56", "c2d-standard-112",
+        "c2d-highcpu-56", "c2d-highcpu-112",
+        "c2d-highmem-56", "c2d-highmem-112",
+        "c3-standard-88", "c3-standard-176", "c3-standard-192-metal",
+        "c3-standard-88-lssd", "c3-standard-176-lssd",
+        "c3-highcpu-88", "c3-highcpu-176", "c3-highcpu-192-metal",
+        "c3-highmem-88", "c3-highmem-176", "c3-highmem-192-metal",
+        "m1-megamem-96", "m1-ultramem-80", "m1-ultramem-160",
+        "m2-megamem-416", "m2-ultramem-208", "m2-ultramem-416", "m2-hypermem-416",
+        "m3-megamem-64", "m3-megamem-128", "m3-ultramem-32", "m3-ultramem-64", "m3-ultramem-128"
+      ]
+    },
+    "hyperdisk-throughput": {
+      "supportedMachineTypes": [
+        "n2-standard-2", "n2-standard-4", "n2-standard-8", "n2-standard-16", "n2-standard-32", "n2-standard-48", "n2-standard-64", "n2-standard-80", "n2-standard-96", "n2-standard-128",
+        "n2-highcpu-2", "n2-highcpu-4", "n2-highcpu-8", "n2-highcpu-16", "n2-highcpu-32", "n2-highcpu-48", "n2-highcpu-64", "n2-highcpu-80", "n2-highcpu-96",
+        "n2-highmem-2", "n2-highmem-4", "n2-highmem-8", "n2-highmem-16", "n2-highmem-32", "n2-highmem-48", "n2-highmem-64", "n2-highmem-80", "n2-highmem-96", "n2-highmem-128",
+        "n2d-standard-2", "n2d-standard-4", "n2d-standard-8", "n2d-standard-16", "n2d-standard-32", "n2d-standard-48", "n2d-standard-64", "n2d-standard-80", "n2d-standard-96", "n2d-standard-128", "n2d-standard-224",
+        "n2d-highcpu-2", "n2d-highcpu-4", "n2d-highcpu-8", "n2d-highcpu-16", "n2d-highcpu-32", "n2d-highcpu-48", "n2d-highcpu-64", "n2d-highcpu-80", "n2d-highcpu-96", "n2d-highcpu-128", "n2d-highcpu-224",
+        "n2d-highmem-2", "n2d-highmem-4", "n2d-highmem-8", "n2d-highmem-16", "n2d-highmem-32", "n2d-highmem-48", "n2d-highmem-64", "n2d-highmem-80", "n2d-highmem-96",
+        "c2d-standard-2", "c2d-standard-4", "c2d-standard-8", "c2d-standard-16", "c2d-standard-32", "c2d-standard-56", "c2d-standard-112",
+        "c2d-highcpu-2", "c2d-highcpu-4", "c2d-highcpu-8", "c2d-highcpu-16", "c2d-highcpu-32", "c2d-highcpu-56", "c2d-highcpu-112",
+        "c2d-highmem-2", "c2d-highmem-4", "c2d-highmem-8", "c2d-highmem-16", "c2d-highmem-32", "c2d-highmem-56", "c2d-highmem-112",
+        "c3-standard-4", "c3-standard-8", "c3-standard-22", "c3-standard-44", "c3-standard-88", "c3-standard-176", "c3-standard-192-metal",
+        "c3-standard-4-lssd", "c3-standard-8-lssd", "c3-standard-22-lssd", "c3-standard-44-lssd", "c3-standard-88-lssd", "c3-standard-176-lssd",
+        "c3-highcpu-4", "c3-highcpu-8", "c3-highcpu-22", "c3-highcpu-44", "c3-highcpu-88", "c3-highcpu-176", "c3-highcpu-192-metal",
+        "c3-highmem-4", "c3-highmem-8", "c3-highmem-22", "c3-highmem-44", "c3-highmem-88", "c3-highmem-176", "c3-highmem-192-metal"
+      ]
+    },
+    "local-ssd": {
+      "supportedMachineTypes": [
+        "n1-standard-1", "n1-standard-2", "n1-standard-4", "n1-standard-8", "n1-standard-16", "n1-standard-32", "n1-standard-64", "n1-standard-96",
+        "n1-highcpu-2", "n1-highcpu-4", "n1-highcpu-8", "n1-highcpu-16", "n1-highcpu-32", "n1-highcpu-64", "n1-highcpu-96",
+        "n1-highmem-2", "n1-highmem-4", "n1-highmem-8", "n1-highmem-16", "n1-highmem-32", "n1-highmem-64", "n1-highmem-96",
+        "n1-megamem-96", "n1-ultramem-40", "n1-ultramem-80", "n1-ultramem-160",
+        "n2-standard-8", "n2-standard-16", "n2-standard-32", "n2-standard-48", "n2-standard-64", "n2-standard-80", "n2-standard-96", "n2-standard-128",
+        "n2-highcpu-8", "n2-highcpu-16", "n2-highcpu-32", "n2-highcpu-48", "n2-highcpu-64", "n2-highcpu-80", "n2-highcpu-96",
+        "n2-highmem-8", "n2-highmem-16", "n2-highmem-32", "n2-highmem-48", "n2-highmem-64", "n2-highmem-80", "n2-highmem-96", "n2-highmem-128",
+        "n2d-standard-2", "n2d-standard-4", "n2d-standard-8", "n2d-standard-16", "n2d-standard-32", "n2d-standard-48", "n2d-standard-64", "n2d-standard-80", "n2d-standard-96", "n2d-standard-128", "n2d-standard-224",
+        "n2d-highcpu-2", "n2d-highcpu-4", "n2d-highcpu-8", "n2d-highcpu-16", "n2d-highcpu-32", "n2d-highcpu-48", "n2d-highcpu-64", "n2d-highcpu-80", "n2d-highcpu-96", "n2d-highcpu-128", "n2d-highcpu-224",
+        "n2d-highmem-2", "n2d-highmem-4", "n2d-highmem-8", "n2d-highmem-16", "n2d-highmem-32", "n2d-highmem-48", "n2d-highmem-64", "n2d-highmem-80", "n2d-highmem-96",
+        "e2-standard-8", "e2-standard-16", "e2-standard-32",
+        "e2-highcpu-8", "e2-highcpu-16", "e2-highcpu-32",
+        "e2-highmem-8", "e2-highmem-16",
+        "c2-standard-4", "c2-standard-8", "c2-standard-16", "c2-standard-30", "c2-standard-60",
+        "c2d-standard-2", "c2d-standard-4", "c2d-standard-8", "c2d-standard-16", "c2d-standard-32", "c2d-standard-56", "c2d-standard-112",
+        "c2d-highcpu-2", "c2d-highcpu-4", "c2d-highcpu-8", "c2d-highcpu-16", "c2d-highcpu-32", "c2d-highcpu-56", "c2d-highcpu-112",
+        "c2d-highmem-2", "c2d-highmem-4", "c2d-highmem-8", "c2d-highmem-16", "c2d-highmem-32", "c2d-highmem-56", "c2d-highmem-112",
+        "c3-standard-4", "c3-standard-8", "c3-standard-22", "c3-standard-44", "c3-standard-88", "c3-standard-176", "c3-standard-192-metal",
+        "c3-standard-4-lssd", "c3-standard-8-lssd", "c3-standard-22-lssd", "c3-standard-44-lssd", "c3-standard-88-lssd", "c3-standard-176-lssd",
+        "c3-highcpu-4", "c3-highcpu-8", "c3-highcpu-22", "c3-highcpu-44", "c3-highcpu-88", "c3-highcpu-176", "c3-highcpu-192-metal",
+        "c3-highmem-4", "c3-highmem-8", "c3-highmem-22", "c3-highmem-44", "c3-highmem-88", "c3-highmem-176", "c3-highmem-192-metal",
+        "m1-megamem-96", "m1-ultramem-40", "m1-ultramem-80", "m1-ultramem-160",
+        "m2-megamem-416", "m2-ultramem-208", "m2-ultramem-416", "m2-hypermem-416",
+        "m3-megamem-64", "m3-megamem-128", "m3-ultramem-32", "m3-ultramem-64", "m3-ultramem-128"
+      ]
+    },
+    "pd-extreme": {
+      "supportedMachineTypes": []
+    },
+    "hyperdisk-ml": {
+      "supportedMachineTypes": []
+    },
+    "hyperdisk-balanced-high-availability": {
+      "supportedMachineTypes": []
+    }
+  }
+}
