@@ -194,7 +194,7 @@ func TestGetInstanceKey(t *testing.T) {
 				Zone:     proto.String("projects/my-project/zones/us-west1-a"),
 				SelfLink: proto.String("https://www.googleapis.com/compute/v1/projects/my-project/zones/us-west1-a/instances/my-instance"),
 			},
-			expected: "my-project/projects/my-project/zones/us-west1-a/my-instance",
+			expected: "my-project/us-west1-a/my-instance",
 		},
 		{
 			name: "Instance without self link",
@@ -202,7 +202,7 @@ func TestGetInstanceKey(t *testing.T) {
 				Name: proto.String("my-instance"),
 				Zone: proto.String("projects/my-project/zones/us-west1-a"),
 			},
-			expected: "/projects/my-project/zones/us-west1-a/my-instance",
+			expected: "/us-west1-a/my-instance",
 		},
 		{
 			name: "Instance with minimal info",

@@ -6,10 +6,13 @@ import (
 	"fmt"
 	"strings"
 
+	computepb "cloud.google.com/go/compute/apiv1/computepb"
 	"github.com/maxkimambo/pd/internal/gcp"
 	"github.com/maxkimambo/pd/internal/logger"
 	"github.com/maxkimambo/pd/internal/migrator"
 	"github.com/maxkimambo/pd/internal/orchestrator"
+	"github.com/maxkimambo/pd/internal/utils"
+	"github.com/maxkimambo/pd/internal/validation"
 	"github.com/spf13/cobra"
 )
 
@@ -171,12 +174,32 @@ func runGceConvert(cmd *cobra.Command, args []string) error {
 	}
 	logger.User.Infof("Discovered %d instance(s) eligible for migration.", len(discoveredInstances))
 
+	// Validate instances against target disk type
+	validatedInstances, failedInstances, err := validateInstancesForMigration(ctx, discoveredInstances, gceTargetDiskType, projectID, gcpClient)
+	if err != nil {
+		return fmt.Errorf("failed to validate instances for migration: %w", err)
+	}
+
+	// Report validation results
+	if len(failedInstances) > 0 {
+		logger.User.Warnf("--- Validation Failed for %d Instance(s) ---", len(failedInstances))
+		for _, failedInstance := range failedInstances {
+			logger.User.Warnf("  ❌ %s: %s", failedInstance.InstanceName, failedInstance.Reason)
+		}
+		logger.User.Info("--- End Validation Failures ---")
+	}
+
+	if len(validatedInstances) == 0 {
+		return fmt.Errorf("no instances passed validation for target disk type %s", gceTargetDiskType)
+	}
+
+	logger.User.Infof("✅ %d instance(s) validated successfully for migration.", len(validatedInstances))
 
 	// Create task orchestrator
 	taskOrchestrator := orchestrator.NewDAGOrchestrator(&config, gcpClient)
 
-	// Execute migration workflow
-	result, err := taskOrchestrator.ExecuteInstanceMigrations(ctx, discoveredInstances)
+	// Execute migration workflow with validated instances
+	result, err := taskOrchestrator.ExecuteInstanceMigrations(ctx, validatedInstances)
 	if err != nil {
 		return fmt.Errorf("migration workflow failed: %w", err)
 	}
@@ -190,4 +213,101 @@ func runGceConvert(cmd *cobra.Command, args []string) error {
 
 	logger.User.Success("Task-based disk migration process completed successfully.")
 	return nil
+}
+
+// ValidationFailure represents an instance that failed validation
+type ValidationFailure struct {
+	InstanceName string
+	Reason       string
+}
+
+// validateInstancesForMigration validates that all instances can support the target disk type
+func validateInstancesForMigration(ctx context.Context, instances []*computepb.Instance, targetDiskType string, projectID string, gcpClient *gcp.Clients) ([]*computepb.Instance, []ValidationFailure, error) {
+	var validatedInstances []*computepb.Instance
+	var failedInstances []ValidationFailure
+
+	logger.User.Info("--- Validating instance compatibility before migration ---")
+	logger.User.Infof("Validating %d instance(s) against target disk type: %s", len(instances), targetDiskType)
+
+	for _, instance := range instances {
+		instanceName := instance.GetName()
+		machineType := utils.ExtractMachineType(instance.GetMachineType())
+
+		// Validate machine type against target disk type
+		validationResult := validation.IsCompatible(machineType, targetDiskType)
+		logger.User.Infof("Instance %s: Machine type %s validation against target disk type %s: %v", instanceName, machineType, targetDiskType, validationResult)
+		if !validationResult.Compatible {
+			logger.User.Warnf("Instance %s validation failed: %s", instanceName, validationResult.Reason)
+			failedInstances = append(failedInstances, ValidationFailure{
+				InstanceName: instanceName,
+				Reason:       validationResult.Reason,
+			})
+			logger.Op.Debugf("❌ Instance %s failed validation: %s", instanceName, validationResult.Reason)
+			continue
+		}
+
+		// Validate all attached disks can be migrated to target type
+		if instance.Disks != nil {
+			diskValidationPassed := true
+			var diskFailureReasons []string
+
+			for _, attachedDisk := range instance.Disks {
+				if attachedDisk.GetSource() == "" {
+					continue // Skip disks without source (e.g., local-ssd)
+				}
+
+				// Get disk name from source URL
+				diskName := ""
+				if attachedDisk.GetSource() != "" {
+					parts := strings.Split(attachedDisk.GetSource(), "/")
+					diskName = parts[len(parts)-1]
+				}
+
+				if diskName == "" {
+					continue
+				}
+
+				// Get zone name from instance zone
+				zone := utils.ExtractZoneName(instance.GetZone())
+
+				disk, err := gcpClient.DiskClient.GetDisk(ctx, projectID, zone, diskName)
+				if err != nil {
+					logger.Op.Debugf("Warning: Could not get disk details for %s: %v", diskName, err)
+					continue
+				}
+
+				// Check if disk is already the target type
+				currentDiskType := utils.ExtractDiskType(disk.GetType())
+
+				if currentDiskType == targetDiskType {
+					logger.Op.Debugf("Disk %s already has target type %s, skipping", diskName, targetDiskType)
+					continue
+				}
+
+				// Validate current disk type can be migrated to target type
+				// For now, we'll allow all migrations except those that are clearly incompatible
+				if currentDiskType == "local-ssd" {
+					diskValidationPassed = false
+					diskFailureReasons = append(diskFailureReasons, fmt.Sprintf("disk %s has type local-ssd which cannot be migrated", diskName))
+				}
+			}
+
+			if !diskValidationPassed {
+				reason := fmt.Sprintf("Disk validation failed: %s", strings.Join(diskFailureReasons, "; "))
+				failedInstances = append(failedInstances, ValidationFailure{
+					InstanceName: instanceName,
+					Reason:       reason,
+				})
+				logger.Op.Debugf("❌ Instance %s failed disk validation: %s", instanceName, reason)
+				continue
+			}
+		}
+
+		// Instance passed all validation checks
+		validatedInstances = append(validatedInstances, instance)
+		logger.Op.Debugf("✅ Instance %s passed validation", instanceName)
+	}
+
+	logger.User.Infof("Validation complete: %d passed, %d failed", len(validatedInstances), len(failedInstances))
+	return validatedInstances, failedInstances, nil
 }

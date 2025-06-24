@@ -18,7 +18,6 @@ func (o *DAGOrchestrator) ExecuteInstanceMigrations(ctx context.Context, instanc
 		logger.User.Info("--- Phase 2: Migration of GCE Attached Disks ---")
 		logger.User.Infof("Preparing migration tasks for %d instance(s)", len(instances))
 	}
-
 	// Build task graph from instances
 	migrationDAG, err := o.BuildMigrationDAG(ctx, instances)
 	if err != nil {
