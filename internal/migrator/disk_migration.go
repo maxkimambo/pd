@@ -81,6 +81,20 @@ func MigrateSingleDisk(ctx context.Context, config *Config, gcpClient *gcp.Clien
 		zone = parts[len(parts)-1]
 	}
 
+	currentDiskType := getShortDiskTypeName(disk.GetType())
+
+	if currentDiskType == config.TargetDiskType {
+		logger.User.Infof("Disk %s is already of type %s, skipping migration", diskName, config.TargetDiskType)
+		return MigrationResult{
+			DiskName:     diskName,
+			Zone:         zone,
+			Status:       "Skipped",
+			OriginalDisk: diskName,
+			NewDiskName:  diskName,
+			Duration:     time.Since(startTime),
+		}
+	}
+
 	logger.Op.WithFields(map[string]interface{}{
 		"disk": diskName,
 		"zone": zone,

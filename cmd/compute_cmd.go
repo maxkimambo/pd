@@ -113,6 +113,10 @@ func runGceConvert(cmd *cobra.Command, args []string) error {
 	logger.Setup(verbose, jsonLogs, quiet)
 
 	logger.User.Starting("Starting disk migration process...")
+	// trim leading/trailing whitespace from instance names
+	for i, instance := range gceInstances {
+		gceInstances[i] = strings.TrimSpace(instance)
+	}
 
 	config := migrator.Config{
 		ProjectID:      projectID,
