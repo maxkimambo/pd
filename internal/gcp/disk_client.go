@@ -9,6 +9,7 @@ import (
 
 	compute "cloud.google.com/go/compute/apiv1"
 	computepb "cloud.google.com/go/compute/apiv1/computepb"
+	"github.com/maxkimambo/pd/internal/errors"
 	"github.com/maxkimambo/pd/internal/logger"
 	"github.com/maxkimambo/pd/internal/utils"
 	"google.golang.org/api/iterator"
@@ -67,8 +68,13 @@ func (dc *DiskClient) GetDisk(ctx context.Context, projectID, zone, diskName str
 
 	disk, err := dc.client.Get(ctx, req)
 	if err != nil {
-		logger.Op.WithFields(logFields).WithError(err).Error("Failed to retrieve disk")
-		return nil, fmt.Errorf("failed to get disk %s in zone %s: %w", diskName, zone, err)
+		// Create a structured error with context and troubleshooting
+		migErr := errors.NewDiskAccessError(diskName, zone, projectID, err)
+		
+		// Log with structured fields
+		logger.Op.WithFields(logFields).WithError(err).Error(migErr.Message)
+		
+		return nil, migErr
 	}
 
 	logger.Op.WithFields(logFields).Infof("Retrieved disk: %s", *disk.Name)

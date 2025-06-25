@@ -176,8 +176,7 @@ func runConvert(cmd *cobra.Command, args []string) error {
 	}
 	defer gcpClient.Close()
 
-	// --- Phase 1: Disk Discovery ---
-	logger.User.Info("--- Phase 1: Disk Discovery ---")
+	logger.User.Info("=== DISCOVERY ===")
 	discoveredDisks, err := migrator.DiscoverDisks(ctx, &config, gcpClient)
 	if err != nil {
 		return err
@@ -188,8 +187,7 @@ func runConvert(cmd *cobra.Command, args []string) error {
 	}
 	logger.User.Infof("Discovered %d disk(s) for migration.", len(discoveredDisks))
 
-	// --- Phase 2: Task-based Migration ---
-	logger.User.Info("--- Phase 2: Task-based Migration (Detached Disks) ---")
+	logger.User.Info("=== MIGRATION ===")
 
 	// Create task orchestrator
 	taskOrchestrator := orchestrator.NewDAGOrchestrator(&config, gcpClient)
@@ -200,8 +198,7 @@ func runConvert(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("migration workflow failed: %w", err)
 	}
 
-	// --- Phase 3: Results Summary ---
-	logger.User.Info("--- Phase 3: Results Summary ---")
+	logger.User.Info("=== RESULTS ===")
 	err = taskOrchestrator.ProcessExecutionResults(result)
 	if err != nil {
 		return fmt.Errorf("migration completed with errors: %w", err)

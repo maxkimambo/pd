@@ -165,17 +165,18 @@ func (o *DAGOrchestrator) addInstanceWorkflow(ctx context.Context, d *dag.DAG, i
 // addDiskMigrationWorkflow adds the complete workflow for migrating a single disk
 func (o *DAGOrchestrator) addDiskMigrationWorkflow(d *dag.DAG, instanceName, zone, diskName, deviceName string, deps []string) ([]string, error) {
 	var operations []string
+	timestamp := time.Now().Unix()
 
-	// 1. Create snapshot task
-	snapshotName := fmt.Sprintf("pd-migrate-%s-%d", diskName, time.Now().Unix())
-	snapshotID := fmt.Sprintf("snapshot_%s_%s", instanceName, diskName)
-	snapshotTask := dag.NewSnapshotTask(snapshotID, o.config.ProjectID, zone, diskName, snapshotName, o.gcpClient, o.config)
-	snapshotNode := dag.NewBaseNode(snapshotTask)
-	if err := d.AddNode(snapshotNode); err != nil {
+	// 1. Create hot snapshot (while instance running)
+	hotSnapshotName := fmt.Sprintf("pd-migrate-%s-hot-%d", diskName, timestamp)
+	hotSnapshotID := fmt.Sprintf("hot-snapshot_%s_%s", instanceName, diskName)
+	hotSnapshotTask := dag.NewSnapshotTask(hotSnapshotID, o.config.ProjectID, zone, diskName, hotSnapshotName, o.gcpClient, o.config)
+	hotSnapshotNode := dag.NewBaseNode(hotSnapshotTask)
+	if err := d.AddNode(hotSnapshotNode); err != nil {
 		return nil, err
 	}
 
-	// 2. Detach disk task
+	// 2. Detach disk task (depends on instance shutdown)
 	detachID := fmt.Sprintf("detach_%s_%s", instanceName, diskName)
 	detachTask := dag.NewDiskAttachmentTask(detachID, o.config.ProjectID, zone, instanceName, diskName, deviceName, "detach", o.gcpClient)
 	detachNode := dag.NewBaseNode(detachTask)
@@ -183,17 +184,28 @@ func (o *DAGOrchestrator) addDiskMigrationWorkflow(d *dag.DAG, instanceName, zon
 		return nil, err
 	}
 
-	// Detach depends on snapshot completion and instance shutdown (if applicable)
-	if err := d.AddDependency(snapshotID, detachID); err != nil {
-		return nil, err
-	}
+	// Detach depends on instance shutdown (if applicable)
 	for _, dep := range deps {
 		if err := d.AddDependency(dep, detachID); err != nil {
 			return nil, err
 		}
 	}
 
-	// 3. Migrate disk task (delete old, create new from snapshot)
+	// 3. Create cold snapshot (after detach, incremental from hot snapshot)
+	coldSnapshotName := fmt.Sprintf("pd-migrate-%s-cold-%d", diskName, timestamp)
+	coldSnapshotID := fmt.Sprintf("cold-snapshot_%s_%s", instanceName, diskName)
+	coldSnapshotTask := dag.NewSnapshotTask(coldSnapshotID, o.config.ProjectID, zone, diskName, coldSnapshotName, o.gcpClient, o.config)
+	coldSnapshotNode := dag.NewBaseNode(coldSnapshotTask)
+	if err := d.AddNode(coldSnapshotNode); err != nil {
+		return nil, err
+	}
+
+	// Cold snapshot depends on detach completion
+	if err := d.AddDependency(detachID, coldSnapshotID); err != nil {
+		return nil, err
+	}
+
+	// 4. Migrate disk task (delete old, create new from cold snapshot)
 	migrateID := fmt.Sprintf("migrate_%s_%s", instanceName, diskName)
 
 	// Get the disk to pass to migration task
@@ -202,18 +214,19 @@ func (o *DAGOrchestrator) addDiskMigrationWorkflow(d *dag.DAG, instanceName, zon
 		return nil, fmt.Errorf("failed to get disk %s for migration: %w", diskName, err)
 	}
 
-	migrateTask := dag.NewDiskMigrationTask(migrateID, o.config.ProjectID, zone, diskName, o.config.TargetDiskType, snapshotName, o.gcpClient, o.config, disk)
+	// Use cold snapshot for migration (most recent/complete data)
+	migrateTask := dag.NewDiskMigrationTask(migrateID, o.config.ProjectID, zone, diskName, o.config.TargetDiskType, coldSnapshotName, o.gcpClient, o.config, disk)
 	migrateNode := dag.NewBaseNode(migrateTask)
 	if err := d.AddNode(migrateNode); err != nil {
 		return nil, err
 	}
 
-	// Migration depends on detach
-	if err := d.AddDependency(detachID, migrateID); err != nil {
+	// Migration depends on cold snapshot
+	if err := d.AddDependency(coldSnapshotID, migrateID); err != nil {
 		return nil, err
 	}
 
-	// 4. Attach new disk task
+	// 5. Attach new disk task
 	attachID := fmt.Sprintf("attach_%s_%s", instanceName, diskName)
 	newDiskName := diskName
 	if !o.config.RetainName {
@@ -231,20 +244,31 @@ func (o *DAGOrchestrator) addDiskMigrationWorkflow(d *dag.DAG, instanceName, zon
 		return nil, err
 	}
 
-	// 5. Cleanup snapshot task
-	cleanupID := fmt.Sprintf("cleanup_%s_%s", instanceName, diskName)
-	cleanupTask := dag.NewCleanupTask(cleanupID, o.config.ProjectID, "snapshot", snapshotName, o.gcpClient)
-	cleanupNode := dag.NewBaseNode(cleanupTask)
-	if err := d.AddNode(cleanupNode); err != nil {
+	// 6. Cleanup hot snapshot task
+	cleanupHotID := fmt.Sprintf("cleanup-hot_%s_%s", instanceName, diskName)
+	cleanupHotTask := dag.NewCleanupTask(cleanupHotID, o.config.ProjectID, "snapshot", hotSnapshotName, o.gcpClient)
+	cleanupHotNode := dag.NewBaseNode(cleanupHotTask)
+	if err := d.AddNode(cleanupHotNode); err != nil {
 		return nil, err
 	}
 
-	// Cleanup depends on successful attach
-	if err := d.AddDependency(attachID, cleanupID); err != nil {
+	// 7. Cleanup cold snapshot task
+	cleanupColdID := fmt.Sprintf("cleanup-cold_%s_%s", instanceName, diskName)
+	cleanupColdTask := dag.NewCleanupTask(cleanupColdID, o.config.ProjectID, "snapshot", coldSnapshotName, o.gcpClient)
+	cleanupColdNode := dag.NewBaseNode(cleanupColdTask)
+	if err := d.AddNode(cleanupColdNode); err != nil {
 		return nil, err
 	}
 
-	operations = []string{snapshotID, detachID, migrateID, attachID, cleanupID}
+	// Both cleanups depend on successful attach
+	if err := d.AddDependency(attachID, cleanupHotID); err != nil {
+		return nil, err
+	}
+	if err := d.AddDependency(attachID, cleanupColdID); err != nil {
+		return nil, err
+	}
+
+	operations = []string{hotSnapshotID, detachID, coldSnapshotID, migrateID, attachID, cleanupHotID, cleanupColdID}
 
 	if logger.Op != nil {
 		logger.Op.WithFields(map[string]interface{}{
@@ -346,10 +370,10 @@ func (o *DAGOrchestrator) isDiskAlreadyTargetType(attachedDisk *computepb.Attach
 		return false
 	}
 
-	// Extract zone from the source URL
-	zoneName := utils.ExtractZoneName(attachedDisk.GetSource())
+	// Use the zone from config instead of trying to extract from disk URL
+	zoneName := o.config.Zone
 	if zoneName == "" {
-		// If we can't determine the zone, include the disk for migration to be safe
+		// If no zone configured, include the disk for migration to be safe
 		return false
 	}
 
@@ -362,8 +386,10 @@ func (o *DAGOrchestrator) isDiskAlreadyTargetType(attachedDisk *computepb.Attach
 		// If we can't get disk details, include it for migration to be safe
 		if logger.Op != nil {
 			logger.Op.WithFields(map[string]interface{}{
-				"disk":  diskName,
-				"error": err.Error(),
+				"disk":    diskName,
+				"zone":    zoneName,
+				"project": o.config.ProjectID,
+				"error":   err.Error(),
 			}).Warn("Could not get disk details for type check, including in migration")
 		}
 		return false

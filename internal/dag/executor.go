@@ -3,6 +3,7 @@ package dag
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -131,8 +132,7 @@ func (e *Executor) Execute(ctx context.Context) (*ExecutionResult, error) {
 		logger.User.Infof("Starting execution of %d tasks (max %d parallel)", totalNodes, e.config.MaxParallelTasks)
 	}
 
-	// Start progress logging goroutine
-	go e.logProgress()
+	// Remove periodic progress logging - we'll just show task-by-task progress
 
 	// Execute root nodes
 	for _, nodeID := range rootNodes {
@@ -145,8 +145,8 @@ func (e *Executor) Execute(ctx context.Context) (*ExecutionResult, error) {
 	// Signal that execution is finished
 	close(e.finished)
 
-	// Log final progress
-	e.logFinalProgress()
+	// Log final summary
+	e.logFinalSummary()
 
 	return e.buildResult(), nil
 }
@@ -249,21 +249,25 @@ func (e *Executor) executeNode(nodeID string) {
 
 	e.setNodeStarted(nodeID)
 
-	// Log task start
+	// Log task start with simplified name
+	var taskStartTime time.Time
 	if logger.User != nil {
-		task := node.GetTask()
-		logger.User.Infof("Starting task: %s (%s)", nodeID, GetTaskType(task))
+		simplifiedName := e.simplifyTaskName(nodeID)
+		logger.User.Infof("🔄 Starting: %s", simplifiedName)
+		taskStartTime = time.Now()
 	}
 
 	err = node.Execute(nodeCtx)
 
-	// Log task completion
+	// Log task completion with timing
 	if logger.User != nil {
+		simplifiedName := e.simplifyTaskName(nodeID)
+		duration := time.Since(taskStartTime)
+		
 		if err != nil {
-			logger.User.Errorf("Task failed: %s - %v", nodeID, err)
+			logger.User.Errorf("❌ Failed: %s (%v) - %v", simplifiedName, duration.Round(time.Millisecond), err)
 		} else {
-			task := node.GetTask()
-			logger.User.Successf("Task completed: %s (%s)", nodeID, GetTaskType(task))
+			logger.User.Successf("Completed: %s (%v)", simplifiedName, duration.Round(time.Millisecond))
 		}
 	}
 
@@ -511,34 +515,68 @@ func (e *Executor) IsRunning() bool {
 	}
 }
 
-// logProgress provides periodic progress updates during execution
-func (e *Executor) logProgress() {
-	ticker := time.NewTicker(5 * time.Second)
-	defer ticker.Stop()
+// Removed periodic progress logging - we now show individual task progress
 
-	for {
-		select {
-		case <-e.finished:
-			return
-		case <-ticker.C:
-			e.printProgress()
-		}
+// Removed complex progress tracking - we now use simple task-by-task logging
+
+// Removed complex task type and phase tracking - no longer needed for simplified reporting
+
+// simplifyTaskName converts task IDs to target:action format
+func (e *Executor) simplifyTaskName(taskID string) string {
+	// Examples:
+	// "startup_sap-mig-1" -> "sap-mig-1:startup"
+	// "hot-snapshot_sap-mig-1_sap-mig-1-disk-1" -> "sap-mig-1-disk-1:hot-snapshot"
+	// "cold-snapshot_sap-mig-1_sap-mig-1-disk-1" -> "sap-mig-1-disk-1:cold-snapshot"
+	// "detach_sap-mig-1_sap-mig-1-disk-1" -> "sap-mig-1-disk-1:detach"
+	// "migrate_sap-mig-1_sap-mig-1-disk-1" -> "sap-mig-1-disk-1:migrate"
+	// "attach_sap-mig-1_sap-mig-1-disk-1" -> "sap-mig-1-disk-1:attach"
+	
+	parts := strings.Split(taskID, "_")
+	if len(parts) < 2 {
+		return taskID // Return as-is if can't parse
 	}
+	
+	action := parts[0]
+	
+	// For simple instance actions like "startup_sap-mig-1"
+	if len(parts) == 2 && (action == "startup" || action == "shutdown") {
+		instanceName := parts[1]
+		return fmt.Sprintf("%s:%s", instanceName, action)
+	}
+	
+	// For hot/cold snapshots like "hot-snapshot_sap-mig-1_sap-mig-1-disk-1"
+	if len(parts) == 3 && (action == "hot-snapshot" || action == "cold-snapshot") {
+		diskName := parts[2]
+		return fmt.Sprintf("%s:%s", diskName, action)
+	}
+	
+	// For disk operations like "detach_sap-mig-1_sap-mig-1-disk-1"
+	if len(parts) == 3 && (action == "detach" || action == "attach" || action == "migrate") {
+		diskName := parts[2]
+		return fmt.Sprintf("%s:%s", diskName, action)
+	}
+	
+	// For cleanup operations like "cleanup-hot_sap-mig-1_sap-mig-1-disk-1"
+	if len(parts) == 3 && (action == "cleanup-hot" || action == "cleanup-cold") {
+		diskName := parts[2]
+		cleanupType := strings.Replace(action, "cleanup-", "", 1)
+		return fmt.Sprintf("%s:cleanup-%s", diskName, cleanupType)
+	}
+	
+	// For legacy snapshot format "snapshot_sap-mig-1-disk-1"
+	if len(parts) == 2 && action == "snapshot" {
+		diskName := parts[1]
+		return fmt.Sprintf("%s:%s", diskName, action)
+	}
+	
+	// Fallback: return original taskID
+	return taskID
 }
 
-// printProgress logs current execution progress
-func (e *Executor) printProgress() {
-	completed, total := e.GetProgress()
-	if total > 0 && logger.User != nil {
-		percentage := float64(completed) / float64(total) * 100
-		elapsed := time.Since(e.startTime)
-		logger.User.Infof("Progress: %d/%d tasks completed (%.1f%%) - elapsed: %v",
-			completed, total, percentage, elapsed.Round(time.Second))
-	}
-}
+// Removed instance tracking functions - no longer needed for simplified reporting
 
-// logFinalProgress logs the final execution summary
-func (e *Executor) logFinalProgress() {
+// logFinalSummary logs a simple final execution summary
+func (e *Executor) logFinalSummary() {
 	completed, total := e.GetProgress()
 	elapsed := time.Since(e.startTime)
 
@@ -553,12 +591,21 @@ func (e *Executor) logFinalProgress() {
 		}
 		e.mutex.RUnlock()
 
+		logger.User.Info("=== EXECUTION SUMMARY ===")
 		if failed == 0 {
-			logger.User.Successf("Execution completed: %d/%d tasks successful in %v",
-				completed, total, elapsed.Round(time.Second))
+			logger.User.Successf("✅ All %d tasks completed successfully in %v", total, elapsed.Round(time.Second))
 		} else {
-			logger.User.Errorf("Execution completed: %d successful, %d failed in %v",
-				completed-failed, failed, elapsed.Round(time.Second))
+			logger.User.Errorf("⚠️  Execution completed: %d successful, %d failed in %v", completed-failed, failed, elapsed.Round(time.Second))
+			
+			// Show failed tasks
+			logger.User.Info("Failed tasks:")
+			for nodeID, result := range e.results {
+				if result.Error != nil {
+					simplifiedName := e.simplifyTaskName(nodeID)
+					logger.User.Errorf("  ❌ %s: %v", simplifiedName, result.Error)
+				}
+			}
 		}
+		logger.User.Info("========================")
 	}
 }

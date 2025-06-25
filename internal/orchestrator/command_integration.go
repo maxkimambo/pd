@@ -15,7 +15,7 @@ import (
 // This is the high-level entry point for CLI commands
 func (o *DAGOrchestrator) ExecuteInstanceMigrations(ctx context.Context, instances []*computepb.Instance) (*dag.ExecutionResult, error) {
 	if logger.User != nil {
-		logger.User.Info("--- Phase 2: Migration of GCE Attached Disks ---")
+		logger.User.Info("=== MIGRATION ===")
 		logger.User.Infof("Preparing migration tasks for %d instance(s)", len(instances))
 	}
 	// Build task graph from instances

@@ -12,11 +12,11 @@ import (
 )
 
 func GenerateReports(results []MigrationResult) {
-	logger.User.Info("--- Phase 4: Reporting ---")
+	logger.User.Info("=== REPORTING ===")
 
 	if len(results) == 0 {
 		logger.User.Info("No migration results to report.")
-		logger.User.Info("--- Reporting Phase Complete ---")
+		logger.User.Success("Reporting complete")
 		return
 	}
 
@@ -27,7 +27,7 @@ func GenerateReports(results []MigrationResult) {
 	printSummaryReport(results)
 	printDetailedReport(results)
 
-	logger.User.Info("--- Reporting Phase Complete ---")
+	logger.User.Success("Reporting complete")
 }
 
 func printSummaryReport(results []MigrationResult) {

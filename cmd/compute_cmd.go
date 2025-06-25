@@ -2,11 +2,11 @@ package cmd
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"strings"
 
 	computepb "cloud.google.com/go/compute/apiv1/computepb"
+	migerrors "github.com/maxkimambo/pd/internal/errors"
 	"github.com/maxkimambo/pd/internal/gcp"
 	"github.com/maxkimambo/pd/internal/logger"
 	"github.com/maxkimambo/pd/internal/migrator"
@@ -115,16 +115,47 @@ func init() {
 
 func validateComputeCmdFlags(cmd *cobra.Command, args []string) error {
 	if projectID == "" { // projectID is from root persistent flag
-		return errors.New("required flag --project not set")
+		return migerrors.NewValidationError(
+			migerrors.CodeValidationInput,
+			"Project ID is required",
+			"Parameter validation").
+			WithContext("parameter", "--project").
+			WithTroubleshooting(
+				"Specify the project with --project flag",
+				"Set GOOGLE_CLOUD_PROJECT environment variable",
+				"Run 'gcloud config set project PROJECT_ID' to set default",
+			)
 	}
 
 	if (gceZone == "" && gceRegion == "") || (gceZone != "" && gceRegion != "") {
-		return errors.New("exactly one of --zone or --region must be specified")
+		return migerrors.NewValidationError(
+			migerrors.CodeValidationInput,
+			"Either zone or region must be specified (but not both)",
+			"Parameter validation").
+			WithContext("zone", gceZone).
+			WithContext("region", gceRegion).
+			WithTroubleshooting(
+				"Specify a zone with --zone (e.g., --zone us-central1-a)",
+				"Or specify a region with --region (e.g., --region us-central1)",
+				"Use 'gcloud compute zones list' to see available zones",
+				"Do not specify both --zone and --region at the same time",
+			)
 	}
 
 	if gceKmsKey != "" {
 		if gceKmsKeyRing == "" || gceKmsLocation == "" {
-			return errors.New("--kms-keyring and --kms-location are required when --kms-key is specified")
+			return migerrors.NewValidationError(
+				migerrors.CodeValidationInput,
+				"KMS key requires keyring and location",
+				"KMS parameter validation").
+				WithContext("kms_key", gceKmsKey).
+				WithContext("kms_keyring", gceKmsKeyRing).
+				WithContext("kms_location", gceKmsLocation).
+				WithTroubleshooting(
+					"Specify --kms-keyring with the KMS key ring name",
+					"Specify --kms-location with the KMS location",
+					"Or remove --kms-key to skip encryption",
+				)
 		}
 		if gceKmsProject == "" {
 			gceKmsProject = projectID
@@ -140,7 +171,16 @@ func validateComputeCmdFlags(cmd *cobra.Command, args []string) error {
 	}
 
 	if len(gceInstances) == 0 {
-		return errors.New("required flag --instances not set")
+		return migerrors.NewValidationError(
+			migerrors.CodeValidationInput,
+			"Instance names are required",
+			"Parameter validation").
+			WithContext("parameter", "--instances").
+			WithTroubleshooting(
+				"Specify instance names with --instances flag (comma-separated)",
+				"Example: --instances instance1,instance2",
+				"Use 'gcloud compute instances list' to see available instances",
+			)
 	}
 
 	return nil
@@ -190,7 +230,7 @@ func runGceConvert(cmd *cobra.Command, args []string) error {
 	if gceInstances[0] == "*" {
 		logger.User.Infof("Target: All instances in scope (%s)", config.Location())
 	} else {
-		logger.User.Infof("Target: %s", strings.Join(gceInstances, ", "))
+		logger.User.Infof("Target instances: %s", strings.Join(gceInstances, ", "))
 	}
 	logger.User.Infof("Target disk type: %s", gceTargetDiskType)
 
@@ -223,7 +263,20 @@ func runGceConvert(cmd *cobra.Command, args []string) error {
 	}
 
 	if len(validatedInstances) == 0 {
-		return fmt.Errorf("no instances passed validation for target disk type %s", gceTargetDiskType)
+		validationErr := migerrors.NewValidationError(
+			migerrors.CodeValidationConfig,
+			fmt.Sprintf("No instances are compatible with target disk type '%s'", gceTargetDiskType),
+			"Instance validation").
+			WithContext("target_disk_type", gceTargetDiskType).
+			WithContext("total_instances", len(discoveredInstances)).
+			WithContext("failed_instances", len(failedInstances)).
+			WithTroubleshooting(
+				"Check that the target disk type is supported by your instance machine types",
+				"Review the validation failures above for specific compatibility issues",
+				"Consider using a different target disk type that's more broadly supported",
+				"Verify that your instances are running supported machine types",
+			)
+		return validationErr
 	}
 
 	logger.User.Infof("✅ %d instance(s) validated successfully for migration.", len(validatedInstances))
@@ -237,8 +290,7 @@ func runGceConvert(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("migration workflow failed: %w", err)
 	}
 
-	// --- Phase 3: Results Summary ---
-	logger.User.Info("--- Phase 3: Results Summary ---")
+	logger.User.Info("=== RESULTS ===")
 	err = taskOrchestrator.ProcessExecutionResults(result)
 	if err != nil {
 		return fmt.Errorf("migration completed with errors: %w", err)
@@ -259,7 +311,7 @@ func validateInstancesForMigration(ctx context.Context, instances []*computepb.I
 	var validatedInstances []*computepb.Instance
 	var failedInstances []ValidationFailure
 
-	logger.User.Info("--- Validating instance compatibility before migration ---")
+	logger.User.Info("=== VALIDATION ===")
 	logger.User.Infof("Validating %d instance(s) against target disk type: %s", len(instances), targetDiskType)
 
 	for _, instance := range instances {
