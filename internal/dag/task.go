@@ -77,6 +77,10 @@ func (tr *TaskResult) MarkCompleted() {
 	}
 }
 
+func (tr *TaskResult) GetDuration() time.Duration {
+	return tr.Duration
+}
+
 // MarkFailed marks the task as failed and calculates duration
 func (tr *TaskResult) MarkFailed(err error) {
 	tr.SetError(err)

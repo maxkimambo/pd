@@ -133,7 +133,7 @@ func (m *mockDiskClientForMigrator) CreateNewDiskFromSnapshot(ctx context.Contex
 func (m *mockDiskClientForMigrator) GetDisk(ctx context.Context, projectID, zone, diskName string) (*computepb.Disk, error) {
 	return nil, nil
 }
-func (m *mockDiskClientForMigrator) ListDetachedDisks(ctx context.Context, projectID string, location string, labelFilter string) ([]*computepb.Disk, error) {
+func (m *mockDiskClientForMigrator) ListDetachedDisks(ctx context.Context, projectID string, location string, labelFilter map[string]string) ([]*computepb.Disk, error) {
 	return nil, nil
 }
 func (m *mockDiskClientForMigrator) UpdateDiskLabel(ctx context.Context, projectID string, zone string, diskName string, labelKey string, labelValue string) error {

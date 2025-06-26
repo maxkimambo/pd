@@ -10,12 +10,14 @@ import (
 	"github.com/maxkimambo/pd/internal/logger"
 	"github.com/maxkimambo/pd/internal/migrator"
 	"github.com/maxkimambo/pd/internal/orchestrator"
+	"github.com/maxkimambo/pd/internal/utils"
 	"github.com/spf13/cobra"
 )
 
 var (
 	targetDiskType string
-	labelFilter    string
+	labelFilter    map[string]string
+	labelFilterStr string // For parsing label filter from string
 	kmsKey         string
 	kmsKeyRing     string
 	kmsLocation    string
@@ -78,7 +80,7 @@ pd migrate disk --project my-project --zone europe-west1-c --target-disk-type pd
 
 func init() {
 	diskCmd.Flags().StringVarP(&targetDiskType, "target-disk-type", "t", "", "Target disk type (pd-ssd, pd-standard, hyperdisk-balanced, etc.) (required)")
-	diskCmd.Flags().StringVar(&labelFilter, "label", "", "Filter disks by label in key=value format (e.g., env=prod)")
+	diskCmd.Flags().StringVar(&labelFilterStr, "label", "", "Filter disks by label in key=value format (e.g., env=prod)")
 	diskCmd.Flags().StringVar(&kmsKey, "kms-key", "", "KMS key name for snapshot encryption (enhances security)")
 	diskCmd.Flags().StringVar(&kmsKeyRing, "kms-keyring", "", "KMS key ring name (required when using --kms-key)")
 	diskCmd.Flags().StringVar(&kmsLocation, "kms-location", "", "KMS key location/region (required when using --kms-key)")
@@ -88,8 +90,8 @@ func init() {
 	diskCmd.Flags().BoolVar(&autoApprove, "auto-approve", true, "Skip interactive confirmations (default: true for automation)")
 	diskCmd.Flags().IntVar(&concurrency, "concurrency", 10, "Number of disks to process simultaneously (1-200, default: 10)")
 	diskCmd.Flags().BoolVar(&retainName, "retain-name", true, "Reuse original disk name by deleting original (default: true, irreversible)")
-	diskCmd.Flags().Int64Var(&throughput, "throughput", 140, "Disk throughput in MiB/s (applicable to hyperdisk types, default: 140)")
-	diskCmd.Flags().Int64Var(&iops, "iops", 2000, "Disk IOPS limit (applicable to hyperdisk types, default: 2000)")
+	diskCmd.Flags().Int64Var(&throughput, "throughput", 150, "Disk throughput in MiB/s (applicable to hyperdisk types, default: 150)")
+	diskCmd.Flags().Int64Var(&iops, "iops", 3000, "Disk IOPS limit (applicable to hyperdisk types, default: 3000)")
 	diskCmd.Flags().StringVarP(&storagePoolId, "pool-id", "s", "", "Storage pool ID for new disks (advanced feature for storage pools)")
 
 	_ = diskCmd.MarkFlagRequired("target-disk-type")
@@ -113,7 +115,7 @@ func validateDiskCmdFlags(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	if labelFilter != "" && !strings.Contains(labelFilter, "=") {
+	if labelFilterStr != "" && !strings.Contains(labelFilterStr, "=") {
 		return fmt.Errorf("invalid label format: %s. Expected key=value", labelFilter)
 	}
 
@@ -144,6 +146,7 @@ func runConvert(cmd *cobra.Command, args []string) error {
 		ProjectID:        projectID,
 		TargetDiskType:   targetDiskType,
 		LabelFilter:      labelFilter,
+		LabelFilterStr:   labelFilterStr,
 		KmsKey:           kmsKey,
 		KmsKeyRing:       kmsKeyRing,
 		KmsLocation:      kmsLocation,
@@ -159,6 +162,7 @@ func runConvert(cmd *cobra.Command, args []string) error {
 		Iops:             iops,
 	}
 
+	config.LabelFilter = utils.ParseLabels(labelFilterStr)
 	logger.Op.Debugf("Configuration: %+v", config)
 	logger.User.Infof("Project: %s", projectID)
 	if zone != "" {

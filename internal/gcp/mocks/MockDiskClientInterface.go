@@ -235,7 +235,7 @@ func (_c *MockDiskClientInterface_GetDisk_Call) RunAndReturn(run func(context.Co
 }
 
 // ListDetachedDisks provides a mock function with given fields: ctx, projectID, location, labelFilter
-func (_m *MockDiskClientInterface) ListDetachedDisks(ctx context.Context, projectID string, location string, labelFilter string) ([]*computepb.Disk, error) {
+func (_m *MockDiskClientInterface) ListDetachedDisks(ctx context.Context, projectID string, location string, labelFilter map[string]string) ([]*computepb.Disk, error) {
 	ret := _m.Called(ctx, projectID, location, labelFilter)
 
 	if len(ret) == 0 {
@@ -244,10 +244,10 @@ func (_m *MockDiskClientInterface) ListDetachedDisks(ctx context.Context, projec
 
 	var r0 []*computepb.Disk
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, string, string) ([]*computepb.Disk, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, map[string]string) ([]*computepb.Disk, error)); ok {
 		return rf(ctx, projectID, location, labelFilter)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, string, string, string) []*computepb.Disk); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, map[string]string) []*computepb.Disk); ok {
 		r0 = rf(ctx, projectID, location, labelFilter)
 	} else {
 		if ret.Get(0) != nil {
@@ -255,7 +255,7 @@ func (_m *MockDiskClientInterface) ListDetachedDisks(ctx context.Context, projec
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, string, string, string) error); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, string, string, map[string]string) error); ok {
 		r1 = rf(ctx, projectID, location, labelFilter)
 	} else {
 		r1 = ret.Error(1)

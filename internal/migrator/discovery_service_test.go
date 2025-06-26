@@ -108,7 +108,7 @@ func (m *mockDiskClientForDiscovery) GetDisk(ctx context.Context, projectID, zon
 }
 
 // Implement other required interface methods as no-ops for testing
-func (m *mockDiskClientForDiscovery) ListDetachedDisks(ctx context.Context, projectID string, location string, labelFilter string) ([]*computepb.Disk, error) {
+func (m *mockDiskClientForDiscovery) ListDetachedDisks(ctx context.Context, projectID string, location string, labelFilter map[string]string) ([]*computepb.Disk, error) {
 	return nil, nil
 }
 func (m *mockDiskClientForDiscovery) CreateNewDiskFromSnapshot(ctx context.Context, projectID string, zone string, newDiskName string, targetDiskType string, snapshotSource string, labels map[string]string, size int64, iops int64, throughput int64, storagePoolID string) error {

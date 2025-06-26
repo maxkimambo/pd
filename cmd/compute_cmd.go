@@ -17,20 +17,22 @@ import (
 )
 
 var (
-	gceTargetDiskType string
-	gceLabelFilter    string
-	gceKmsKey         string
-	gceKmsKeyRing     string
-	gceKmsLocation    string
-	gceKmsProject     string
-	gceRegion         string
-	gceZone           string
-	gceInstances      []string
-	gceAutoApprove    bool
-	gceMaxConcurrency int
-	gceRetainName     bool
-	gceThroughput     int64
-	gceIops           int64
+	gceTargetDiskType    string
+	gceLabelFilter       map[string]string
+	gceKmsKey            string
+	gceKmsKeyRing        string
+	gceKmsLocation       string
+	gceKmsProject        string
+	gceRegion            string
+	gceZone              string
+	gceInstances         []string
+	gceAutoApprove       bool
+	gceConcurrency       int
+	gceRetainName        bool
+	gceThroughput        int64
+	gceIops              int64
+	gceStoragePoolId     string
+	gceLabelFilterString string
 )
 
 var computeCmd = &cobra.Command{
@@ -95,7 +97,7 @@ pd migrate compute --project test-project --zone europe-west1-c --instances "tes
 func init() {
 	computeCmd.Flags().StringVarP(&projectID, "project", "p", "", "GCP Project ID where instances are located (required)")
 	computeCmd.Flags().StringVarP(&gceTargetDiskType, "target-disk-type", "t", "", "Target disk type (pd-ssd, hyperdisk-balanced, etc.) (required)")
-	computeCmd.Flags().StringVar(&gceLabelFilter, "label", "", "Filter instance disks by label in key=value format")
+	computeCmd.Flags().StringVar(&gceLabelFilterString, "label", "", "Filter instance disks by label in key=value format")
 	computeCmd.Flags().StringVar(&gceKmsKey, "kms-key", "", "KMS key name for snapshot encryption (enhances security)")
 	computeCmd.Flags().StringVar(&gceKmsKeyRing, "kms-keyring", "", "KMS key ring name (required when using --kms-key)")
 	computeCmd.Flags().StringVar(&gceKmsLocation, "kms-location", "", "KMS key location/region (required when using --kms-key)")
@@ -104,17 +106,18 @@ func init() {
 	computeCmd.Flags().StringVar(&gceZone, "zone", "", "GCP zone to search for instances (mutually exclusive with --region)")
 	computeCmd.Flags().StringSliceVar(&gceInstances, "instances", nil, "Instance names (comma-separated) or '*' for all instances (required)")
 	computeCmd.Flags().BoolVar(&gceAutoApprove, "auto-approve", false, "Skip interactive confirmations (default: false for safety)")
-	computeCmd.Flags().IntVar(&gceMaxConcurrency, "max-concurrency", 5, "Maximum instances to process simultaneously (1-50, default: 5)")
+	computeCmd.Flags().IntVar(&gceConcurrency, "concurrency", 10, "Instances to process simultaneously (1-50, default: 10)")
 	computeCmd.Flags().BoolVar(&gceRetainName, "retain-name", true, "Reuse original disk name by deleting original (default: true, irreversible)")
 	computeCmd.Flags().Int64Var(&gceThroughput, "throughput", 150, "Disk throughput in MiB/s (applicable to hyperdisk types, default: 150)")
 	computeCmd.Flags().Int64Var(&gceIops, "iops", 3000, "Disk IOPS limit (applicable to hyperdisk types, default: 3000)")
+	computeCmd.Flags().StringVarP(&gceStoragePoolId, "pool-id", "s", "", "Storage pool ID for new disks (advanced feature for storage pools)")
 
 	_ = computeCmd.MarkFlagRequired("target-disk-type")
 	_ = computeCmd.MarkFlagRequired("instances")
 }
 
 func validateComputeCmdFlags(cmd *cobra.Command, args []string) error {
-	if projectID == "" { // projectID is from root persistent flag
+	if projectID == "" {
 		return migerrors.NewValidationError(
 			migerrors.CodeValidationInput,
 			"Project ID is required",
@@ -162,12 +165,12 @@ func validateComputeCmdFlags(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	if gceLabelFilter != "" && !strings.Contains(gceLabelFilter, "=") {
-		return fmt.Errorf("invalid label format for --label: %s. Expected key=value", gceLabelFilter)
+	if gceLabelFilterString != "" && !strings.Contains(gceLabelFilterString, "=") {
+		return fmt.Errorf("invalid label format for --label: %s. Expected key=value", gceLabelFilterString)
 	}
 
-	if gceMaxConcurrency < 1 || gceMaxConcurrency > 50 { // Adjusted max concurrency for instance operations
-		return fmt.Errorf("--max-concurrency must be between 1 and 50, got %d", gceMaxConcurrency)
+	if gceConcurrency < 1 || gceConcurrency > 50 {
+		return fmt.Errorf("--concurrency must be between 1 and 50, got %d", gceConcurrency)
 	}
 
 	if len(gceInstances) == 0 {
@@ -204,6 +207,7 @@ func runGceConvert(cmd *cobra.Command, args []string) error {
 		ProjectID:        projectID,
 		TargetDiskType:   gceTargetDiskType,
 		LabelFilter:      gceLabelFilter,
+		LabelFilterStr:   gceLabelFilterString,
 		KmsKey:           gceKmsKey,
 		KmsKeyRing:       gceKmsKeyRing,
 		KmsLocation:      gceKmsLocation,
@@ -211,8 +215,8 @@ func runGceConvert(cmd *cobra.Command, args []string) error {
 		Region:           gceRegion,
 		Zone:             gceZone,
 		AutoApproveAll:   gceAutoApprove,
-		Concurrency:      gceMaxConcurrency,
-		MaxParallelTasks: gceMaxConcurrency, // Map concurrency to task parallelism
+		Concurrency:      gceConcurrency,
+		MaxParallelTasks: gceConcurrency, // Map concurrency to task parallelism
 		RetainName:       gceRetainName,
 		Debug:            debug,
 		Instances:        gceInstances,
@@ -257,7 +261,7 @@ func runGceConvert(cmd *cobra.Command, args []string) error {
 	if len(failedInstances) > 0 {
 		logger.User.Warnf("--- Validation Failed for %d Instance(s) ---", len(failedInstances))
 		for _, failedInstance := range failedInstances {
-			logger.User.Warnf("  ❌ %s: %s", failedInstance.InstanceName, failedInstance.Reason)
+			logger.User.Warnf(" %s: %s", failedInstance.InstanceName, failedInstance.Reason)
 		}
 		logger.User.Info("--- End Validation Failures ---")
 	}
@@ -279,7 +283,7 @@ func runGceConvert(cmd *cobra.Command, args []string) error {
 		return validationErr
 	}
 
-	logger.User.Infof("✅ %d instance(s) validated successfully for migration.", len(validatedInstances))
+	logger.User.Successf("%d instance(s) validated successfully for migration.", len(validatedInstances))
 
 	// Create task orchestrator
 	taskOrchestrator := orchestrator.NewDAGOrchestrator(&config, gcpClient)
@@ -296,7 +300,7 @@ func runGceConvert(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("migration completed with errors: %w", err)
 	}
 
-	logger.User.Success("Task-based disk migration process completed successfully.")
+	logger.User.Success("Disk migration process completed successfully.")
 	return nil
 }
 

@@ -74,3 +74,21 @@ func GetDiskUrl(projectId, zone, diskName string) string {
 
 	return fmt.Sprintf("projects/%s/zones/%s/disks/%s", projectId, zone, diskName)
 }
+
+
+func ParseLabels(labels string) map[string]string {
+	result := make(map[string]string)
+	for _, part := range strings.Split(labels, ",") {
+		if strings.TrimSpace(part) == "" {
+			continue
+		}
+		kv := strings.SplitN(part, "=", 2)
+		if len(kv) != 2 {
+			continue
+		}
+		key := strings.TrimSpace(kv[0])
+		value := strings.TrimSpace(kv[1])
+		result[key] = value
+	}
+	return result
+}

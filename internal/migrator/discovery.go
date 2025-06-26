@@ -20,9 +20,6 @@ func DiscoverDisks(ctx context.Context, config *Config, gcpClient *gcp.Clients) 
 
 	location := config.Location()
 	logger.User.Infof("Listing detached disks in %s (Project: %s)", location, config.ProjectID)
-	if config.LabelFilter != "" {
-		logger.User.Infof("Applying label filter: %s", config.LabelFilter)
-	}
 
 	disksToMigrate, err := gcpClient.DiskClient.ListDetachedDisks(ctx, config.ProjectID, location, config.LabelFilter)
 	if err != nil {
@@ -34,7 +31,7 @@ func DiscoverDisks(ctx context.Context, config *Config, gcpClient *gcp.Clients) 
 		return []*computepb.Disk{}, nil
 	}
 
-	logger.User.Infof("Found %d detached disk(s) matching criteria:", len(disksToMigrate))
+	logger.User.Successf("Found %d detached disk(s) matching criteria:", len(disksToMigrate))
 	var sb strings.Builder
 	for i, disk := range disksToMigrate {
 		zone := "unknown"
@@ -112,6 +109,12 @@ func DiscoverInstances(ctx context.Context, config *Config, gcpClient *gcp.Clien
 		if err != nil {
 			return nil, fmt.Errorf("failed to discover instances in region %s: %w", config.Region, err)
 		}
+	} else if config.LabelFilter != nil && len(config.LabelFilter) > 0 {
+		logger.User.Infof("Listing instances with label filter: %v", config.LabelFilter)
+		discoveredInstances, err = listInstancesByLabel(ctx, config.ProjectID, config.LabelFilter, gcpClient)
+		if err != nil {
+			return nil, fmt.Errorf("failed to discover instances by label: %w", err)
+		}
 	} else {
 		return nil, fmt.Errorf("you must specify either a zone or a region for instance discovery")
 	}
@@ -155,4 +158,33 @@ func listInstancesInRegion(ctx context.Context, projectID, region string, gcpCli
 		}
 	}
 	return instancesInRegion, nil
+}
+
+func listInstancesByLabel(ctx context.Context, projectID string, labelFilter map[string]string, gcpClient *gcp.Clients) ([]*computepb.Instance, error) {
+	allInstances, err := gcpClient.ComputeClient.AggregatedListInstances(ctx, projectID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to retrieve aggregated instances list for project %s: %w", projectID, err)
+	}
+
+	var labelledInstances []*computepb.Instance
+	for _, instance := range allInstances {
+		instanceLabels := instance.GetLabels()
+		match := true
+		if len(labelFilter) > 0 && instanceLabels == nil {
+			match = false
+		} else {
+			for key, value := range labelFilter {
+				if val, ok := instanceLabels[key]; !ok || val != value {
+					match = false
+					break
+				}
+			}
+		}
+
+		if match {
+			labelledInstances = append(labelledInstances, instance)
+		}
+
+	}
+	return labelledInstances, nil
 }

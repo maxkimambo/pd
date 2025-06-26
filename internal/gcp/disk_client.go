@@ -31,7 +31,7 @@ type DiskClientInterface interface {
 	// GetDisk retrieves a specific disk by name and zone
 	GetDisk(ctx context.Context, projectID, zone, diskName string) (*computepb.Disk, error)
 	// ListDetachedDisks lists all detached disks in the specified location, optionally filtered by labels
-	ListDetachedDisks(ctx context.Context, projectID string, location string, labelFilter string) ([]*computepb.Disk, error)
+	ListDetachedDisks(ctx context.Context, projectID string, location string, labelFilter map[string]string) ([]*computepb.Disk, error)
 	// CreateNewDiskFromSnapshot creates a new disk from an existing snapshot with the specified configuration
 	CreateNewDiskFromSnapshot(ctx context.Context, projectID string, zone string, newDiskName string, targetDiskType string, snapshotSource string, labels map[string]string, size int64, iops int64, throughput int64, storagePoolID string) error
 	// UpdateDiskLabel updates a single label on the specified disk
@@ -70,10 +70,10 @@ func (dc *DiskClient) GetDisk(ctx context.Context, projectID, zone, diskName str
 	if err != nil {
 		// Create a structured error with context and troubleshooting
 		migErr := errors.NewDiskAccessError(diskName, zone, projectID, err)
-		
+
 		// Log with structured fields
 		logger.Op.WithFields(logFields).WithError(err).Error(migErr.Message)
-		
+
 		return nil, migErr
 	}
 
@@ -85,7 +85,7 @@ func (dc *DiskClient) ListDetachedDisks(
 	ctx context.Context,
 	projectID string,
 	location string,
-	labelFilter string,
+	labelFilter map[string]string,
 ) ([]*computepb.Disk, error) {
 	logFields := map[string]interface{}{
 		"project": projectID,
@@ -116,9 +116,17 @@ func (dc *DiskClient) ListDetachedDisks(
 
 		for _, disk := range resp.Value.Disks {
 			zone := utils.ExtractZoneName(disk.GetZone())
-			if *disk.Status == "READY" && zone == location && len(disk.Users) == 0 {
-				disks = append(disks, disk)
+			if *disk.Status == "READY" && len(disk.Users) == 0 {
+				// apply filters if any
+				if location != "" && zone != location {
+					continue
+				}
+				if location == zone {
+					disks = append(disks, disk)
+				}
+				
 				logger.Op.WithFields(logFields).Infof("Found detached disk: %s", *disk.Name)
+				disks = append(disks, disk)
 			}
 		}
 	}

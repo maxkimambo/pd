@@ -50,7 +50,7 @@ func (o *DAGOrchestrator) BuildMigrationDAG(ctx context.Context, instances []*co
 			logger.Op.WithFields(map[string]interface{}{
 				"instance": instanceName,
 				"zone":     zone,
-			}).Debug("Building workflow for instance")
+			}).Debug("Building tasks for instance")
 		}
 
 		// Add tasks for this instance
@@ -81,7 +81,7 @@ func (o *DAGOrchestrator) addInstanceWorkflow(ctx context.Context, d *dag.DAG, i
 		return fmt.Errorf("failed to get disks for instance %s: %w", instanceName, err)
 	}
 
-	// Filter disks that need migration (exclude boot disks if not supported and already target type)
+	// Filter disks that need migration (exclude boot disks, and those disks that are already target type)
 	disksToMigrate := o.filterDisksForMigration(attachedDisks)
 
 	if len(disksToMigrate) == 0 {
@@ -97,15 +97,28 @@ func (o *DAGOrchestrator) addInstanceWorkflow(ctx context.Context, d *dag.DAG, i
 	var shutdownID, startupID string
 	var diskOperationDeps []string
 
-	// 2. If instance is running, add shutdown task
+	// 2. If instance is running, add hotsnapshot task and  add shutdown task
 	if isRunning {
+		hotsnapId := fmt.Sprintf("%s:hotsnapshot", instanceName)
+		hotsnapName := fmt.Sprintf("pd-migrate-%s-hot-%d", instanceName, time.Now().Unix())
+		hotsnapTask := dag.NewSnapshotTask(hotsnapId, o.config.ProjectID, zone, instanceName, hotsnapName, o.gcpClient, o.config)
+		hotsnapNode := dag.NewBaseNode(hotsnapTask)
+		if err := d.AddNode(hotsnapNode); err != nil {
+			return err
+		}
+
+		diskOperationDeps = append(diskOperationDeps, hotsnapId)
+
 		shutdownID = fmt.Sprintf("shutdown_%s", instanceName)
 		shutdownTask := dag.NewInstanceStateTask(shutdownID, o.config.ProjectID, zone, instanceName, "stop", o.gcpClient)
 		shutdownNode := dag.NewBaseNode(shutdownTask)
 		if err := d.AddNode(shutdownNode); err != nil {
 			return err
 		}
+
 		diskOperationDeps = append(diskOperationDeps, shutdownID)
+
+		dag.NewDAG().AddDependency(hotsnapId, shutdownID)
 
 		if logger.Op != nil {
 			logger.Op.WithFields(map[string]interface{}{
@@ -167,14 +180,14 @@ func (o *DAGOrchestrator) addDiskMigrationWorkflow(d *dag.DAG, instanceName, zon
 	var operations []string
 	timestamp := time.Now().Unix()
 
-	// 1. Create hot snapshot (while instance running)
-	hotSnapshotName := fmt.Sprintf("pd-migrate-%s-hot-%d", diskName, timestamp)
-	hotSnapshotID := fmt.Sprintf("hot-snapshot_%s_%s", instanceName, diskName)
-	hotSnapshotTask := dag.NewSnapshotTask(hotSnapshotID, o.config.ProjectID, zone, diskName, hotSnapshotName, o.gcpClient, o.config)
-	hotSnapshotNode := dag.NewBaseNode(hotSnapshotTask)
-	if err := d.AddNode(hotSnapshotNode); err != nil {
-		return nil, err
-	}
+	// // 1. Create hot snapshot (while instance running)
+	// hotSnapshotName := fmt.Sprintf("pd-migrate-%s-hot-%d", diskName, timestamp)
+	// hotSnapshotID := fmt.Sprintf("hot-snapshot_%s_%s", instanceName, diskName)
+	// hotSnapshotTask := dag.NewSnapshotTask(hotSnapshotID, o.config.ProjectID, zone, diskName, hotSnapshotName, o.gcpClient, o.config)
+	// hotSnapshotNode := dag.NewBaseNode(hotSnapshotTask)
+	// if err := d.AddNode(hotSnapshotNode); err != nil {
+	// 	return nil, err
+	// }
 
 	// 2. Detach disk task (depends on instance shutdown)
 	detachID := fmt.Sprintf("detach_%s_%s", instanceName, diskName)
@@ -184,11 +197,17 @@ func (o *DAGOrchestrator) addDiskMigrationWorkflow(d *dag.DAG, instanceName, zon
 		return nil, err
 	}
 
-	// Detach depends on instance shutdown (if applicable)
+	// Detach depends on instance shutdown
 	for _, dep := range deps {
-		if err := d.AddDependency(dep, detachID); err != nil {
-			return nil, err
+
+		if strings.Contains(dep, "shutdown") {
+			if err := d.AddDependency(dep, detachID); err != nil {
+				return nil, err
+			}
 		}
+		// if err := d.AddDependency(dep, detachID); err != nil {
+		// 	return nil, err
+		// }
 	}
 
 	// 3. Create cold snapshot (after detach, incremental from hot snapshot)
@@ -244,13 +263,13 @@ func (o *DAGOrchestrator) addDiskMigrationWorkflow(d *dag.DAG, instanceName, zon
 		return nil, err
 	}
 
-	// 6. Cleanup hot snapshot task
-	cleanupHotID := fmt.Sprintf("cleanup-hot_%s_%s", instanceName, diskName)
-	cleanupHotTask := dag.NewCleanupTask(cleanupHotID, o.config.ProjectID, "snapshot", hotSnapshotName, o.gcpClient)
-	cleanupHotNode := dag.NewBaseNode(cleanupHotTask)
-	if err := d.AddNode(cleanupHotNode); err != nil {
-		return nil, err
-	}
+	// // 6. Cleanup hot snapshot task
+	// cleanupHotID := fmt.Sprintf("cleanup-hot_%s_%s", instanceName, diskName)
+	// cleanupHotTask := dag.NewCleanupTask(cleanupHotID, o.config.ProjectID, "snapshot", hotSnapshotName, o.gcpClient)
+	// cleanupHotNode := dag.NewBaseNode(cleanupHotTask)
+	// if err := d.AddNode(cleanupHotNode); err != nil {
+	// 	return nil, err
+	// }
 
 	// 7. Cleanup cold snapshot task
 	cleanupColdID := fmt.Sprintf("cleanup-cold_%s_%s", instanceName, diskName)
@@ -261,14 +280,14 @@ func (o *DAGOrchestrator) addDiskMigrationWorkflow(d *dag.DAG, instanceName, zon
 	}
 
 	// Both cleanups depend on successful attach
-	if err := d.AddDependency(attachID, cleanupHotID); err != nil {
-		return nil, err
-	}
+	// if err := d.AddDependency(attachID, cleanupHotID); err != nil {
+	// 	return nil, err
+	// }
 	if err := d.AddDependency(attachID, cleanupColdID); err != nil {
 		return nil, err
 	}
 
-	operations = []string{hotSnapshotID, detachID, coldSnapshotID, migrateID, attachID, cleanupHotID, cleanupColdID}
+	operations = []string{detachID, coldSnapshotID, migrateID, attachID, cleanupColdID}
 
 	if logger.Op != nil {
 		logger.Op.WithFields(map[string]interface{}{

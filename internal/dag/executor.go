@@ -132,8 +132,6 @@ func (e *Executor) Execute(ctx context.Context) (*ExecutionResult, error) {
 		logger.User.Infof("Starting execution of %d tasks (max %d parallel)", totalNodes, e.config.MaxParallelTasks)
 	}
 
-	// Remove periodic progress logging - we'll just show task-by-task progress
-
 	// Execute root nodes
 	for _, nodeID := range rootNodes {
 		e.scheduleNode(nodeID)
@@ -163,6 +161,7 @@ func (e *Executor) Cancel() {
 }
 
 // GetProgress returns the current execution progress
+// TODO: Remove this, we decided against periodic progress logging
 func (e *Executor) GetProgress() (completed, total int) {
 	e.mutex.RLock()
 	defer e.mutex.RUnlock()
@@ -263,9 +262,9 @@ func (e *Executor) executeNode(nodeID string) {
 	if logger.User != nil {
 		simplifiedName := e.simplifyTaskName(nodeID)
 		duration := time.Since(taskStartTime)
-		
+
 		if err != nil {
-			logger.User.Errorf("❌ Failed: %s (%v) - %v", simplifiedName, duration.Round(time.Millisecond), err)
+			logger.User.Errorf("Failed: %s (%v) - %v", simplifiedName, duration.Round(time.Millisecond), err)
 		} else {
 			logger.User.Successf("Completed: %s (%v)", simplifiedName, duration.Round(time.Millisecond))
 		}
@@ -530,45 +529,45 @@ func (e *Executor) simplifyTaskName(taskID string) string {
 	// "detach_sap-mig-1_sap-mig-1-disk-1" -> "sap-mig-1-disk-1:detach"
 	// "migrate_sap-mig-1_sap-mig-1-disk-1" -> "sap-mig-1-disk-1:migrate"
 	// "attach_sap-mig-1_sap-mig-1-disk-1" -> "sap-mig-1-disk-1:attach"
-	
+
 	parts := strings.Split(taskID, "_")
 	if len(parts) < 2 {
 		return taskID // Return as-is if can't parse
 	}
-	
+
 	action := parts[0]
-	
+
 	// For simple instance actions like "startup_sap-mig-1"
 	if len(parts) == 2 && (action == "startup" || action == "shutdown") {
 		instanceName := parts[1]
 		return fmt.Sprintf("%s:%s", instanceName, action)
 	}
-	
+
 	// For hot/cold snapshots like "hot-snapshot_sap-mig-1_sap-mig-1-disk-1"
 	if len(parts) == 3 && (action == "hot-snapshot" || action == "cold-snapshot") {
 		diskName := parts[2]
 		return fmt.Sprintf("%s:%s", diskName, action)
 	}
-	
+
 	// For disk operations like "detach_sap-mig-1_sap-mig-1-disk-1"
 	if len(parts) == 3 && (action == "detach" || action == "attach" || action == "migrate") {
 		diskName := parts[2]
 		return fmt.Sprintf("%s:%s", diskName, action)
 	}
-	
+
 	// For cleanup operations like "cleanup-hot_sap-mig-1_sap-mig-1-disk-1"
 	if len(parts) == 3 && (action == "cleanup-hot" || action == "cleanup-cold") {
 		diskName := parts[2]
 		cleanupType := strings.Replace(action, "cleanup-", "", 1)
 		return fmt.Sprintf("%s:cleanup-%s", diskName, cleanupType)
 	}
-	
+
 	// For legacy snapshot format "snapshot_sap-mig-1-disk-1"
 	if len(parts) == 2 && action == "snapshot" {
 		diskName := parts[1]
 		return fmt.Sprintf("%s:%s", diskName, action)
 	}
-	
+
 	// Fallback: return original taskID
 	return taskID
 }
@@ -593,10 +592,10 @@ func (e *Executor) logFinalSummary() {
 
 		logger.User.Info("=== EXECUTION SUMMARY ===")
 		if failed == 0 {
-			logger.User.Successf("✅ All %d tasks completed successfully in %v", total, elapsed.Round(time.Second))
+			logger.User.Successf("All %d tasks completed successfully in %v", total, elapsed.Round(time.Second))
 		} else {
 			logger.User.Errorf("⚠️  Execution completed: %d successful, %d failed in %v", completed-failed, failed, elapsed.Round(time.Second))
-			
+
 			// Show failed tasks
 			logger.User.Info("Failed tasks:")
 			for nodeID, result := range e.results {

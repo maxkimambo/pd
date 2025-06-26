@@ -10,7 +10,8 @@ import (
 type Config struct {
 	ProjectID      string
 	TargetDiskType string
-	LabelFilter    string
+	LabelFilter    map[string]string
+	LabelFilterStr string 
 	KmsKey         string
 	KmsKeyRing     string
 	KmsLocation    string
@@ -70,7 +71,7 @@ func DefaultConfig() *Config {
 		// Existing defaults
 		ProjectID:      "",
 		TargetDiskType: "pd-ssd",
-		LabelFilter:    "",
+		LabelFilter:    map[string]string{},
 		AutoApproveAll: false,
 		Concurrency:    5,
 		RetainName:     false,

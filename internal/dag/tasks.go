@@ -349,7 +349,6 @@ func (t *DiskMigrationTask) Execute(ctx context.Context) (*TaskResult, error) {
 	if t.config.Throughput > 0 {
 		result.AddMetric("throughput", t.config.Throughput)
 	}
-
 	result.MarkCompleted()
 	return result, nil
 }
