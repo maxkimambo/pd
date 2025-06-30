@@ -9,6 +9,8 @@ import (
 	"github.com/maxkimambo/pd/internal/gcp"
 	"github.com/maxkimambo/pd/internal/logger"
 	"github.com/maxkimambo/pd/internal/migrator"
+	"github.com/maxkimambo/pd/internal/taskmanager"
+	"github.com/maxkimambo/pd/internal/workflow"
 	"github.com/spf13/cobra"
 )
 
@@ -158,22 +160,58 @@ func runGceConvert(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to discover GCE instances: %w", err)
 	}
 	logger.User.Infof("Discovered %d instance(s) for migration.", len(discoveredInstances))
+
+	// Create migration manager
+	manager := workflow.NewMigrationManager(gcpClient, &config)
+
 	logger.User.Info("--- Phase 2: Migration (GCE Attached Disks) ---")
 
+	// Track overall results
+	var successCount, failureCount int
+	var allResults []*workflow.WorkflowResult
+	workflows := make([]*taskmanager.Workflow, 0, len(discoveredInstances))
 	for _, instance := range discoveredInstances {
 		logger.User.Infof("Processing instance: %s", *instance.Name)
-		migrator.HandleInstanceDiskMigration(ctx, &config, instance, gcpClient)
+		// Create instance-specific workflow
+		workflow, err := manager.CreateInstanceMigrationWorkflow(instance)
+		workflows = append(workflows, workflow)
+		if err != nil {
+			logger.User.Errorf("Failed to create workflow for %s: %v", *instance.Name, err)
+			failureCount++
+			continue
+		}
 	}
 
-	// --- Placeholder for Cleanup Phase ---
-	logger.User.Info("--- Phase 3: Cleanup (Snapshots) ---")
-	// Similar to existing snapshot cleanup, but based on snapshots created during this process.
-	logger.User.Warn("Snapshot cleanup logic for GCE conversion is not yet implemented.")
+	// Execute prepared workflows
+	for _, workflow := range workflows {
 
-	// --- Placeholder for Reporting Phase ---
-	logger.User.Info("--- Reporting ---")
-	// Generate a summary of actions taken, successes, failures.
-	logger.User.Warn("Reporting for GCE conversion is not yet implemented.")
+		// Execute workflow
+		result, err := manager.ExecuteWorkflow(ctx, workflow)
+		allResults = append(allResults, result)
 
+		if err != nil {
+			logger.User.Errorf("Workflow failed for %s: %v", workflow.ID, err)
+			failureCount++
+		} else {
+			successCount++
+		}
+	}
+
+	// --- Summary Report ---
+	logger.User.Info("--- Migration Summary ---")
+	logger.User.Infof("Total instances processed: %d", len(discoveredInstances))
+	logger.User.Infof("Successful migrations: %d", successCount)
+	logger.User.Infof("Failed migrations: %d", failureCount)
+
+	for _, result := range allResults {
+		// Report individual results
+		manager.ReportResults(result)
+	}
+
+	if failureCount > 0 {
+		return fmt.Errorf("%d out of %d instance migrations failed", failureCount, len(discoveredInstances))
+	}
+
+	logger.User.Success("All instance migrations completed successfully!")
 	return nil
 }

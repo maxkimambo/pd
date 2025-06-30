@@ -77,7 +77,7 @@ func (wb *WorkflowBuilder) validateDependencies() error {
 	return nil
 }
 
-// ShowOrder returns the planned execution order without building the full Workflow
+// ShowOrder returns the planned execution order
 func (wb *WorkflowBuilder) ShowOrder() ([]string, error) {
 	// Validate all dependencies exist
 	if err := wb.validateDependencies(); err != nil {
@@ -92,18 +92,18 @@ func (wb *WorkflowBuilder) ShowOrder() ([]string, error) {
 // createDAG creates a DAG from the builder's current state
 func (wb *WorkflowBuilder) createDAG() *DAG {
 	dag := NewDAG()
-	
+
 	// Add all tasks as nodes
 	for taskID := range wb.tasks {
 		dag.AddNode(taskID)
 	}
-	
+
 	// Add all dependencies as edges
 	for taskID, deps := range wb.dependencies {
 		for _, depID := range deps {
 			dag.AddEdge(taskID, depID)
 		}
 	}
-	
+
 	return dag
 }
