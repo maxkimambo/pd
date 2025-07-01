@@ -1,10 +1,8 @@
 package migrator
 
 import (
-	"bufio"
 	"context"
 	"fmt"
-	"os"
 	"strings"
 
 	"github.com/maxkimambo/pd/internal/gcp"
@@ -52,21 +50,20 @@ func DiscoverDisks(ctx context.Context, config *Config, gcpClient *gcp.Clients) 
 
 	logger.User.Info(sb.String())
 
+	confirmed, err := utils.PromptForConfirmation(
+		config.AutoApproveAll,
+		fmt.Sprintf("migrate %d disk(s) to type '%s'", len(disksToMigrate), config.TargetDiskType),
+		"This will create snapshots and recreate disks",
+	)
+	if err != nil {
+		return nil, err
+	}
+	if !confirmed {
+		logger.User.Info("Migration cancelled by user.")
+		return []*computepb.Disk{}, nil
+	}
 	if !config.AutoApproveAll {
-		fmt.Printf("\nProceed with migrating these %d disk(s) to type '%s'? (yes/no): ", len(disksToMigrate), config.TargetDiskType)
-		reader := bufio.NewReader(os.Stdin)
-		input, err := reader.ReadString('\n')
-		if err != nil {
-			return nil, fmt.Errorf("failed to read user confirmation: %w", err)
-		}
-		input = strings.ToLower(strings.TrimSpace(input))
-		if input != "yes" {
-			logger.User.Info("Migration cancelled by user.")
-			return []*computepb.Disk{}, nil
-		}
 		logger.User.Info("User confirmed. Proceeding with migration.")
-	} else {
-		logger.User.Info("Skipping user confirmation due to --auto-approve flag.")
 	}
 
 	logger.User.Info("--- Discovery Phase Complete ---")

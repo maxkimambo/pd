@@ -7,6 +7,7 @@ import (
 
 	"github.com/maxkimambo/pd/internal/gcp"
 	"github.com/maxkimambo/pd/internal/logger"
+	"github.com/maxkimambo/pd/internal/utils"
 )
 
 func CleanupSnapshots(ctx context.Context, config *Config, gcpClient *gcp.Clients, results []MigrationResult) error {
@@ -27,9 +28,26 @@ func CleanupSnapshots(ctx context.Context, config *Config, gcpClient *gcp.Client
 
 	logger.User.Infof("Found %d snapshot(s) to cleanup:", len(snapshotsToDelete))
 	snapshotMap := make(map[string]bool)
+	snapshotNames := make([]string, 0, len(snapshotsToDelete))
 	for _, snap := range snapshotsToDelete {
 		logger.User.Infof("  - %s", snap.GetName())
 		snapshotMap[snap.GetName()] = false
+		snapshotNames = append(snapshotNames, snap.GetName())
+	}
+
+	// Prompt for confirmation before deleting snapshots
+	confirmed, err := utils.PromptForMultipleItems(
+		config.AutoApproveAll,
+		"delete snapshots",
+		snapshotNames,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to get user confirmation: %w", err)
+	}
+	if !confirmed {
+		logger.User.Info("Snapshot cleanup cancelled by user.")
+		logger.User.Info("--- Cleanup Phase Complete ---")
+		return nil
 	}
 
 	var wg sync.WaitGroup

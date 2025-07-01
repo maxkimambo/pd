@@ -6,6 +6,7 @@ import (
 
 	"github.com/maxkimambo/pd/internal/logger"
 	"github.com/maxkimambo/pd/internal/taskmanager"
+	"github.com/maxkimambo/pd/internal/utils"
 )
 
 // StopInstanceTask stops a running instance
@@ -75,6 +76,30 @@ func (t *StopInstanceTask) Execute(ctx context.Context, shared *taskmanager.Shar
 		
 		if projectID == "" {
 			return fmt.Errorf("project ID not found in config")
+		}
+		
+		// Check for auto-approve flag
+		autoApprove := false
+		if config, ok := configData.(map[string]interface{}); ok {
+			if approve, ok := config["AutoApproveAll"].(bool); ok {
+				autoApprove = approve
+			}
+		}
+		
+		// Prompt for confirmation before stopping the instance
+		confirmed, err := utils.PromptForConfirmation(
+			autoApprove,
+			"stop instance",
+			fmt.Sprintf("Instance: %s in zone %s", instanceName, instanceZone),
+		)
+		if err != nil {
+			return fmt.Errorf("failed to get user confirmation: %w", err)
+		}
+		if !confirmed {
+			logger.User.Infof("Instance stop operation cancelled by user for %s", instanceName)
+			shared.Set("instance_stopped", false)
+			shared.Set("stop_operation_id", "")
+			return fmt.Errorf("operation cancelled by user")
 		}
 		
 		logger.User.Infof("Stopping instance %s in zone %s", instanceName, instanceZone)
