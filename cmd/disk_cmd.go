@@ -62,7 +62,7 @@ func init() {
 	diskCmd.Flags().IntVar(&concurrency, "concurrency", 10, "Number of disks to process concurrently (1-200), default: 10")
 	diskCmd.Flags().BoolVar(&retainName, "retain-name", true, "Reuse original disk name (delete original). If false, keep original and suffix new name.")
 	diskCmd.Flags().Int64Var(&throughput, "throughput", 140, "Throughput in MB/s to set (optional, default: 140 MiB/s)")
-	diskCmd.Flags().Int64Var(&iops, "iops", 2000, "IOPS to set(optional, default: 2000 IOPS)")
+	diskCmd.Flags().Int64Var(&iops, "iops", 3000, "IOPS to set(optional, default: 3000 IOPS)")
 	diskCmd.Flags().StringVarP(&storagePoolId, "pool-id", "s", "", "Storage pool ID to use for the new disks (optional)")
 	diskCmd.MarkFlagRequired("target-disk-type")
 }
@@ -93,10 +93,10 @@ func validateDiskCmdFlags(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("--max-concurrency must be between 1 and 200, got %d", concurrency)
 	}
 	if throughput < 140 || throughput > 5000 {
-		return fmt.Errorf("--throughput must be between 0 and 5000 MB/s, got %d", throughput)
+		return fmt.Errorf("--throughput must be between 140 and 5000 MB/s, got %d", throughput)
 	}
 
-	if iops < 2000 || iops > 350000 {
+	if iops < 3000 || iops > 350000 {
 		return fmt.Errorf("--iops must be between 3000 and 350,000, got %d", iops)
 	}
 	if concurrency < 1 || concurrency > 200 {
@@ -129,6 +129,9 @@ func runConvert(cmd *cobra.Command, args []string) error {
 		Concurrency:    concurrency,
 		RetainName:     retainName,
 		Debug:          debug,
+		Iops:           iops,
+		Throughput:     throughput,
+		StoragePoolId:  storagePoolId,
 	}
 	logger.Op.Debugf("Configuration: %+v", config)
 	ctx := context.Background()

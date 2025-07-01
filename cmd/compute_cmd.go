@@ -67,8 +67,9 @@ func init() {
 	computeCmd.Flags().BoolVar(&gceAutoApprove, "auto-approve", false, "Skip all interactive prompts")
 	computeCmd.Flags().IntVar(&gceMaxConcurrency, "max-concurrency", 5, "Maximum number of disks/instances to process concurrently (1-50)")
 	computeCmd.Flags().BoolVar(&gceRetainName, "retain-name", true, "Reuse original disk name. If false, keep original and suffix new name.")
-	computeCmd.Flags().Int64Var(&throughput, "throughput", 150, "Throughput for the new disk in MiB/s (optional, default is 150)")
+	computeCmd.Flags().Int64Var(&throughput, "throughput", 140, "Throughput for the new disk in MiB/s (optional, default is 140)")
 	computeCmd.Flags().Int64Var(&iops, "iops", 3000, "IOPS for the new disk (optional, default is 3000)")
+	computeCmd.Flags().StringVarP(&storagePoolId, "pool-id", "s", "", "Storage pool ID to use for the new disks (optional)")
 	computeCmd.MarkFlagRequired("target-disk-type")
 	computeCmd.MarkFlagRequired("instances")
 }
@@ -104,6 +105,14 @@ func validateComputeCmdFlags(cmd *cobra.Command, args []string) error {
 		return errors.New("required flag --instances not set")
 	}
 
+	if throughput < 140 || throughput > 5000 {
+		return fmt.Errorf("--throughput must be between 140 and 5000 MB/s, got %d", throughput)
+	}
+
+	if iops < 3000 || iops > 350000 {
+		return fmt.Errorf("--iops must be between 3000 and 350,000, got %d", iops)
+	}
+
 	return nil
 }
 
@@ -133,6 +142,7 @@ func runGceConvert(cmd *cobra.Command, args []string) error {
 		Instances:      gceInstances,
 		Throughput:     throughput,
 		Iops:           iops,
+		StoragePoolId:  storagePoolId,
 	}
 	logger.Op.Debugf("Configuration: %+v", config)
 	logger.User.Infof("Project: %s", projectID)
