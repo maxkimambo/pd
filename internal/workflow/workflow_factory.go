@@ -29,7 +29,7 @@ func (f *WorkflowFactory) CreateComputeDiskMigrationWorkflow(workflowID string, 
 	builder := taskmanager.NewWorkflowBuilder(workflowID)
 	
 	// Create task instances
-	validateTask := tasks.NewValidateInstanceTask(instance)
+	validateTask := tasks.NewValidateInstanceTask(instance, f.config.TargetDiskType, f.config, f.gcpClient)
 	checkStateTask := tasks.NewCheckInstanceStateTask()
 	snapshotTask := createSnapshotTask(f.config)
 	stopTask := tasks.NewStopInstanceTask()
@@ -86,7 +86,7 @@ func (f *WorkflowFactory) CreateBatchInstanceWorkflow(workflowID string, instanc
 		instancePrefix := fmt.Sprintf("instance_%d_%s", i, *instance.Name)
 		
 		// Create task instances for this instance
-		validateTask := tasks.NewValidateInstanceTask(instance)
+		validateTask := tasks.NewValidateInstanceTask(instance, f.config.TargetDiskType, f.config, f.gcpClient)
 		checkStateTask := tasks.NewCheckInstanceStateTask()
 		snapshotTask := createSnapshotTask(f.config)
 		stopTask := tasks.NewStopInstanceTask()
