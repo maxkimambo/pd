@@ -50,7 +50,7 @@ func (sc *SnapshotClient) CreateSnapshot(ctx context.Context, projectID, zone, d
 		"disk":         diskName,
 		"snapshotName": snapshotName,
 	}
-	logger.Op.WithFields(logFields).Info("Initiating snapshot creation...")
+	logger.WithFieldsMap(logFields).Info("Initiating snapshot creation...")
 
 	if labels == nil {
 		labels = make(map[string]string)
@@ -76,7 +76,7 @@ func (sc *SnapshotClient) CreateSnapshot(ctx context.Context, projectID, zone, d
 		snapshotResource.SnapshotEncryptionKey = &computepb.CustomerEncryptionKey{
 			KmsKeyName: proto.String(kmsKeyName),
 		}
-		logger.Op.WithFields(logFields).Info("Applying KMS encryption to snapshot")
+		logger.WithFieldsMap(logFields).Info("Applying KMS encryption to snapshot")
 	}
 
 	req := &computepb.InsertSnapshotRequest{
@@ -86,23 +86,23 @@ func (sc *SnapshotClient) CreateSnapshot(ctx context.Context, projectID, zone, d
 
 	op, err := sc.client.Insert(ctx, req)
 	if err != nil {
-		logger.Op.WithFields(logFields).WithError(err).Error("Failed to initiate snapshot creation")
+		logger.WithFieldsMap(logFields).WithError(err).Error("Failed to initiate snapshot creation")
 		return fmt.Errorf("failed to initiate snapshot creation for disk %s: %w", diskName, err)
 	}
 
 	opName := op.Name()
-	logger.Op.WithFields(logFields).Infof("Waiting for snapshot creation operation %s to complete...", opName)
+	logger.WithFieldsMap(logFields).Infof("Waiting for snapshot creation operation %s to complete...", opName)
 
 	opCtx, cancel := context.WithTimeout(ctx, defaultOpTimeout)
 	defer cancel()
 
 	err = op.Wait(opCtx)
 	if err != nil {
-		logger.Op.WithFields(logFields).WithError(err).Errorf("Waiting for snapshot creation operation %s failed", opName)
+		logger.WithFieldsMap(logFields).WithError(err).Errorf("Waiting for snapshot creation operation %s failed", opName)
 		return fmt.Errorf("waiting for snapshot %s creation failed: %w", snapshotName, err)
 	}
 
-	logger.Op.WithFields(logFields).Info("Snapshot created successfully.")
+	logger.WithFieldsMap(logFields).Info("Snapshot created successfully.")
 	return nil
 }
 
@@ -111,7 +111,7 @@ func (sc *SnapshotClient) DeleteSnapshot(ctx context.Context, projectID, snapsho
 		"project":      projectID,
 		"snapshotName": snapshotName,
 	}
-	logger.Op.WithFields(logFields).Info("Initiating deletion of snapshot...")
+	logger.WithFieldsMap(logFields).Info("Initiating deletion of snapshot...")
 
 	req := &computepb.DeleteSnapshotRequest{
 		Project:  projectID,
@@ -120,23 +120,23 @@ func (sc *SnapshotClient) DeleteSnapshot(ctx context.Context, projectID, snapsho
 
 	op, err := sc.client.Delete(ctx, req)
 	if err != nil {
-		logger.Op.WithFields(logFields).WithError(err).Error("Failed to initiate snapshot deletion")
+		logger.WithFieldsMap(logFields).WithError(err).Error("Failed to initiate snapshot deletion")
 		return fmt.Errorf("failed to initiate deletion for snapshot %s: %w", snapshotName, err)
 	}
 
 	opName := op.Name()
-	logger.Op.WithFields(logFields).Infof("Waiting for snapshot deletion operation %s to complete...", opName)
+	logger.WithFieldsMap(logFields).Infof("Waiting for snapshot deletion operation %s to complete...", opName)
 
 	opCtx, cancel := context.WithTimeout(ctx, defaultOpTimeout)
 	defer cancel()
 
 	err = op.Wait(opCtx)
 	if err != nil {
-		logger.Op.WithFields(logFields).WithError(err).Errorf("Waiting for snapshot deletion operation %s failed", opName)
+		logger.WithFieldsMap(logFields).WithError(err).Errorf("Waiting for snapshot deletion operation %s failed", opName)
 		return fmt.Errorf("waiting for snapshot %s deletion failed: %w", snapshotName, err)
 	}
 
-	logger.Op.WithFields(logFields).Info("Snapshot deleted successfully.")
+	logger.WithFieldsMap(logFields).Info("Snapshot deleted successfully.")
 	return nil
 }
 
@@ -147,7 +147,7 @@ func (sc *SnapshotClient) ListSnapshotsByLabel(ctx context.Context, projectID, l
 		"project": projectID,
 		"filter":  filter,
 	}
-	logger.Op.WithFields(logFields).Info("Listing snapshots by label...")
+	logger.WithFieldsMap(logFields).Info("Listing snapshots by label...")
 
 	req := &computepb.ListSnapshotsRequest{
 		Project: projectID,
@@ -156,7 +156,7 @@ func (sc *SnapshotClient) ListSnapshotsByLabel(ctx context.Context, projectID, l
 
 	it := sc.client.List(ctx, req)
 	if it == nil {
-		logger.Op.WithFields(logFields).Warn("List returned a nil iterator. Returning empty snapshot list.")
+		logger.WithFieldsMap(logFields).Warn("List returned a nil iterator. Returning empty snapshot list.")
 		return snapshots, nil
 	}
 
@@ -171,7 +171,7 @@ func (sc *SnapshotClient) ListSnapshotsByLabel(ctx context.Context, projectID, l
 		snapshots = append(snapshots, snapshot)
 	}
 
-	logger.Op.WithFields(logFields).Infof("Found %d snapshots matching label.", len(snapshots))
+	logger.WithFieldsMap(logFields).Infof("Found %d snapshots matching label.", len(snapshots))
 	return snapshots, nil
 }
 

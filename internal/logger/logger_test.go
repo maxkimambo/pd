@@ -9,12 +9,9 @@ import (
 )
 
 func TestLoggerInitialization(t *testing.T) {
-	// Test that User and Op loggers are never nil
-	if User == nil {
-		t.Error("User logger should not be nil after init")
-	}
-	if Op == nil {
-		t.Error("Op logger should not be nil after init")
+	// Test that unified logger is never nil
+	if log == nil {
+		t.Error("Unified logger should not be nil after init")
 	}
 }
 
@@ -51,31 +48,25 @@ func TestLoggerSetup(t *testing.T) {
 			// Setup should not panic
 			Setup(tt.verbose, tt.jsonLogs, tt.quiet)
 			
-			// Loggers should still be non-nil
-			if User == nil {
-				t.Error("User logger should not be nil after Setup")
-			}
-			if Op == nil {
-				t.Error("Op logger should not be nil after Setup")
+			// Unified logger should still be non-nil
+			if log == nil {
+				t.Error("Unified logger should not be nil after Setup")
 			}
 		})
 	}
 }
 
-func TestUserLoggerOutput(t *testing.T) {
+func TestUnifiedLoggerOutput(t *testing.T) {
 	// Create a buffer to capture output
 	var buf bytes.Buffer
 	
-	// Create a test logger
-	testLogger := logrus.New()
-	testLogger.SetOutput(&buf)
-	testLogger.SetLevel(logrus.InfoLevel)
-	
-	// Create a user logger with our test logger
-	userLogger := &UserLogger{logger: testLogger}
+	// Get the unified logger and set output
+	ul := GetLogger()
+	ul.GetInternalLogger().SetOutput(&buf)
+	ul.GetInternalLogger().SetLevel(logrus.InfoLevel)
 	
 	// Test basic logging
-	userLogger.Info("test message")
+	ul.Info("test message")
 	output := buf.String()
 	if !strings.Contains(output, "test message") {
 		t.Errorf("Expected output to contain 'test message', got: %s", output)
@@ -85,27 +76,24 @@ func TestUserLoggerOutput(t *testing.T) {
 	buf.Reset()
 	
 	// Test methods with emojis
-	userLogger.Starting("starting test")
+	ul.Starting("starting test")
 	output = buf.String()
 	if !strings.Contains(output, "starting test") {
 		t.Errorf("Expected output to contain 'starting test', got: %s", output)
 	}
 }
 
-func TestOpLoggerOutput(t *testing.T) {
+func TestFieldsLoggerOutput(t *testing.T) {
 	// Create a buffer to capture output
 	var buf bytes.Buffer
 	
-	// Create a test logger
-	testLogger := logrus.New()
-	testLogger.SetOutput(&buf)
-	testLogger.SetLevel(logrus.InfoLevel)
-	
-	// Create an op logger with our test logger
-	opLogger := &OpLogger{logger: testLogger}
+	// Get the unified logger and set output
+	ul := GetLogger()
+	ul.GetInternalLogger().SetOutput(&buf)
+	ul.GetInternalLogger().SetLevel(logrus.InfoLevel)
 	
 	// Test basic logging
-	opLogger.Info("operational message")
+	ul.Info("operational message")
 	output := buf.String()
 	if !strings.Contains(output, "operational message") {
 		t.Errorf("Expected output to contain 'operational message', got: %s", output)
@@ -115,11 +103,10 @@ func TestOpLoggerOutput(t *testing.T) {
 	buf.Reset()
 	
 	// Test with fields
-	entry := opLogger.WithFields(map[string]interface{}{
+	ul.WithFieldsMap(map[string]interface{}{
 		"disk": "test-disk",
 		"zone": "us-central1-a",
-	})
-	entry.Info("disk operation")
+	}).Info("disk operation")
 	output = buf.String()
 	if !strings.Contains(output, "disk operation") {
 		t.Errorf("Expected output to contain 'disk operation', got: %s", output)
@@ -139,8 +126,8 @@ func TestLogTypeRouting(t *testing.T) {
 	// Clear existing entries
 	captureHook.entries = make([]*logrus.Entry, 0)
 	
-	// Test User logger
-	User.Info("user message")
+	// Test user-style logger
+	ul.Info("user message", WithLogType(UserLog))
 	if len(captureHook.entries) == 0 {
 		t.Fatal("Expected log entry to be captured")
 	}
@@ -150,8 +137,8 @@ func TestLogTypeRouting(t *testing.T) {
 		t.Errorf("Expected log_type to be 'user', got: %v", logType)
 	}
 	
-	// Test Op logger
-	Op.Info("op message")
+	// Test op-style logger
+	ul.Info("op message", WithLogType(OpLog))
 	if len(captureHook.entries) < 2 {
 		t.Fatal("Expected second log entry to be captured")
 	}

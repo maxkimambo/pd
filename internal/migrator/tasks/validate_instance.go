@@ -40,7 +40,7 @@ func (t *ValidateInstanceTask) Execute(ctx context.Context, shared *taskmanager.
 			return fmt.Errorf("instance zone is nil")
 		}
 		
-		logger.User.Infof("Validating instance: %s", *t.instance.Name)
+		logger.Infof("Validating instance: %s", *t.instance.Name)
 		
 		// Extract instance information
 		instanceName := *t.instance.Name
@@ -64,10 +64,10 @@ func (t *ValidateInstanceTask) Execute(ctx context.Context, shared *taskmanager.
 		for _, disk := range attachedDisks {
 			if disk.GetBoot() {
 				bootDiskCount++
-				logger.Op.Debugf("Found boot disk: %s", disk.GetDeviceName())
+				logger.Debugf("Found boot disk: %s", disk.GetDeviceName())
 			} else {
 				nonBootDisks = append(nonBootDisks, disk)
-				logger.Op.Debugf("Found non-boot disk: %s", disk.GetDeviceName())
+				logger.Debugf("Found non-boot disk: %s", disk.GetDeviceName())
 			}
 		}
 
@@ -93,7 +93,7 @@ func (t *ValidateInstanceTask) Execute(ctx context.Context, shared *taskmanager.
 		}
 		shared.Set("disk_metadata", diskMetadata)
 		
-		logger.User.Successf("Instance validation complete: %d non-boot disk(s) found for migration", len(nonBootDisks))
+		logger.Successf("Instance validation complete: %d non-boot disk(s) found for migration", len(nonBootDisks))
 		shared.Set("validation_status", "completed")
 		
 		return nil

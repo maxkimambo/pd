@@ -11,7 +11,7 @@ import (
 )
 
 func CleanupSnapshots(ctx context.Context, config *Config, gcpClient *gcp.Clients, results []MigrationResult) error {
-	logger.Info("--- Phase 3: Cleanup ---")
+	logger.Starting("🧽 Cleanup Phase")
 	logger.Infof("Searching for snapshots with label '%s=%s' in project %s for cleanup...",
 		gcp.MANAGED_BY_KEY, gcp.MANAGED_BY_VALUE, config.ProjectID)
 
@@ -22,7 +22,7 @@ func CleanupSnapshots(ctx context.Context, config *Config, gcpClient *gcp.Client
 
 	if len(snapshotsToDelete) == 0 {
 		logger.Info("No snapshots found with the cleanup label.")
-		logger.Info("--- Cleanup Phase Complete ---")
+		logger.Success("Cleanup phase completed")
 		return nil
 	}
 
@@ -46,7 +46,7 @@ func CleanupSnapshots(ctx context.Context, config *Config, gcpClient *gcp.Client
 	}
 	if !confirmed {
 		logger.Info("Snapshot cleanup cancelled by user.")
-		logger.Info("--- Cleanup Phase Complete ---")
+		logger.Success("Cleanup phase completed")
 		return nil
 	}
 
@@ -104,6 +104,6 @@ func CleanupSnapshots(ctx context.Context, config *Config, gcpClient *gcp.Client
 		logger.Info("Snapshot cleanup completed successfully.")
 	}
 
-	logger.Info("--- Cleanup Phase Complete ---")
+	logger.Success("Cleanup phase completed")
 	return nil
 }

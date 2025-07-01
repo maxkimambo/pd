@@ -27,12 +27,12 @@ func (t *CleanupSnapshotsTask) Execute(ctx context.Context, shared *taskmanager.
 		// Check verification status
 		verificationStatus, ok := shared.Get("verification_status")
 		if !ok {
-			logger.User.Warn("Verification status not found, skipping snapshot cleanup")
+			logger.Warn("Verification status not found, skipping snapshot cleanup")
 			return nil
 		}
 		
 		if verificationStatus != "passed" {
-			logger.User.Warn("Migration verification did not pass, skipping snapshot cleanup for safety")
+			logger.Warn("Migration verification did not pass, skipping snapshot cleanup for safety")
 			shared.Set("cleanup_status", "skipped - verification failed")
 			return nil
 		}
@@ -40,7 +40,7 @@ func (t *CleanupSnapshotsTask) Execute(ctx context.Context, shared *taskmanager.
 		// Get snapshot map
 		snapshotMapData, ok := shared.Get("snapshot_map")
 		if !ok {
-			logger.User.Info("No snapshots found to clean up")
+			logger.Info("No snapshots found to clean up")
 			shared.Set("cleanup_status", "skipped - no snapshots")
 			return nil
 		}
@@ -51,7 +51,7 @@ func (t *CleanupSnapshotsTask) Execute(ctx context.Context, shared *taskmanager.
 		}
 		
 		if len(snapshotMap) == 0 {
-			logger.User.Info("No snapshots to clean up")
+			logger.Info("No snapshots to clean up")
 			shared.Set("cleanup_status", "skipped - empty snapshot map")
 			return nil
 		}
@@ -79,7 +79,7 @@ func (t *CleanupSnapshotsTask) Execute(ctx context.Context, shared *taskmanager.
 			return fmt.Errorf("project ID not found in config")
 		}
 		
-		logger.User.Infof("Cleaning up %d snapshot(s) created during migration", len(snapshotMap))
+		logger.Infof("Cleaning up %d snapshot(s) created during migration", len(snapshotMap))
 		
 		// Track deleted snapshots
 		deletedSnapshots := []string{}
@@ -87,17 +87,17 @@ func (t *CleanupSnapshotsTask) Execute(ctx context.Context, shared *taskmanager.
 		
 		// Delete each snapshot
 		for diskName, snapshotName := range snapshotMap {
-			logger.User.Infof("Deleting snapshot %s (created from disk %s)", snapshotName, diskName)
+			logger.Infof("Deleting snapshot %s (created from disk %s)", snapshotName, diskName)
 			
 			err := gcpClient.SnapshotClient.DeleteSnapshot(ctx, projectID, snapshotName)
 			if err != nil {
-				logger.User.Errorf("Failed to delete snapshot %s: %v", snapshotName, err)
+				logger.Errorf("Failed to delete snapshot %s: %v", snapshotName, err)
 				deleteErrors = append(deleteErrors, fmt.Errorf("failed to delete snapshot %s: %w", snapshotName, err))
 				continue
 			}
 			
 			deletedSnapshots = append(deletedSnapshots, snapshotName)
-			logger.User.Successf("Snapshot %s deleted successfully", snapshotName)
+			logger.Successf("Snapshot %s deleted successfully", snapshotName)
 		}
 		
 		// Store cleanup results
@@ -106,13 +106,13 @@ func (t *CleanupSnapshotsTask) Execute(ctx context.Context, shared *taskmanager.
 		if len(deleteErrors) > 0 {
 			shared.Set("cleanup_status", fmt.Sprintf("partial - deleted %d/%d snapshots", 
 				len(deletedSnapshots), len(snapshotMap)))
-			logger.User.Warnf("Snapshot cleanup completed with %d error(s)", len(deleteErrors))
+			logger.Warnf("Snapshot cleanup completed with %d error(s)", len(deleteErrors))
 			// Don't fail the task for cleanup errors
 			return nil
 		}
 		
 		shared.Set("cleanup_status", "completed")
-		logger.User.Successf("All snapshots cleaned up successfully")
+		logger.Successf("All snapshots cleaned up successfully")
 		
 		return nil
 	})

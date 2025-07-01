@@ -42,7 +42,7 @@ func (t *CheckInstanceStateTask) Execute(ctx context.Context, shared *taskmanage
 			return err
 		}
 		
-		logger.User.Infof("Checking instance state for: %s", *instance.Name)
+		logger.Infof("Checking instance state for: %s", *instance.Name)
 		
 		// Check if instance is running
 		isRunning := gcpClient.ComputeClient.InstanceIsRunning(ctx, instance)
@@ -59,7 +59,7 @@ func (t *CheckInstanceStateTask) Execute(ctx context.Context, shared *taskmanage
 		shared.Set("instance_running", isRunning)
 		shared.Set("original_state", state)
 		
-		logger.User.Infof("Instance %s is currently: %s", *instance.Name, state)
+		logger.Infof("Instance %s is currently: %s", *instance.Name, state)
 		
 		return nil
 	})

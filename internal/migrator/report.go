@@ -12,11 +12,11 @@ import (
 )
 
 func GenerateReports(results []MigrationResult) {
-	logger.Info("--- Phase 4: Reporting ---")
+	logger.Starting("📋 Reporting Phase")
 
 	if len(results) == 0 {
 		logger.Info("No migration results to report.")
-		logger.Info("--- Reporting Phase Complete ---")
+		logger.Success("Reporting phase completed")
 		return
 	}
 
@@ -27,11 +27,11 @@ func GenerateReports(results []MigrationResult) {
 	printSummaryReport(results)
 	printDetailedReport(results)
 
-	logger.Info("--- Reporting Phase Complete ---")
+	logger.Success("Reporting phase completed")
 }
 
 func printSummaryReport(results []MigrationResult) {
-	fmt.Println("\n--- Migration Summary Report ---")
+	fmt.Println("\n📋 Migration Summary Report\n" + strings.Repeat("=", 30))
 
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
 	fmt.Fprintln(w, "Original Disk\tNew Disk\tZone\tStatus\tDuration\tSnapshot\tCleaned Up\tError")
@@ -78,7 +78,7 @@ func printSummaryReport(results []MigrationResult) {
 
 	w.Flush()
 
-	fmt.Printf("\n--- Overall Stats ---\n")
+	fmt.Printf("\n🎯 Overall Statistics\n")
 	fmt.Printf("Total Disks Processed: %d\n", len(results))
 	fmt.Printf("Successful Migrations: %d\n", successCount)
 	fmt.Printf("Failed Migrations:     %d\n", failureCount)
@@ -86,11 +86,11 @@ func printSummaryReport(results []MigrationResult) {
 		avgDuration := totalDuration / time.Duration(len(results))
 		fmt.Printf("Average Duration/Disk: %s\n", avgDuration.Round(time.Millisecond).String())
 	}
-	fmt.Println("---------------------")
+	fmt.Println(strings.Repeat("-", 20))
 }
 
 func printDetailedReport(results []MigrationResult) {
-	fmt.Println("\n--- Detailed Error Report ---")
+	fmt.Println("\n⚠️  Detailed Error Report\n" + strings.Repeat("=", 30))
 	failuresFound := false
 	for _, res := range results {
 		if strings.HasPrefix(res.Status, "Failed") || (res.Status == "Success" && !res.SnapshotCleaned) {
@@ -109,5 +109,5 @@ func printDetailedReport(results []MigrationResult) {
 	if !failuresFound {
 		fmt.Println("No detailed errors to report.")
 	}
-	fmt.Println("---------------------------")
+	fmt.Println(strings.Repeat("-", 30))
 }

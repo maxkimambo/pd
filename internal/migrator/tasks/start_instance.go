@@ -32,7 +32,7 @@ func (t *StartInstanceTask) Execute(ctx context.Context, shared *taskmanager.Sha
 		
 		// If instance was not running originally, skip
 		if originalState != "RUNNING" {
-			logger.User.Info("Instance was not originally running, skipping start operation")
+			logger.Info("Instance was not originally running, skipping start operation")
 			shared.Set("instance_started", false)
 			shared.Set("start_operation_id", "")
 			return nil
@@ -72,7 +72,7 @@ func (t *StartInstanceTask) Execute(ctx context.Context, shared *taskmanager.Sha
 			return fmt.Errorf("project ID not found in config")
 		}
 		
-		logger.User.Infof("Starting instance %s in zone %s", instanceName, instanceZone)
+		logger.Infof("Starting instance %s in zone %s", instanceName, instanceZone)
 		
 		// Start the instance
 		err = gcpClient.ComputeClient.StartInstance(ctx, projectID, instanceZone.(string), instanceName.(string))
@@ -84,7 +84,7 @@ func (t *StartInstanceTask) Execute(ctx context.Context, shared *taskmanager.Sha
 		shared.Set("instance_started", true)
 		shared.Set("start_operation_id", fmt.Sprintf("start-%s-%d", instanceName, ctx.Value("request_id")))
 		
-		logger.User.Successf("Instance %s started successfully", instanceName)
+		logger.Successf("Instance %s started successfully", instanceName)
 		
 		return nil
 	})

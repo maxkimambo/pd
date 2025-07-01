@@ -29,7 +29,7 @@ func (t *MigrateDisksTask) Execute(ctx context.Context, shared *taskmanager.Shar
 	return t.BaseTask.Execute(ctx, shared, func() error {
 		// Check if already completed (idempotency)
 		if completed, ok := shared.Get("migrate_disks_completed"); ok && completed.(bool) {
-			logger.Op.Debug("Migrate disks task already completed, skipping")
+			logger.Debug("Migrate disks task already completed, skipping")
 			return nil
 		}
 		
@@ -57,7 +57,7 @@ func (t *MigrateDisksTask) Execute(ctx context.Context, shared *taskmanager.Shar
 			}
 		}
 		
-		logger.User.Infof("Migrating %d disk(s) to %s", len(detachedDisks), targetDiskType)
+		logger.Infof("Migrating %d disk(s) to %s", len(detachedDisks), targetDiskType)
 		
 		// Track migration results
 		migratedDisks := make(map[string]string) // old_name -> new_name mapping
@@ -84,7 +84,7 @@ func (t *MigrateDisksTask) Execute(ctx context.Context, shared *taskmanager.Shar
 		// Mark task as completed
 		shared.Set("migrate_disks_completed", true)
 		
-		logger.User.Successf("All disks migrated successfully")
+		logger.Successf("All disks migrated successfully")
 		return nil
 	})
 }

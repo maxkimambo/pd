@@ -167,7 +167,7 @@ func runGceConvert(cmd *cobra.Command, args []string) error {
 	// Create migration manager
 	manager := workflow.NewMigrationManager(gcpClient, &config)
 
-	logger.Info("--- Phase 2: Migration (GCE Attached Disks) ---")
+	logger.Starting("⚙️  Migration Phase: GCE Attached Disks")
 
 	// Track overall results
 	var successCount, failureCount int
@@ -200,8 +200,8 @@ func runGceConvert(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	// --- Summary Report ---
-	logger.Info("--- Migration Summary ---")
+	// Summary Report
+	logger.Info("\n🎯 Migration Summary\n" + strings.Repeat("=", 25))
 	logger.Infof("Total instances processed: %d", len(discoveredInstances))
 	logger.Infof("Successful migrations: %d", successCount)
 	logger.Infof("Failed migrations: %d", failureCount)

@@ -25,7 +25,7 @@ func NewVerifyMigrationTask() taskmanager.TaskFunc {
 // Execute verifies the migration was successful
 func (t *VerifyMigrationTask) Execute(ctx context.Context, shared *taskmanager.SharedContext) error {
 	return t.BaseTask.Execute(ctx, shared, func() error {
-		logger.User.Info("Verifying migration success...")
+		logger.Info("Verifying migration success...")
 		
 		// Get instance details
 		instanceData, ok := shared.Get("instance")
@@ -92,7 +92,7 @@ func (t *VerifyMigrationTask) Execute(ctx context.Context, shared *taskmanager.S
 		zone := instanceZone.(string)
 		
 		for originalName, newName := range migratedDisks {
-			logger.Op.Debugf("Verifying disk %s (now %s)", originalName, newName)
+			logger.Debugf("Verifying disk %s (now %s)", originalName, newName)
 			
 			// Get the new disk
 			disk, err := gcpClient.DiskClient.GetDisk(ctx, projectID, zone, newName)
@@ -152,15 +152,15 @@ func (t *VerifyMigrationTask) Execute(ctx context.Context, shared *taskmanager.S
 		
 		if len(verificationErrors) > 0 {
 			shared.Set("verification_status", "failed")
-			logger.User.Warnf("Verification completed with %d issue(s)", len(verificationErrors))
+			logger.Warnf("Verification completed with %d issue(s)", len(verificationErrors))
 			for _, err := range verificationErrors {
-				logger.User.Warnf("  - %v", err)
+				logger.Warnf("  - %v", err)
 			}
 			return fmt.Errorf("verification failed with %d errors", len(verificationErrors))
 		}
 		
 		shared.Set("verification_status", "passed")
-		logger.User.Success("Migration verification passed - all disks migrated successfully")
+		logger.Success("Migration verification passed - all disks migrated successfully")
 		
 		return nil
 	})

@@ -38,7 +38,7 @@ func (t *StopInstanceTask) Execute(ctx context.Context, shared *taskmanager.Shar
 		
 		// If instance is not running, skip this task
 		if !isRunning {
-			logger.User.Info("Instance is already stopped, skipping stop operation")
+			logger.Info("Instance is already stopped, skipping stop operation")
 			shared.Set("instance_stopped", false)
 			shared.Set("stop_operation_id", "")
 			return nil
@@ -96,13 +96,13 @@ func (t *StopInstanceTask) Execute(ctx context.Context, shared *taskmanager.Shar
 			return fmt.Errorf("failed to get user confirmation: %w", err)
 		}
 		if !confirmed {
-			logger.User.Infof("Instance stop operation cancelled by user for %s", instanceName)
+			logger.Infof("Instance stop operation cancelled by user for %s", instanceName)
 			shared.Set("instance_stopped", false)
 			shared.Set("stop_operation_id", "")
 			return fmt.Errorf("operation cancelled by user")
 		}
 		
-		logger.User.Infof("Stopping instance %s in zone %s", instanceName, instanceZone)
+		logger.Infof("Stopping instance %s in zone %s", instanceName, instanceZone)
 		
 		// Stop the instance
 		err = gcpClient.ComputeClient.StopInstance(ctx, projectID, instanceZone.(string), instanceName.(string))
@@ -114,7 +114,7 @@ func (t *StopInstanceTask) Execute(ctx context.Context, shared *taskmanager.Shar
 		shared.Set("instance_stopped", true)
 		shared.Set("stop_operation_id", fmt.Sprintf("stop-%s-%d", instanceName, ctx.Value("request_id")))
 		
-		logger.User.Successf("Instance %s stopped successfully", instanceName)
+		logger.Successf("Instance %s stopped successfully", instanceName)
 		
 		return nil
 	})

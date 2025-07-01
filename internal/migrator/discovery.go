@@ -14,7 +14,7 @@ import (
 
 // DiscoverDisks discovers GCP Compute Engine persistent disks based on the migration configuration.
 func DiscoverDisks(ctx context.Context, config *Config, gcpClient *gcp.Clients) ([]*computepb.Disk, error) {
-	logger.Info("--- Phase 1: Discovery ---")
+	logger.Starting("🔍 Discovery Phase")
 
 	location := config.Location()
 	logger.Infof("Listing detached disks in %s (Project: %s)", location, config.ProjectID)
@@ -66,7 +66,7 @@ func DiscoverDisks(ctx context.Context, config *Config, gcpClient *gcp.Clients) 
 		logger.Info("User confirmed. Proceeding with migration.")
 	}
 
-	logger.Info("--- Discovery Phase Complete ---")
+	logger.Success("Discovery phase completed")
 	return disksToMigrate, nil
 }
 
@@ -79,7 +79,7 @@ func getShortDiskTypeName(typeURL string) string {
 }
 
 func DiscoverInstances(ctx context.Context, config *Config, gcpClient *gcp.Clients) ([]*computepb.Instance, error) {
-	logger.Info("--- Phase 1: Discovering Instances ---")
+	logger.Starting("🔍 Instance Discovery")
 
 	var discoveredInstances []*computepb.Instance
 	var err error

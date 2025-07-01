@@ -70,7 +70,7 @@ func (t *DetachDisksTask) Execute(ctx context.Context, shared *taskmanager.Share
 			return fmt.Errorf("project ID not found in config")
 		}
 		
-		logger.User.Infof("Detaching %d non-boot disk(s) from instance %s", len(diskList), instanceName)
+		logger.Infof("Detaching %d non-boot disk(s) from instance %s", len(diskList), instanceName)
 		
 		// Map to store device names and attachment info
 		detachedDisks := make(map[string]map[string]interface{})
@@ -79,7 +79,7 @@ func (t *DetachDisksTask) Execute(ctx context.Context, shared *taskmanager.Share
 		for _, attachedDisk := range diskList {
 			diskName := attachedDisk.GetDeviceName()
 			
-			logger.User.Infof("Detaching disk %s from instance %s", diskName, instanceName)
+			logger.Infof("Detaching disk %s from instance %s", diskName, instanceName)
 			
 			// Store attachment metadata before detaching
 			detachedDisks[diskName] = map[string]interface{}{
@@ -95,14 +95,14 @@ func (t *DetachDisksTask) Execute(ctx context.Context, shared *taskmanager.Share
 				return fmt.Errorf("failed to detach disk %s: %w", diskName, err)
 			}
 			
-			logger.User.Successf("Disk %s detached successfully", diskName)
+			logger.Successf("Disk %s detached successfully", diskName)
 		}
 		
 		// Store detached disks info in shared context
 		shared.Set("detached_disks", detachedDisks)
 		shared.Set("detach_status", "completed")
 		
-		logger.User.Successf("All disks detached successfully from instance %s", instanceName)
+		logger.Successf("All disks detached successfully from instance %s", instanceName)
 		
 		return nil
 	})

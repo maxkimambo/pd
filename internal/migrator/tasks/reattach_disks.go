@@ -80,7 +80,7 @@ func (t *ReattachDisksTask) Execute(ctx context.Context, shared *taskmanager.Sha
 			return fmt.Errorf("project ID not found in config")
 		}
 		
-		logger.User.Infof("Reattaching %d disk(s) to instance %s", len(migratedDisks), instanceName)
+		logger.Infof("Reattaching %d disk(s) to instance %s", len(migratedDisks), instanceName)
 		
 		// Track attached disks
 		attachedDisks := make(map[string]string)
@@ -95,7 +95,7 @@ func (t *ReattachDisksTask) Execute(ctx context.Context, shared *taskmanager.Sha
 				}
 			}
 			
-			logger.User.Infof("Attaching disk %s to instance %s as device %s", newDiskName, instanceName, deviceName)
+			logger.Infof("Attaching disk %s to instance %s as device %s", newDiskName, instanceName, deviceName)
 			
 			// Attach the disk
 			err := gcpClient.ComputeClient.AttachDisk(
@@ -112,14 +112,14 @@ func (t *ReattachDisksTask) Execute(ctx context.Context, shared *taskmanager.Sha
 			}
 			
 			attachedDisks[deviceName] = newDiskName
-			logger.User.Successf("Disk %s attached successfully", newDiskName)
+			logger.Successf("Disk %s attached successfully", newDiskName)
 		}
 		
 		// Store attachment info
 		shared.Set("reattach_status", "completed")
 		shared.Set("attached_disks", attachedDisks)
 		
-		logger.User.Successf("All disks reattached successfully to instance %s", instanceName)
+		logger.Successf("All disks reattached successfully to instance %s", instanceName)
 		
 		return nil
 	})

@@ -3,6 +3,7 @@ package workflow
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	computepb "cloud.google.com/go/compute/apiv1/computepb"
@@ -45,7 +46,7 @@ func (m *MigrationManager) CreateInstanceMigrationWorkflow(instance *computepb.I
 	}
 
 	workflowID := fmt.Sprintf("migrate-instance-%s-%d", *instance.Name, time.Now().Unix())
-	logger.Op.Debugf("Creating workflow %s for instance %s", workflowID, *instance.Name)
+	logger.Debugf("Creating workflow %s for instance %s", workflowID, *instance.Name)
 
 	return m.factory.CreateComputeDiskMigrationWorkflow(workflowID, instance)
 }
@@ -79,7 +80,7 @@ func (m *MigrationManager) ExecuteWorkflow(ctx context.Context, workflow *taskma
 	sharedCtx.Set("config", configMap)
 	sharedCtx.Set("workflow_start_time", startTime)
 	
-	logger.User.Infof("Starting workflow: %s", workflow.ID)
+	logger.Starting(fmt.Sprintf("Starting workflow: %s", workflow.ID))
 	
 	// Execute the workflow
 	err := workflow.Execute(ctx, sharedCtx)
@@ -97,9 +98,9 @@ func (m *MigrationManager) ExecuteWorkflow(ctx context.Context, workflow *taskma
 	}
 	
 	if err != nil {
-		logger.User.Errorf("Workflow %s failed: %v", workflow.ID, err)
+		logger.Errorf("Workflow %s failed: %v", workflow.ID, err)
 	} else {
-		logger.User.Successf("Workflow %s completed successfully in %v", workflow.ID, endTime.Sub(startTime))
+		logger.Successf("Workflow %s completed successfully in %v", workflow.ID, endTime.Sub(startTime))
 	}
 	
 	return result, err
@@ -107,20 +108,20 @@ func (m *MigrationManager) ExecuteWorkflow(ctx context.Context, workflow *taskma
 
 // ReportResults provides a summary of the workflow execution
 func (m *MigrationManager) ReportResults(result *WorkflowResult) {
-	logger.User.Info("=== Workflow Execution Report ===")
-	logger.User.Infof("Workflow ID: %s", result.WorkflowID)
-	logger.User.Infof("Duration: %v", result.EndTime.Sub(result.StartTime))
-	logger.User.Infof("Status: %s", m.getStatusString(result.Success))
+	logger.Info("\n📋 Workflow Execution Report\n" + strings.Repeat("=", 35))
+	logger.Infof("Workflow ID: %s", result.WorkflowID)
+	logger.Infof("Duration: %v", result.EndTime.Sub(result.StartTime))
+	logger.Infof("Status: %s", m.getStatusString(result.Success))
 	
 	// Extract and report migration results if available
 	if migrationResults, ok := result.SharedContext.Get("migration_results"); ok {
 		if results, ok := migrationResults.([]migrator.MigrationResult); ok {
-			logger.User.Info("\nMigration Results:")
+			logger.Info("\nMigration Results:")
 			for _, res := range results {
 				if res.ErrorMessage != "" {
-					logger.User.Errorf("  - %s: FAILED (%s)", res.DiskName, res.ErrorMessage)
+					logger.Errorf("  - %s: FAILED (%s)", res.DiskName, res.ErrorMessage)
 				} else {
-					logger.User.Successf("  - %s: SUCCESS (migrated to %s)", res.DiskName, res.NewDiskName)
+					logger.Successf("  - %s: SUCCESS (migrated to %s)", res.DiskName, res.NewDiskName)
 				}
 			}
 		}
@@ -129,23 +130,23 @@ func (m *MigrationManager) ReportResults(result *WorkflowResult) {
 	// Report any verification errors
 	if verificationErrors, ok := result.SharedContext.Get("verification_errors"); ok {
 		if errors, ok := verificationErrors.([]error); ok && len(errors) > 0 {
-			logger.User.Warn("\nVerification Issues:")
+			logger.Warn("\nVerification Issues:")
 			for _, err := range errors {
-				logger.User.Warnf("  - %v", err)
+				logger.Warnf("  - %v", err)
 			}
 		}
 	}
 	
 	// Report cleanup status
 	if cleanupStatus, ok := result.SharedContext.Get("cleanup_status"); ok {
-		logger.User.Infof("\nCleanup Status: %v", cleanupStatus)
+		logger.Infof("\nCleanup Status: %v", cleanupStatus)
 	}
 	
 	if result.Error != nil {
-		logger.User.Errorf("\nWorkflow Error: %v", result.Error)
+		logger.Errorf("\nWorkflow Error: %v", result.Error)
 	}
 	
-	logger.User.Info("=================================")
+	logger.Info(strings.Repeat("=", 35))
 }
 
 // getStatusString returns a human-readable status string

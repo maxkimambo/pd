@@ -35,15 +35,3 @@ func Example_unifiedLogger() {
 	log.Info("Processing disk", fields...)
 }
 
-func Example_compatibility() {
-	// The existing API still works
-	logger.User.Info("User message")
-	logger.User.Starting("Starting process")
-	logger.User.Success("Process completed")
-	
-	logger.Op.Info("Operational message")
-	logger.Op.WithFields(map[string]interface{}{
-		"component": "disk-migrator",
-		"action": "snapshot",
-	}).Debug("Creating snapshot")
-}

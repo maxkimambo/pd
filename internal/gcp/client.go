@@ -29,7 +29,7 @@ type Clients struct {
 }
 
 func NewClients(ctx context.Context) (*Clients, error) {
-	logger.Op.Debug("Initializing GCP Compute API client...")
+	logger.Debug("Initializing GCP Compute API client...")
 
 	defaultOpts := getDefaultClientOptions()
 
@@ -37,14 +37,14 @@ func NewClients(ctx context.Context) (*Clients, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to create compute Disks client: %w", err)
 	}
-	logger.Op.Debug("Disks client initialized.")
+	logger.Debug("Disks client initialized.")
 
 	snapshotsClient, err := compute.NewSnapshotsRESTClient(ctx, defaultOpts...)
 	if err != nil {
 		disksClient.Close()
 		return nil, fmt.Errorf("failed to create compute Snapshots client: %w", err)
 	}
-	logger.Op.Debug("Snapshots client initialized.")
+	logger.Debug("Snapshots client initialized.")
 
 	zonesClient, err := compute.NewZonesRESTClient(ctx, defaultOpts...)
 	if err != nil {
@@ -52,7 +52,7 @@ func NewClients(ctx context.Context) (*Clients, error) {
 		snapshotsClient.Close()
 		return nil, fmt.Errorf("failed to create compute Zones client: %w", err)
 	}
-	logger.Op.Debug("Zones client initialized.")
+	logger.Debug("Zones client initialized.")
 
 	regionsClient, err := compute.NewRegionsRESTClient(ctx, defaultOpts...)
 	if err != nil {
@@ -61,7 +61,7 @@ func NewClients(ctx context.Context) (*Clients, error) {
 		zonesClient.Close()
 		return nil, fmt.Errorf("failed to create compute Regions client: %w", err)
 	}
-	logger.Op.Debug("Regions client initialized.")
+	logger.Debug("Regions client initialized.")
 
 	gceClient, err := compute.NewInstancesRESTClient(ctx, defaultOpts...)
 	if err != nil {
@@ -71,14 +71,14 @@ func NewClients(ctx context.Context) (*Clients, error) {
 		regionsClient.Close()
 		return nil, fmt.Errorf("failed to create compute Instances (GCE) client: %w", err)
 	}
-	logger.Op.Debug("GCE client initialized.")
+	logger.Debug("GCE client initialized.")
 
 	// Create the high-level clients
 	diskClient := NewDiskClient(disksClient)
 	snapshotClient := NewSnapshotClient(snapshotsClient)
 	computeClient := NewComputeClient(gceClient, disksClient)
 
-	logger.Op.Info("Successfully initialized GCP Compute API clients.")
+	logger.Info("Successfully initialized GCP Compute API clients.")
 	return &Clients{
 		DiskClient:     diskClient,
 		SnapshotClient: snapshotClient,
@@ -89,7 +89,7 @@ func NewClients(ctx context.Context) (*Clients, error) {
 }
 
 func (c *Clients) Close() {
-	logger.Op.Debug("Closing GCP Compute API clients...")
+	logger.Debug("Closing GCP Compute API clients...")
 	if c.DiskClient != nil {
 		c.DiskClient.Close()
 	}
@@ -105,7 +105,7 @@ func (c *Clients) Close() {
 	if c.Regions != nil {
 		c.Regions.Close()
 	}
-	logger.Op.Debug("GCP Compute API clients closed.")
+	logger.Debug("GCP Compute API clients closed.")
 }
 
 func getDefaultClientOptions() []option.ClientOption {

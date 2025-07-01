@@ -12,185 +12,17 @@ import (
 )
 
 var (
-	User *UserLogger // Clean messages for users (stdout) with emojis
-	Op   *OpLogger   // Detailed operational logs (stderr) without emojis
-	
-	// Unified logger instance (preferred for new code)
+	// Unified logger instance
 	log *UnifiedLogger
 )
 
-// init ensures loggers are never nil
+// init ensures logger is never nil
 func init() {
-	// Initialize with unified logger
+	// Initialize unified logger
 	log = GetLogger()
-	User = &UserLogger{logger: log.GetInternalLogger()}
-	Op = &OpLogger{logger: log.GetInternalLogger()}
 }
 
-type UserLogger struct {
-	logger *logrus.Logger
-}
 
-type OpLogger struct {
-	logger *logrus.Logger
-}
-
-// UserLogger methods with emojis built-in
-func (u *UserLogger) Info(msg string) {
-	u.logger.WithField("log_type", string(UserLog)).Info(msg)
-}
-
-func (u *UserLogger) Infof(format string, args ...interface{}) {
-	u.logger.WithField("log_type", string(UserLog)).Infof(format, args...)
-}
-
-func (u *UserLogger) Error(msg string) {
-	u.logger.WithFields(logrus.Fields{
-		"log_type": string(UserLog),
-		"emoji": "❌",
-	}).Error(msg)
-}
-
-func (u *UserLogger) Errorf(format string, args ...interface{}) {
-	u.logger.WithFields(logrus.Fields{
-		"log_type": string(UserLog),
-		"emoji": "❌",
-	}).Errorf(format, args...)
-}
-
-func (u *UserLogger) Warn(msg string) {
-	u.logger.WithFields(logrus.Fields{
-		"log_type": string(UserLog),
-		"emoji": "⚠️",
-	}).Warn(msg)
-}
-
-func (u *UserLogger) Warnf(format string, args ...interface{}) {
-	u.logger.WithFields(logrus.Fields{
-		"log_type": string(UserLog),
-		"emoji": "⚠️",
-	}).Warnf(format, args...)
-}
-
-// Specific operation methods with relevant emojis
-func (u *UserLogger) Starting(msg string) {
-	u.logger.WithFields(logrus.Fields{
-		"log_type": string(UserLog),
-		"emoji": "🚀",
-	}).Info(msg)
-}
-
-func (u *UserLogger) Success(msg string) {
-	u.logger.WithFields(logrus.Fields{
-		"log_type": string(UserLog),
-		"emoji": "✅",
-	}).Info(msg)
-}
-
-func (u *UserLogger) Successf(format string, args ...interface{}) {
-	u.logger.WithFields(logrus.Fields{
-		"log_type": string(UserLog),
-		"emoji": "✅",
-	}).Infof(format, args...)
-}
-
-func (u *UserLogger) Snapshot(msg string) {
-	u.logger.WithFields(logrus.Fields{
-		"log_type": string(UserLog),
-		"emoji": "📸",
-	}).Info(msg)
-}
-
-func (u *UserLogger) Snapshotf(format string, args ...interface{}) {
-	u.logger.WithFields(logrus.Fields{
-		"log_type": string(UserLog),
-		"emoji": "📸",
-	}).Infof(format, args...)
-}
-
-func (u *UserLogger) Delete(msg string) {
-	u.logger.WithFields(logrus.Fields{
-		"log_type": string(UserLog),
-		"emoji": "🗑️",
-	}).Info(msg)
-}
-
-func (u *UserLogger) Deletef(format string, args ...interface{}) {
-	u.logger.WithFields(logrus.Fields{
-		"log_type": string(UserLog),
-		"emoji": "🗑️",
-	}).Infof(format, args...)
-}
-
-func (u *UserLogger) Create(msg string) {
-	u.logger.WithFields(logrus.Fields{
-		"log_type": string(UserLog),
-		"emoji": "💾",
-	}).Info(msg)
-}
-
-func (u *UserLogger) Createf(format string, args ...interface{}) {
-	u.logger.WithFields(logrus.Fields{
-		"log_type": string(UserLog),
-		"emoji": "💾",
-	}).Infof(format, args...)
-}
-
-func (u *UserLogger) Cleanup(msg string) {
-	u.logger.WithFields(logrus.Fields{
-		"log_type": string(UserLog),
-		"emoji": "🧹",
-	}).Info(msg)
-}
-
-func (u *UserLogger) Cleanupf(format string, args ...interface{}) {
-	u.logger.WithFields(logrus.Fields{
-		"log_type": string(UserLog),
-		"emoji": "🧹",
-	}).Infof(format, args...)
-}
-
-// OpLogger methods without emojis - clean operational logs
-func (o *OpLogger) Info(msg string) {
-	o.logger.WithField("log_type", string(OpLog)).Info(msg)
-}
-
-func (o *OpLogger) Infof(format string, args ...interface{}) {
-	o.logger.WithField("log_type", string(OpLog)).Infof(format, args...)
-}
-
-func (o *OpLogger) Error(msg string) {
-	o.logger.WithField("log_type", string(OpLog)).Error(msg)
-}
-
-func (o *OpLogger) Errorf(format string, args ...interface{}) {
-	o.logger.WithField("log_type", string(OpLog)).Errorf(format, args...)
-}
-
-func (o *OpLogger) Warn(msg string) {
-	o.logger.WithField("log_type", string(OpLog)).Warn(msg)
-}
-
-func (o *OpLogger) Warnf(format string, args ...interface{}) {
-	o.logger.WithField("log_type", string(OpLog)).Warnf(format, args...)
-}
-
-func (o *OpLogger) Debug(msg string) {
-	o.logger.WithField("log_type", string(OpLog)).Debug(msg)
-}
-
-func (o *OpLogger) Debugf(format string, args ...interface{}) {
-	o.logger.WithField("log_type", string(OpLog)).Debugf(format, args...)
-}
-
-func (o *OpLogger) WithFields(fields map[string]interface{}) *logrus.Entry {
-	// Add log_type to fields
-	if fields == nil {
-		fields = make(map[string]interface{})
-	}
-	fields["log_type"] = string(OpLog)
-	return o.logger.WithFields(fields)
-}
 
 // CLIFormatter provides clean output for CLI applications
 type CLIFormatter struct {
@@ -332,10 +164,6 @@ func Setup(verbose bool, jsonLogs bool, quiet bool) {
 		
 		internalLogger.AddHook(hook)
 	}
-	
-	// Update the compatibility layer loggers
-	User = &UserLogger{logger: internalLogger}
-	Op = &OpLogger{logger: internalLogger}
 }
 
 // Log returns the logrus standard logger (deprecated - use L() instead)

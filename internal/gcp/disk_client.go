@@ -50,7 +50,7 @@ func (dc *DiskClient) GetDisk(ctx context.Context, projectID, zone, diskName str
 		"zone":    zone,
 		"disk":    diskName,
 	}
-	logger.Op.WithFields(logFields).Info("Retrieving disk information...")
+	logger.WithFieldsMap(logFields).Info("Retrieving disk information...")
 
 	req := &computepb.GetDiskRequest{
 		Project: projectID,
@@ -60,11 +60,11 @@ func (dc *DiskClient) GetDisk(ctx context.Context, projectID, zone, diskName str
 
 	disk, err := dc.client.Get(ctx, req)
 	if err != nil {
-		logger.Op.WithFields(logFields).WithError(err).Error("Failed to retrieve disk")
+		logger.WithFieldsMap(logFields).WithError(err).Error("Failed to retrieve disk")
 		return nil, fmt.Errorf("failed to get disk %s in zone %s: %w", diskName, zone, err)
 	}
 
-	logger.Op.WithFields(logFields).Infof("Retrieved disk: %s", *disk.Name)
+	logger.WithFieldsMap(logFields).Infof("Retrieved disk: %s", *disk.Name)
 	return disk, nil
 }
 
@@ -78,7 +78,7 @@ func (dc *DiskClient) ListDetachedDisks(
 		"project": projectID,
 		"zone":    location,
 	}
-	logger.Op.WithFields(logFields).Info("Listing detached disks...")
+	logger.WithFieldsMap(logFields).Info("Listing detached disks...")
 
 	req := &computepb.AggregatedListDisksRequest{
 		Project: projectID,
@@ -87,7 +87,7 @@ func (dc *DiskClient) ListDetachedDisks(
 	it := dc.client.AggregatedList(ctx, req)
 	disks := make([]*computepb.Disk, 0)
 	if it == nil {
-		logger.Op.WithFields(logFields).Warn("AggregatedList returned a nil iterator. Returning empty disk list.")
+		logger.WithFieldsMap(logFields).Warn("AggregatedList returned a nil iterator. Returning empty disk list.")
 		return disks, nil
 	}
 
@@ -97,7 +97,7 @@ func (dc *DiskClient) ListDetachedDisks(
 			if err == iterator.Done {
 				break
 			}
-			logger.Op.WithFields(logFields).WithError(err).Error("Failed to list disks")
+			logger.WithFieldsMap(logFields).WithError(err).Error("Failed to list disks")
 			return nil, fmt.Errorf("failed to list disks: %w", err)
 		}
 
@@ -105,12 +105,12 @@ func (dc *DiskClient) ListDetachedDisks(
 			zone := utils.ExtractZoneName(disk.GetZone())
 			if *disk.Status == "READY" && zone == location && len(disk.Users) == 0 {
 				disks = append(disks, disk)
-				logger.Op.WithFields(logFields).Infof("Found detached disk: %s", *disk.Name)
+				logger.WithFieldsMap(logFields).Infof("Found detached disk: %s", *disk.Name)
 			}
 		}
 	}
 
-	logger.Op.WithFields(logFields).Infof("Found %d detached disk(s)", len(disks))
+	logger.WithFieldsMap(logFields).Infof("Found %d detached disk(s)", len(disks))
 	return disks, nil
 }
 
@@ -134,7 +134,7 @@ func (dc *DiskClient) CreateNewDiskFromSnapshot(
 		"targetType":     targetDiskType,
 		"snapshotSource": snapshotSource,
 	}
-	logger.Op.WithFields(logFields).Info("Initiating disk creation from snapshot...")
+	logger.WithFieldsMap(logFields).Info("Initiating disk creation from snapshot...")
 
 	if !strings.Contains(snapshotSource, "/") {
 		snapshotSource = fmt.Sprintf("global/snapshots/%s", snapshotSource)
@@ -177,23 +177,23 @@ func (dc *DiskClient) CreateNewDiskFromSnapshot(
 
 	op, err := dc.client.Insert(ctx, req)
 	if err != nil {
-		logger.Op.WithFields(logFields).WithError(err).Error("Failed to initiate disk creation")
+		logger.WithFieldsMap(logFields).WithError(err).Error("Failed to initiate disk creation")
 		return fmt.Errorf("failed to initiate creation for disk %s: %w", newDiskName, err)
 	}
 
 	opName := op.Name()
-	logger.Op.WithFields(logFields).Infof("Waiting for disk creation operation %s to complete...", opName)
+	logger.WithFieldsMap(logFields).Infof("Waiting for disk creation operation %s to complete...", opName)
 
 	opCtx, cancel := context.WithTimeout(ctx, defaultOpTimeout)
 	defer cancel()
 
 	err = op.Wait(opCtx)
 	if err != nil {
-		logger.Op.WithFields(logFields).WithError(err).Errorf("Waiting for disk creation operation %s failed", opName)
+		logger.WithFieldsMap(logFields).WithError(err).Errorf("Waiting for disk creation operation %s failed", opName)
 		return fmt.Errorf("waiting for disk %s creation failed: %w", newDiskName, err)
 	}
 
-	logger.Op.WithFields(logFields).Info("Disk created successfully from snapshot.")
+	logger.WithFieldsMap(logFields).Info("Disk created successfully from snapshot.")
 	return nil
 }
 
@@ -212,7 +212,7 @@ func (dc *DiskClient) UpdateDiskLabel(
 		"labelKey": labelKey,
 		"labelVal": labelValue,
 	}
-	logger.Op.WithFields(logFields).Info("Setting disk label...")
+	logger.WithFieldsMap(logFields).Info("Setting disk label...")
 
 	req := &computepb.GetDiskRequest{
 		Project: projectID,
@@ -244,29 +244,29 @@ func (dc *DiskClient) UpdateDiskLabel(
 
 	op, err := dc.client.SetLabels(ctx, setLabelsReq)
 	if err != nil {
-		logger.Op.WithFields(logFields).WithError(err).Error("Failed to initiate set disk label operation")
+		logger.WithFieldsMap(logFields).WithError(err).Error("Failed to initiate set disk label operation")
 		return fmt.Errorf("failed to initiate set label for disk %s: %w", diskName, err)
 	}
 
 	opName := op.Name()
-	logger.Op.WithFields(logFields).Infof("Waiting for set label operation %s to complete...", opName)
+	logger.WithFieldsMap(logFields).Infof("Waiting for set label operation %s to complete...", opName)
 
 	opCtx, cancel := context.WithTimeout(ctx, defaultOpTimeout)
 	defer cancel()
 
 	err = op.Wait(opCtx)
 	if err != nil {
-		logger.Op.WithFields(logFields).WithError(err).Errorf("Waiting for set label operation %s failed", opName)
+		logger.WithFieldsMap(logFields).WithError(err).Errorf("Waiting for set label operation %s failed", opName)
 		return fmt.Errorf("waiting for disk %s set label failed: %w", diskName, err)
 	}
 
-	logger.Op.WithFields(logFields).Info("Disk label set successfully.")
+	logger.WithFieldsMap(logFields).Info("Disk label set successfully.")
 	return nil
 }
 
 func (dc *DiskClient) DeleteDisk(ctx context.Context, projectID, zone, diskName string) error {
 	logFields := map[string]interface{}{"project": projectID, "zone": zone, "disk": diskName}
-	logger.Op.WithFields(logFields).Info("Initiating deletion of disk...")
+	logger.WithFieldsMap(logFields).Info("Initiating deletion of disk...")
 
 	req := &computepb.DeleteDiskRequest{
 		Project: projectID,
@@ -276,23 +276,23 @@ func (dc *DiskClient) DeleteDisk(ctx context.Context, projectID, zone, diskName 
 
 	op, err := dc.client.Delete(ctx, req)
 	if err != nil {
-		logger.Op.WithFields(logFields).WithError(err).Error("Failed to initiate disk deletion")
+		logger.WithFieldsMap(logFields).WithError(err).Error("Failed to initiate disk deletion")
 		return fmt.Errorf("failed to initiate deletion for disk %s: %w", diskName, err)
 	}
 
 	opName := op.Name()
-	logger.Op.WithFields(logFields).Infof("Waiting for disk deletion operation %s to complete...", opName)
+	logger.WithFieldsMap(logFields).Infof("Waiting for disk deletion operation %s to complete...", opName)
 
 	opCtx, cancel := context.WithTimeout(ctx, defaultOpTimeout)
 	defer cancel()
 
 	err = op.Wait(opCtx)
 	if err != nil {
-		logger.Op.WithFields(logFields).WithError(err).Errorf("Waiting for disk deletion operation %s failed", opName)
+		logger.WithFieldsMap(logFields).WithError(err).Errorf("Waiting for disk deletion operation %s failed", opName)
 		return fmt.Errorf("waiting for disk %s deletion failed: %w", diskName, err)
 	}
 
-	logger.Op.WithFields(logFields).Info("Disk deleted successfully.")
+	logger.WithFieldsMap(logFields).Info("Disk deleted successfully.")
 	return nil
 }
 

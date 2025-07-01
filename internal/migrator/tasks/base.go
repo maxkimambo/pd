@@ -18,7 +18,7 @@ type BaseTask struct {
 // Execute logs task start/end and measures execution time
 func (b *BaseTask) Execute(ctx context.Context, shared *taskmanager.SharedContext, taskFunc func() error) error {
 	startTime := time.Now()
-	logger.Op.Debugf("Starting task: %s", b.Name)
+	logger.Debugf("Starting task: %s", b.Name)
 	
 	err := taskFunc()
 	
@@ -26,11 +26,11 @@ func (b *BaseTask) Execute(ctx context.Context, shared *taskmanager.SharedContex
 	shared.Set(b.Name+"_duration", duration)
 	
 	if err != nil {
-		logger.Op.Errorf("Task %s failed after %v: %v", b.Name, duration, err)
+		logger.Errorf("Task %s failed after %v: %v", b.Name, duration, err)
 		return err
 	}
 	
-	logger.Op.Debugf("Task %s completed successfully in %v", b.Name, duration)
+	logger.Debugf("Task %s completed successfully in %v", b.Name, duration)
 	return nil
 }
 
