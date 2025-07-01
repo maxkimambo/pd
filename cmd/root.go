@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"github.com/maxkimambo/pd/internal/logger"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
@@ -18,6 +19,10 @@ var (
 		Short: "A CLI tool for migrating Google Cloud persistent disks",
 		Long:  `A CLI tool for bulk migrating Google Cloud persistent disks from one type to another, either detached or attached to GCE instances.`,
 		PersistentPreRun: func(cmd *cobra.Command, args []string) {
+			// Setup the unified logger
+			logger.Setup(verbose || debug, jsonLogs, quiet)
+			
+			// Legacy logrus setup (will be removed after full migration)
 			if debug {
 				logrus.SetLevel(logrus.DebugLevel)
 				logrus.Debug("Debug logging enabled")

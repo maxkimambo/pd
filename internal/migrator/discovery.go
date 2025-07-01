@@ -14,12 +14,12 @@ import (
 
 // DiscoverDisks discovers GCP Compute Engine persistent disks based on the migration configuration.
 func DiscoverDisks(ctx context.Context, config *Config, gcpClient *gcp.Clients) ([]*computepb.Disk, error) {
-	logger.User.Info("--- Phase 1: Discovery ---")
+	logger.Info("--- Phase 1: Discovery ---")
 
 	location := config.Location()
-	logger.User.Infof("Listing detached disks in %s (Project: %s)", location, config.ProjectID)
+	logger.Infof("Listing detached disks in %s (Project: %s)", location, config.ProjectID)
 	if config.LabelFilter != "" {
-		logger.User.Infof("Applying label filter: %s", config.LabelFilter)
+		logger.Infof("Applying label filter: %s", config.LabelFilter)
 	}
 
 	disksToMigrate, err := gcpClient.DiskClient.ListDetachedDisks(ctx, config.ProjectID, location, config.LabelFilter)
@@ -28,11 +28,11 @@ func DiscoverDisks(ctx context.Context, config *Config, gcpClient *gcp.Clients) 
 	}
 
 	if len(disksToMigrate) == 0 {
-		logger.User.Info("No detached disks found matching the criteria.")
+		logger.Info("No detached disks found matching the criteria.")
 		return []*computepb.Disk{}, nil
 	}
 
-	logger.User.Infof("Found %d detached disk(s) matching criteria:", len(disksToMigrate))
+	logger.Infof("Found %d detached disk(s) matching criteria:", len(disksToMigrate))
 	var sb strings.Builder
 	for i, disk := range disksToMigrate {
 		zone := "unknown"
@@ -48,7 +48,7 @@ func DiscoverDisks(ctx context.Context, config *Config, gcpClient *gcp.Clients) 
 		sb.WriteString("----------------------\n")
 	}
 
-	logger.User.Info(sb.String())
+	logger.Info(sb.String())
 
 	confirmed, err := utils.PromptForConfirmation(
 		config.AutoApproveAll,
@@ -59,14 +59,14 @@ func DiscoverDisks(ctx context.Context, config *Config, gcpClient *gcp.Clients) 
 		return nil, err
 	}
 	if !confirmed {
-		logger.User.Info("Migration cancelled by user.")
+		logger.Info("Migration cancelled by user.")
 		return []*computepb.Disk{}, nil
 	}
 	if !config.AutoApproveAll {
-		logger.User.Info("User confirmed. Proceeding with migration.")
+		logger.Info("User confirmed. Proceeding with migration.")
 	}
 
-	logger.User.Info("--- Discovery Phase Complete ---")
+	logger.Info("--- Discovery Phase Complete ---")
 	return disksToMigrate, nil
 }
 
@@ -79,14 +79,14 @@ func getShortDiskTypeName(typeURL string) string {
 }
 
 func DiscoverInstances(ctx context.Context, config *Config, gcpClient *gcp.Clients) ([]*computepb.Instance, error) {
-	logger.User.Info("--- Phase 1: Discovering Instances ---")
+	logger.Info("--- Phase 1: Discovering Instances ---")
 
 	var discoveredInstances []*computepb.Instance
 	var err error
 	if len(config.Instances) > 0 && config.Instances[0] != "*" {
 		// get instances by names
 		for _, instanceName := range config.Instances {
-			logger.User.Infof("Getting compute instance %s", instanceName)
+			logger.Infof("Getting compute instance %s", instanceName)
 			instance, err := gcpClient.ComputeClient.GetInstance(ctx, config.ProjectID, config.Zone, instanceName)
 			if err != nil {
 				return nil, fmt.Errorf("failed to get instance %s in zone %s: %w", instanceName, config.Zone, err)
@@ -94,17 +94,17 @@ func DiscoverInstances(ctx context.Context, config *Config, gcpClient *gcp.Clien
 			if instance != nil {
 				discoveredInstances = append(discoveredInstances, instance)
 			} else {
-				logger.User.Warnf("Instance %s not found in zone %s", instanceName, config.Zone)
+				logger.Warnf("Instance %s not found in zone %s", instanceName, config.Zone)
 			}
 		}
 	} else if config.Zone != "" {
-		logger.User.Infof("Listing instances in zone %s", config.Zone)
+		logger.Infof("Listing instances in zone %s", config.Zone)
 		discoveredInstances, err = listInstancesInZone(ctx, config.ProjectID, config.Zone, gcpClient)
 		if err != nil {
 			return nil, fmt.Errorf("failed to discover instances in zone %s: %w", config.Zone, err)
 		}
 	} else if config.Region != "" {
-		logger.User.Infof("Listing instances in region %s", config.Region)
+		logger.Infof("Listing instances in region %s", config.Region)
 		discoveredInstances, err = listInstancesInRegion(ctx, config.ProjectID, config.Region, gcpClient)
 		if err != nil {
 			return nil, fmt.Errorf("failed to discover instances in region %s: %w", config.Region, err)
@@ -114,13 +114,13 @@ func DiscoverInstances(ctx context.Context, config *Config, gcpClient *gcp.Clien
 	}
 
 	if len(discoveredInstances) == 0 {
-		logger.User.Info("No instances found matching the specified location.")
+		logger.Info("No instances found matching the specified location.")
 		return []*computepb.Instance{}, nil
 	}
 	var sb strings.Builder
 	sb.WriteString("\n")
 	for _, instance := range discoveredInstances {
-		logger.User.Infof("\t %s (Zone: %s)", instance.GetName(), utils.ExtractZoneName(instance.GetZone()))
+		logger.Infof("\t %s (Zone: %s)", instance.GetName(), utils.ExtractZoneName(instance.GetZone()))
 	}
 	return discoveredInstances, nil
 }

@@ -117,13 +117,7 @@ func validateComputeCmdFlags(cmd *cobra.Command, args []string) error {
 }
 
 func runGceConvert(cmd *cobra.Command, args []string) error {
-	// Set verbose to true if debug is enabled for backward compatibility
-	if debug {
-		verbose = true
-	}
-	logger.Setup(verbose, jsonLogs, quiet)
-
-	logger.User.Starting("Starting disk migration process...")
+	logger.Starting("Starting disk migration process...")
 
 	config := migrator.Config{
 		ProjectID:      projectID,
@@ -138,25 +132,24 @@ func runGceConvert(cmd *cobra.Command, args []string) error {
 		AutoApproveAll: gceAutoApprove,
 		Concurrency:    gceMaxConcurrency,
 		RetainName:     gceRetainName,
-		Debug:          debug,
 		Instances:      gceInstances,
 		Throughput:     throughput,
 		Iops:           iops,
 		StoragePoolId:  storagePoolId,
 	}
-	logger.Op.Debugf("Configuration: %+v", config)
-	logger.User.Infof("Project: %s", projectID)
+	logger.Debugf("Configuration: %+v", config)
+	logger.Infof("Project: %s", projectID)
 	if gceZone != "" {
-		logger.User.Infof("Zone: %s", gceZone)
+		logger.Infof("Zone: %s", gceZone)
 	} else {
-		logger.User.Infof("Region: %s", gceRegion)
+		logger.Infof("Region: %s", gceRegion)
 	}
 	if gceInstances[0] == "*" {
-		logger.User.Infof("Target: All instances in scope (%s)", config.Location())
+		logger.Infof("Target: All instances in scope (%s)", config.Location())
 	} else {
-		logger.User.Infof("Target: %s", strings.Join(gceInstances, ", "))
+		logger.Infof("Target: %s", strings.Join(gceInstances, ", "))
 	}
-	logger.User.Infof("Target disk type: %s", gceTargetDiskType)
+	logger.Infof("Target disk type: %s", gceTargetDiskType)
 
 	ctx := context.Background()
 	gcpClient, err := gcp.NewClients(ctx)
@@ -169,24 +162,24 @@ func runGceConvert(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("failed to discover GCE instances: %w", err)
 	}
-	logger.User.Infof("Discovered %d instance(s) for migration.", len(discoveredInstances))
+	logger.Infof("Discovered %d instance(s) for migration.", len(discoveredInstances))
 
 	// Create migration manager
 	manager := workflow.NewMigrationManager(gcpClient, &config)
 
-	logger.User.Info("--- Phase 2: Migration (GCE Attached Disks) ---")
+	logger.Info("--- Phase 2: Migration (GCE Attached Disks) ---")
 
 	// Track overall results
 	var successCount, failureCount int
 	var allResults []*workflow.WorkflowResult
 	workflows := make([]*taskmanager.Workflow, 0, len(discoveredInstances))
 	for _, instance := range discoveredInstances {
-		logger.User.Infof("Processing instance: %s", *instance.Name)
+		logger.Infof("Processing instance: %s", *instance.Name)
 		// Create instance-specific workflow
 		workflow, err := manager.CreateInstanceMigrationWorkflow(instance)
 		workflows = append(workflows, workflow)
 		if err != nil {
-			logger.User.Errorf("Failed to create workflow for %s: %v", *instance.Name, err)
+			logger.Errorf("Failed to create workflow for %s: %v", *instance.Name, err)
 			failureCount++
 			continue
 		}
@@ -200,7 +193,7 @@ func runGceConvert(cmd *cobra.Command, args []string) error {
 		allResults = append(allResults, result)
 
 		if err != nil {
-			logger.User.Errorf("Workflow failed for %s: %v", workflow.ID, err)
+			logger.Errorf("Workflow failed for %s: %v", workflow.ID, err)
 			failureCount++
 		} else {
 			successCount++
@@ -208,10 +201,10 @@ func runGceConvert(cmd *cobra.Command, args []string) error {
 	}
 
 	// --- Summary Report ---
-	logger.User.Info("--- Migration Summary ---")
-	logger.User.Infof("Total instances processed: %d", len(discoveredInstances))
-	logger.User.Infof("Successful migrations: %d", successCount)
-	logger.User.Infof("Failed migrations: %d", failureCount)
+	logger.Info("--- Migration Summary ---")
+	logger.Infof("Total instances processed: %d", len(discoveredInstances))
+	logger.Infof("Successful migrations: %d", successCount)
+	logger.Infof("Failed migrations: %d", failureCount)
 
 	for _, result := range allResults {
 		// Report individual results
@@ -222,6 +215,6 @@ func runGceConvert(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("%d out of %d instance migrations failed", failureCount, len(discoveredInstances))
 	}
 
-	logger.User.Success("All instance migrations completed successfully!")
+	logger.Success("All instance migrations completed successfully!")
 	return nil
 }

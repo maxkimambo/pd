@@ -16,7 +16,6 @@ type Config struct {
 	AutoApproveAll bool
 	Concurrency    int
 	RetainName     bool
-	Debug          bool
 	Iops           int64
 	Throughput     int64
 	StoragePoolId  string

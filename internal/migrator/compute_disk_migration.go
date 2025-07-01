@@ -41,7 +41,7 @@ func GetInstanceState(ctx context.Context, instance *computepb.Instance, gcpClie
 	instanceStateMap[instanceKey] = state
 	stateMapMutex.Unlock()
 
-	logger.User.Infof("Instance %s state: %s", instanceKey, state)
+	logger.Infof("Instance %s state: %s", instanceKey, state)
 	return state, nil
 }
 
@@ -52,11 +52,11 @@ func removeInstanceState(instance *computepb.Instance) {
 	delete(instanceStateMap, instanceKey)
 	stateMapMutex.Unlock()
 
-	logger.Op.Debugf("Removed instance %s from state map", instanceKey)
+	logger.Debugf("Removed instance %s from state map", instanceKey)
 }
 
 func SnapshotInstanceDisks(ctx context.Context, config *Config, instance *computepb.Instance, gcpClient *gcp.Clients) error {
-	logger.User.Infof("Creating snapshots for all disks attached to instance %s", instance.GetName())
+	logger.Infof("Creating snapshots for all disks attached to instance %s", instance.GetName())
 
 	attachedDisks := instance.GetDisks()
 	zone := utils.ExtractZoneName(instance.GetZone())
@@ -70,13 +70,13 @@ func SnapshotInstanceDisks(ctx context.Context, config *Config, instance *comput
 
  		disk, err := gcpClient.DiskClient.GetDisk(ctx, config.ProjectID, zone, diskName)
 		if err != nil {
-			logger.User.Errorf("Failed to get disk %s in zone %s: %v", diskName, zone, err)
+			logger.Errorf("Failed to get disk %s in zone %s: %v", diskName, zone, err)
 			// return fmt.Errorf("failed to get disk %s in zone %s: %w", diskName, zone, err)
 			continue
 		}
 
 		if disk == nil {
-			logger.User.Warnf("Disk %s not found, skipping snapshot", diskName)
+			logger.Warnf("Disk %s not found, skipping snapshot", diskName)
 			continue
 		}
 
@@ -88,7 +88,7 @@ func SnapshotInstanceDisks(ctx context.Context, config *Config, instance *comput
 			KmsProject:  config.KmsProject,
 		}
 
-		logger.User.Snapshotf("Creating snapshot %s for disk %s", snapshotName, disk.GetName())
+		logger.Snapshotf("Creating snapshot %s for disk %s", snapshotName, disk.GetName())
 		labels := map[string]string{
 			"managed-by": "pd-migrate",
 			"instance":   instance.GetName(),
@@ -98,15 +98,15 @@ func SnapshotInstanceDisks(ctx context.Context, config *Config, instance *comput
 			return fmt.Errorf("failed to create snapshot for disk %s: %w", disk.GetName(), err)
 		}
 
-		logger.User.Successf("Snapshot %s created successfully for disk %s", snapshotName, disk.GetName())
+		logger.Successf("Snapshot %s created successfully for disk %s", snapshotName, disk.GetName())
 	}
 
-	logger.User.Success("All disk snapshots completed for instance " + instance.GetName())
+	logger.Success("All disk snapshots completed for instance " + instance.GetName())
 	return nil
 }
 
 func MigrateInstanceNonBootDisks(ctx context.Context, config *Config, instance *computepb.Instance, gcpClient *gcp.Clients) ([]MigrationResult, error) {
-	logger.User.Infof("Migrating non-boot disks for instance %s", instance.GetName())
+	logger.Infof("Migrating non-boot disks for instance %s", instance.GetName())
 
 	attachedDisks := instance.GetDisks()
 	zone := utils.ExtractZoneName(instance.GetZone())
@@ -116,7 +116,7 @@ func MigrateInstanceNonBootDisks(ctx context.Context, config *Config, instance *
 
 	for _, attachedDisk := range attachedDisks {
 		if attachedDisk.GetBoot() {
-			logger.User.Infof("Skipping boot disk %s", attachedDisk.GetDeviceName())
+			logger.Infof("Skipping boot disk %s", attachedDisk.GetDeviceName())
 			continue
 		}
 		nonBootDisks = append(nonBootDisks, attachedDisk)
@@ -128,7 +128,7 @@ func MigrateInstanceNonBootDisks(ctx context.Context, config *Config, instance *
 			return []MigrationResult{}, fmt.Errorf("failed to detach disk %s from instance %s in zone %s: %w", disk.GetDeviceName(), instance.GetName(), zone, err)
 		}
 		// perform the migration for the detached disk
-		logger.User.Infof("Migrating disk %s", disk.GetDeviceName())
+		logger.Infof("Migrating disk %s", disk.GetDeviceName())
 
 		diskToMigrate, err := gcpClient.DiskClient.GetDisk(ctx, config.ProjectID, zone, disk.GetDeviceName())
 		if err != nil {
@@ -139,7 +139,7 @@ func MigrateInstanceNonBootDisks(ctx context.Context, config *Config, instance *
 				ErrorMessage: err.Error(),
 			}
 			results = append(results, result)
-			logger.User.Errorf("Failed to migrate disk %s: %v  continuing with the next disk", disk.GetDeviceName(), err)
+			logger.Errorf("Failed to migrate disk %s: %v  continuing with the next disk", disk.GetDeviceName(), err)
 			hasErrors = true
 			continue
 		}
@@ -152,7 +152,7 @@ func MigrateInstanceNonBootDisks(ctx context.Context, config *Config, instance *
 		deviceName := disk.GetDeviceName()
 		// reattach the disks to the instance
 		if err := gcpClient.ComputeClient.AttachDisk(ctx, config.ProjectID, zone, instance.GetName(), newDisk, deviceName); err != nil {
-			logger.User.Errorf("failed to reattach disk %s to instance %s in zone %s: %w", disk.GetDeviceName(), instance.GetName(), zone, err)
+			logger.Errorf("failed to reattach disk %s to instance %s in zone %s: %v", disk.GetDeviceName(), instance.GetName(), zone, err)
 			// record the error and continue with the next disk
 			result := MigrationResult{
 				DiskName:     disk.GetDeviceName(),
@@ -167,7 +167,7 @@ func MigrateInstanceNonBootDisks(ctx context.Context, config *Config, instance *
 	}
 
 	if hasErrors {
-		logger.User.Errorf("Some disks failed to migrate for instance %s. Check the logs for details.", instance.GetName())
+		logger.Errorf("Some disks failed to migrate for instance %s. Check the logs for details.", instance.GetName())
 	}
 
 	return results, nil
@@ -200,7 +200,7 @@ func HandleInstanceDiskMigration(ctx context.Context, config *Config, instance *
 	}
 
 	if isRunning {
-		logger.User.Infof("Instance %s in zone %s is running, stopping it before migration", instance.GetName(), zone)
+		logger.Infof("Instance %s in zone %s is running, stopping it before migration", instance.GetName(), zone)
 		if err := gcpClient.ComputeClient.StopInstance(ctx, config.ProjectID, zone, instance.GetName()); err != nil {
 			return fmt.Errorf("failed to stop instance %s in zone %s: %w", instance.GetName(), zone, err)
 		}
@@ -213,22 +213,22 @@ func HandleInstanceDiskMigration(ctx context.Context, config *Config, instance *
 
 	for _, result := range migrationResult {
 		if result.ErrorMessage != "" {
-			logger.User.Errorf("Failed to migrate disk %s: %v  continuing with the next disk", result.DiskName, result.ErrorMessage)
+			logger.Errorf("Failed to migrate disk %s: %v  continuing with the next disk", result.DiskName, result.ErrorMessage)
 		}
 	}
 	previousInstanceState, err := GetInstanceState(ctx, instance, gcpClient)
 	if previousInstanceState == RUNNING_STATE && err == nil {
-		logger.User.Infof("Instance %s in zone %s was running, starting it after migration", instance.GetName(), zone)
+		logger.Infof("Instance %s in zone %s was running, starting it after migration", instance.GetName(), zone)
 		if err := gcpClient.ComputeClient.StartInstance(ctx, config.ProjectID, zone, instance.GetName()); err != nil {
 			return fmt.Errorf("failed to start instance %s in zone %s: %w", instance.GetName(), zone, err)
 		}
 	}
-	logger.User.Successf("All disks migrated successfully for instance %s", instance.GetName())
+	logger.Successf("All disks migrated successfully for instance %s", instance.GetName())
 	return nil
 }
 
 func IncrementalSnapshotDisk(ctx context.Context, config *Config, disk *computepb.Disk, gcpClient *gcp.Clients) error {
-	logger.User.Infof("Creating incremental snapshot for disk %s in zone %s", disk.GetName(), disk.GetZone())
+	logger.Infof("Creating incremental snapshot for disk %s in zone %s", disk.GetName(), disk.GetZone())
 
 	snapshotName := fmt.Sprintf("%s-snapshot", utils.AddSuffix(disk.GetName(), 3))
 	kmsParams := &gcp.SnapshotKmsParams{
@@ -242,6 +242,6 @@ func IncrementalSnapshotDisk(ctx context.Context, config *Config, disk *computep
 		return fmt.Errorf("failed to create incremental snapshot for disk %s: %w", disk.GetName(), err)
 	}
 
-	logger.User.Infof("Incremental snapshot %s created successfully for disk %s", snapshotName, disk.GetName())
+	logger.Infof("Incremental snapshot %s created successfully for disk %s", snapshotName, disk.GetName())
 	return nil
 }

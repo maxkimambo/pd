@@ -107,13 +107,7 @@ func validateDiskCmdFlags(cmd *cobra.Command, args []string) error {
 }
 
 func runConvert(cmd *cobra.Command, args []string) error {
-	// Set verbose to true if debug is enabled for backward compatibility
-	if debug {
-		verbose = true
-	}
-	logger.Setup(verbose, jsonLogs, quiet)
-
-	logger.User.Starting("Starting disk conversion process...")
+	logger.Starting("Starting disk conversion process...")
 
 	config := migrator.Config{
 		ProjectID:      projectID,
@@ -128,12 +122,11 @@ func runConvert(cmd *cobra.Command, args []string) error {
 		AutoApproveAll: autoApprove,
 		Concurrency:    concurrency,
 		RetainName:     retainName,
-		Debug:          debug,
 		Iops:           iops,
 		Throughput:     throughput,
 		StoragePoolId:  storagePoolId,
 	}
-	logger.Op.Debugf("Configuration: %+v", config)
+	logger.Debugf("Configuration: %+v", config)
 	ctx := context.Background()
 
 	gcpClient, err := gcp.NewClients(ctx)
@@ -147,22 +140,22 @@ func runConvert(cmd *cobra.Command, args []string) error {
 		return err
 	}
 	if len(discoveredDisks) == 0 {
-		logger.User.Info("No disks to migrate. Exiting.")
+		logger.Info("No disks to migrate. Exiting.")
 		return nil
 	}
 
 	migrationResults, err := migrator.MigrateDisks(ctx, &config, gcpClient, discoveredDisks)
 	if err != nil {
-		logger.User.Errorf("Migration phase encountered errors: %v", err)
+		logger.Errorf("Migration phase encountered errors: %v", err)
 	}
 
 	err = migrator.CleanupSnapshots(ctx, &config, gcpClient, migrationResults)
 	if err != nil {
-		logger.User.Warnf("Cleanup phase encountered errors: %v", err)
+		logger.Warnf("Cleanup phase encountered errors: %v", err)
 	}
 
 	migrator.GenerateReports(migrationResults)
 
-	logger.User.Success("Disk conversion process finished.")
+	logger.Success("Disk conversion process finished.")
 	return nil
 }

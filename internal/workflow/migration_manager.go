@@ -72,7 +72,6 @@ func (m *MigrationManager) ExecuteWorkflow(ctx context.Context, workflow *taskma
 		"AutoApproveAll": m.config.AutoApproveAll,
 		"Concurrency":    m.config.Concurrency,
 		"RetainName":     m.config.RetainName,
-		"Debug":          m.config.Debug,
 		"Instances":      m.config.Instances,
 		"Throughput":     m.config.Throughput,
 		"Iops":           m.config.Iops,
