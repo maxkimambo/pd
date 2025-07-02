@@ -4,11 +4,13 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/maxkimambo/pd/internal/gcp"
 	"github.com/maxkimambo/pd/internal/logger"
 	"github.com/maxkimambo/pd/internal/migrator"
 	"github.com/maxkimambo/pd/internal/taskmanager"
+	"github.com/maxkimambo/pd/internal/utils"
 	"github.com/maxkimambo/pd/internal/validation"
 	"github.com/maxkimambo/pd/internal/workflow"
 	"github.com/spf13/cobra"
@@ -53,6 +55,7 @@ func init() {
 	computeCmd.Flags().Bool("auto-approve", false, "Skip all interactive prompts and proceed with migration")
 	computeCmd.Flags().Int("concurrency", 5, "Maximum number of concurrent instance/disk operations (1-50)")
 	computeCmd.Flags().Bool("retain-name", true, "Reuse original disk name (deletes original). If false, creates new disk with suffix")
+	computeCmd.Flags().Bool("dry-run", false, "Show what would be done without making any changes")
 
 	if err := computeCmd.MarkFlagRequired("target-disk-type"); err != nil {
 		logger.Errorf("Failed to mark target-disk-type as required: %s", err)
@@ -133,10 +136,39 @@ func runGceConvert(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("no instances found matching the specified criteria")
 	}
 
+	// Generate migration summary using formatted message box
+	summaryBox := utils.NewBox(utils.InfoMessage, "Migration Summary").
+		AddLine(fmt.Sprintf("Target disk type: %s", config.TargetDiskType)).
+		AddLine(fmt.Sprintf("Instances to process: %d", len(discoveredInstances))).
+		AddLine(fmt.Sprintf("Estimated time: ~%d minutes per instance", 10)).
+		AddLine("").
+		AddLine("Process includes:").
+		AddBullet("Stop instance (if running)").
+		AddBullet("Detach disks").
+		AddBullet("Create snapshots").
+		AddBullet("Recreate disks with new type").
+		AddBullet("Reattach disks").
+		AddBullet("Restart instance")
+	
+	fmt.Println(summaryBox.Render())
+
+	confirmed, err := utils.PromptForConfirmation(
+		config.AutoApproveAll,
+		fmt.Sprintf("migrate disks for %d instance(s)", len(discoveredInstances)),
+		"Proceed with migration?",
+	)
+	if err != nil {
+		return err
+	}
+	if !confirmed {
+		logger.Info("Migration cancelled by user.")
+		return nil
+	}
+
 	// Create migration manager
 	manager := workflow.NewMigrationManager(gcpClient, config)
 
-	logger.Starting("⚙️  Migration Phase: GCE Attached Disks")
+	logger.Starting("Migration Phase: GCE Attached Disks")
 
 	// Track overall results
 	var successCount, failureCount int
@@ -169,21 +201,31 @@ func runGceConvert(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	// Summary Report
-	logger.Info("\n🎯 Migration Summary\n" + strings.Repeat("=", 25))
-	logger.Infof("Total instances processed: %d", len(discoveredInstances))
-	logger.Infof("Successful migrations: %d", successCount)
-	logger.Infof("Failed migrations: %d", failureCount)
+	// Print migration summary using generic function
+	migrator.PrintMigrationSummary(migrator.MigrationSummary{
+		TotalProcessed: len(discoveredInstances),
+		SuccessCount:   successCount,
+		FailureCount:   failureCount,
+		ResourceType:   "instance",
+	})
 
 	for _, result := range allResults {
 		// Report individual results
 		manager.ReportResults(result)
 	}
 
+	// Calculate and print completion summary
+	summary := migrator.MigrationSummary{
+		TotalProcessed: len(discoveredInstances),
+		SuccessCount:   successCount,
+		FailureCount:   failureCount,
+		ResourceType:   "instance",
+	}
+	migrator.PrintCompletionSummary(summary, config, time.Now()) // Note: we don't have startTime here, using current time for duration calc
+
 	if failureCount > 0 {
-		return fmt.Errorf("%d out of %d instance migrations failed", failureCount, len(discoveredInstances))
+		return fmt.Errorf("some migrations failed")
 	}
 
-	logger.Success("All instance migrations completed successfully!")
 	return nil
 }

@@ -3,6 +3,7 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/maxkimambo/pd/internal/gcp"
 	"github.com/maxkimambo/pd/internal/logger"
@@ -45,6 +46,7 @@ func init() {
 	diskCmd.Flags().Bool("auto-approve", false, "Skip all interactive prompts and proceed with migration")
 	diskCmd.Flags().Int("concurrency", 10, "Maximum number of concurrent disk migrations (1-200)")
 	diskCmd.Flags().Bool("retain-name", true, "Reuse original disk name (deletes original). If false, creates new disk with suffix")
+	diskCmd.Flags().Bool("dry-run", false, "Show what would be done without making any changes")
 
 	if err := diskCmd.MarkFlagRequired("target-disk-type"); err != nil {
 		logger.Errorf("Failed to mark target-disk-type as required: %s", err)
@@ -79,6 +81,7 @@ func validateDiskCmdFlags(cmd *cobra.Command, args []string) error {
 }
 
 func runConvert(cmd *cobra.Command, args []string) error {
+	startTime := time.Now()
 	logger.Starting("Starting disk conversion process...")
 
 	config, err := createMigrationConfig(cmd)
@@ -116,6 +119,13 @@ func runConvert(cmd *cobra.Command, args []string) error {
 
 	migrator.GenerateReports(migrationResults)
 
-	logger.Success("Disk conversion process finished.")
+	// Calculate and print completion summary
+	summary := migrator.CalculateMigrationSummary(migrationResults, "disk")
+	migrator.PrintCompletionSummary(summary, config, startTime)
+
+	if summary.FailureCount > 0 {
+		return fmt.Errorf("some migrations failed")
+	}
+
 	return nil
 }

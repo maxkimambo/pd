@@ -25,6 +25,7 @@ func createMigrationConfig(cmd *cobra.Command) (*migrator.Config, error) {
 	throughput, _ := cmd.Flags().GetInt64("throughput")
 	iops, _ := cmd.Flags().GetInt64("iops")
 	storagePoolId, _ := cmd.Flags().GetString("storage-pool-id")
+	dryRun, _ := cmd.Flags().GetBool("dry-run")
 
 	return &migrator.Config{
 		ProjectID:      projectID,
@@ -43,5 +44,6 @@ func createMigrationConfig(cmd *cobra.Command) (*migrator.Config, error) {
 		Throughput:     throughput,
 		Iops:           iops,
 		StoragePoolId:  storagePoolId,
+		DryRun:         dryRun,
 	}, nil
 }

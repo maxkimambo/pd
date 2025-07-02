@@ -163,57 +163,57 @@ func (l *UnifiedLogger) GetInternalLogger() *logrus.Logger {
 
 // Convenience methods for user-facing logs with emojis
 
-// Starting logs a start message with rocket emoji
+// Starting logs a start message with status prefix
 func (l *UnifiedLogger) Starting(msg string) {
-	l.Info(msg, WithLogType(UserLog), WithEmoji("🚀"))
+	l.Info("[STARTING] " + msg, WithLogType(UserLog))
 }
 
-// Success logs a success message with checkmark emoji
+// Success logs a success message with status prefix
 func (l *UnifiedLogger) Success(msg string) {
-	l.Info(msg, WithLogType(UserLog), WithEmoji("✅"))
+	l.Info("[SUCCESS] " + msg, WithLogType(UserLog))
 }
 
-// Successf logs a formatted success message with checkmark emoji
+// Successf logs a formatted success message with status prefix
 func (l *UnifiedLogger) Successf(format string, args ...interface{}) {
-	l.entry(WithLogType(UserLog), WithEmoji("✅")).Infof(format, args...)
+	l.entry(WithLogType(UserLog)).Infof("[SUCCESS] " + format, args...)
 }
 
-// Snapshot logs a snapshot message with camera emoji
+// Snapshot logs a snapshot message with status prefix
 func (l *UnifiedLogger) Snapshot(msg string) {
-	l.Info(msg, WithLogType(UserLog), WithEmoji("📸"))
+	l.Info("[SNAPSHOT] " + msg, WithLogType(UserLog))
 }
 
-// Snapshotf logs a formatted snapshot message with camera emoji
+// Snapshotf logs a formatted snapshot message with status prefix
 func (l *UnifiedLogger) Snapshotf(format string, args ...interface{}) {
-	l.entry(WithLogType(UserLog), WithEmoji("📸")).Infof(format, args...)
+	l.entry(WithLogType(UserLog)).Infof("[SNAPSHOT] " + format, args...)
 }
 
-// Delete logs a delete message with trash emoji
+// Delete logs a delete message with status prefix
 func (l *UnifiedLogger) Delete(msg string) {
-	l.Info(msg, WithLogType(UserLog), WithEmoji("🗑️"))
+	l.Info("[DELETE] " + msg, WithLogType(UserLog))
 }
 
-// Deletef logs a formatted delete message with trash emoji
+// Deletef logs a formatted delete message with status prefix
 func (l *UnifiedLogger) Deletef(format string, args ...interface{}) {
-	l.entry(WithLogType(UserLog), WithEmoji("🗑️")).Infof(format, args...)
+	l.entry(WithLogType(UserLog)).Infof("[DELETE] " + format, args...)
 }
 
-// Create logs a create message with disk emoji
+// Create logs a create message with status prefix
 func (l *UnifiedLogger) Create(msg string) {
-	l.Info(msg, WithLogType(UserLog), WithEmoji("💾"))
+	l.Info("[CREATE] " + msg, WithLogType(UserLog))
 }
 
-// Createf logs a formatted create message with disk emoji
+// Createf logs a formatted create message with status prefix
 func (l *UnifiedLogger) Createf(format string, args ...interface{}) {
-	l.entry(WithLogType(UserLog), WithEmoji("💾")).Infof(format, args...)
+	l.entry(WithLogType(UserLog)).Infof("[CREATE] " + format, args...)
 }
 
-// Cleanup logs a cleanup message with broom emoji
+// Cleanup logs a cleanup message with status prefix
 func (l *UnifiedLogger) Cleanup(msg string) {
-	l.Info(msg, WithLogType(UserLog), WithEmoji("🧹"))
+	l.Info("[CLEANUP] " + msg, WithLogType(UserLog))
 }
 
-// Cleanupf logs a formatted cleanup message with broom emoji
+// Cleanupf logs a formatted cleanup message with status prefix
 func (l *UnifiedLogger) Cleanupf(format string, args ...interface{}) {
-	l.entry(WithLogType(UserLog), WithEmoji("🧹")).Infof(format, args...)
+	l.entry(WithLogType(UserLog)).Infof("[CLEANUP] " + format, args...)
 }
