@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"strings"
 
@@ -10,24 +9,11 @@ import (
 	"github.com/maxkimambo/pd/internal/logger"
 	"github.com/maxkimambo/pd/internal/migrator"
 	"github.com/maxkimambo/pd/internal/taskmanager"
+	"github.com/maxkimambo/pd/internal/validation"
 	"github.com/maxkimambo/pd/internal/workflow"
 	"github.com/spf13/cobra"
 )
 
-var (
-	gceTargetDiskType string
-	gceLabelFilter    string
-	gceKmsKey         string
-	gceKmsKeyRing     string
-	gceKmsLocation    string
-	gceKmsProject     string
-	gceRegion         string
-	gceZone           string
-	gceInstances      []string
-	gceAutoApprove    bool
-	gceMaxConcurrency int
-	gceRetainName     bool
-)
 
 var computeCmd = &cobra.Command{
 	Use:   "compute",
@@ -35,89 +21,74 @@ var computeCmd = &cobra.Command{
 	Long: `Performs migration of persistent disks attached to specified GCE instances.
 
 Identifies instances and their disks based on project, location (zone or region), and instance names.
-For each targeted disk, it will (eventually):
-1. Optionally stop the instance.
-2. Detach the disk.
-3. Create a snapshot (with optional KMS encryption).
-4. Delete the original disk (if retaining name).
-5. Recreate the disk from the snapshot with the target type.
-6. Attach the new disk to the instance.
-7. Optionally restart the instance.
-8. Clean up snapshots afterwards.
+For each targeted disk, it will:
+1. Optionally stop the instance
+2. Detach the disk
+3. Create a snapshot (with optional KMS encryption)
+4. Delete the original disk (if retaining name)
+5. Recreate the disk from the snapshot with the target type
+6. Attach the new disk to the instance
+7. Optionally restart the instance
+8. Clean up snapshots afterwards
 
-Example:
-pd migrate compute --project my-gcp-project --zone us-central1-a --instances vm1,vm2.. vm.N --target-disk-type hyperdisk-balanced
-pd migrate compute --project my-gcp-project --region us-central1 --instances "*" --target-disk-type hyperdisk-balanced --auto-approve
+Examples:
+  pd migrate compute --project my-gcp-project --zone us-central1-a --instances vm1,vm2 --target-disk-type hyperdisk-balanced
+  pd migrate compute --project my-gcp-project --zone us-central1-a --instances vm1 --target-disk-type pd-ssd --auto-approve
+  pd migrate compute --project my-gcp-project --region us-central1 --instances "*" --target-disk-type hyperdisk-balanced
 `,
 	PreRunE: validateComputeCmdFlags,
 	RunE:    runGceConvert,
 }
 
 func init() {
-	computeCmd.Flags().StringVarP(&projectID, "project", "p", "", "GCP Project ID (required)")
-	computeCmd.Flags().StringVarP(&gceTargetDiskType, "target-disk-type", "t", "", "Target disk type (e.g., pd-ssd, hyperdisk-balanced) (required)")
-	computeCmd.Flags().StringVar(&gceLabelFilter, "label", "", "Label filter for disks in key=value format (optional)")
-	computeCmd.Flags().StringVar(&gceKmsKey, "kms-key", "", "KMS Key name for snapshot encryption (optional)")
-	computeCmd.Flags().StringVar(&gceKmsKeyRing, "kms-keyring", "", "KMS KeyRing name (required if kms-key is set)")
-	computeCmd.Flags().StringVar(&gceKmsLocation, "kms-location", "", "KMS Key location (required if kms-key is set)")
-	computeCmd.Flags().StringVar(&gceKmsProject, "kms-project", "", "KMS Project ID (defaults to --project if not set, required if kms-key is set)")
-	computeCmd.Flags().StringVar(&gceRegion, "region", "", "GCP region (required if zone is not set)")
-	computeCmd.Flags().StringVar(&gceZone, "zone", "", "GCP zone (required if region is not set)")
-	computeCmd.Flags().StringSliceVar(&gceInstances, "instances", nil, "Comma-separated list of instance names, or '*' for all instances in the scope (required)")
-	computeCmd.Flags().BoolVar(&gceAutoApprove, "auto-approve", false, "Skip all interactive prompts")
-	computeCmd.Flags().IntVar(&gceMaxConcurrency, "max-concurrency", 5, "Maximum number of disks/instances to process concurrently (1-50)")
-	computeCmd.Flags().BoolVar(&gceRetainName, "retain-name", true, "Reuse original disk name. If false, keep original and suffix new name.")
-	computeCmd.Flags().Int64Var(&throughput, "throughput", 140, "Throughput for the new disk in MiB/s (optional, default is 140)")
-	computeCmd.Flags().Int64Var(&iops, "iops", 3000, "IOPS for the new disk (optional, default is 3000)")
-	computeCmd.Flags().StringVarP(&storagePoolId, "pool-id", "s", "", "Storage pool ID to use for the new disks (optional)")
-	err := computeCmd.MarkFlagRequired("target-disk-type")
-	if err != nil {
+	computeCmd.Flags().StringP("target-disk-type", "t", "", "Target disk type (e.g., pd-ssd, pd-balanced, hyperdisk-balanced) (required)")
+	computeCmd.Flags().String("label", "", "Label filter for disks in key=value format (optional)")
+	computeCmd.Flags().String("kms-key", "", "KMS key name for snapshot encryption (optional)")
+	computeCmd.Flags().String("kms-keyring", "", "KMS keyring name (required if kms-key is set)")
+	computeCmd.Flags().String("kms-location", "", "KMS key location (required if kms-key is set)")
+	computeCmd.Flags().String("kms-project", "", "KMS project ID (defaults to --project if not set)")
+	computeCmd.Flags().String("region", "", "GCP region for regional instances (use either --zone or --region, not both)")
+	computeCmd.Flags().String("zone", "", "GCP zone for zonal instances (use either --zone or --region, not both)")
+	computeCmd.Flags().StringSlice("instances", nil, "Comma-separated list of instance names, or '*' for all instances (required)")
+	computeCmd.Flags().Bool("auto-approve", false, "Skip all interactive prompts and proceed with migration")
+	computeCmd.Flags().Int("concurrency", 5, "Maximum number of concurrent instance/disk operations (1-50)")
+	computeCmd.Flags().Bool("retain-name", true, "Reuse original disk name (deletes original). If false, creates new disk with suffix")
 
+	if err := computeCmd.MarkFlagRequired("target-disk-type"); err != nil {
 		logger.Errorf("Failed to mark target-disk-type as required: %s", err)
 	}
-	err = computeCmd.MarkFlagRequired("instances")
-	if err != nil {
+	if err := computeCmd.MarkFlagRequired("instances"); err != nil {
 		logger.Errorf("Failed to mark instances as required: %s", err)
 	}
 }
 
 func validateComputeCmdFlags(cmd *cobra.Command, args []string) error {
-
-	if projectID == "" { // projectID is from root persistent flag
-		return errors.New("required flag --project not set")
+	zone, _ := cmd.Flags().GetString("zone")
+	region, _ := cmd.Flags().GetString("region")
+	if err := validation.ValidateLocationFlags(zone, region); err != nil {
+		return err
 	}
 
-	if (gceZone == "" && gceRegion == "") || (gceZone != "" && gceRegion != "") {
-		return errors.New("exactly one of --zone or --region must be specified")
+	kmsKey, _ := cmd.Flags().GetString("kms-key")
+	kmsKeyRing, _ := cmd.Flags().GetString("kms-keyring")
+	kmsLocation, _ := cmd.Flags().GetString("kms-location")
+	if err := validation.ValidateKMSConfig(kmsKey, kmsKeyRing, kmsLocation); err != nil {
+		return err
 	}
 
-	if gceKmsKey != "" {
-		if gceKmsKeyRing == "" || gceKmsLocation == "" {
-			return errors.New("--kms-keyring and --kms-location are required when --kms-key is specified")
-		}
-		if gceKmsProject == "" {
-			gceKmsProject = projectID
-		}
+	labelFilter, _ := cmd.Flags().GetString("label")
+	if err := validation.ValidateLabelFilter(labelFilter); err != nil {
+		return err
 	}
 
-	if gceLabelFilter != "" && !strings.Contains(gceLabelFilter, "=") {
-		return fmt.Errorf("invalid label format for --label: %s. Expected key=value", gceLabelFilter)
+	concurrency, _ := cmd.Flags().GetInt("concurrency")
+	if err := validation.ValidateConcurrency(concurrency, 50); err != nil {
+		return err
 	}
 
-	if gceMaxConcurrency < 1 || gceMaxConcurrency > 50 { // Adjusted max concurrency for instance operations
-		return fmt.Errorf("--max-concurrency must be between 1 and 50, got %d", gceMaxConcurrency)
-	}
-
-	if len(gceInstances) == 0 {
-		return errors.New("required flag --instances not set")
-	}
-
-	if throughput < 140 || throughput > 5000 {
-		return fmt.Errorf("--throughput must be between 140 and 5000 MB/s, got %d", throughput)
-	}
-
-	if iops < 3000 || iops > 350000 {
-		return fmt.Errorf("--iops must be between 3000 and 350,000, got %d", iops)
+	instances, _ := cmd.Flags().GetStringSlice("instances")
+	if len(instances) == 0 {
+		return fmt.Errorf("required flag --instances not set")
 	}
 
 	return nil
@@ -126,37 +97,24 @@ func validateComputeCmdFlags(cmd *cobra.Command, args []string) error {
 func runGceConvert(cmd *cobra.Command, args []string) error {
 	logger.Starting("Starting disk migration process...")
 
-	config := migrator.Config{
-		ProjectID:      projectID,
-		TargetDiskType: gceTargetDiskType,
-		LabelFilter:    gceLabelFilter,
-		KmsKey:         gceKmsKey,
-		KmsKeyRing:     gceKmsKeyRing,
-		KmsLocation:    gceKmsLocation,
-		KmsProject:     gceKmsProject,
-		Region:         gceRegion,
-		Zone:           gceZone,
-		AutoApproveAll: gceAutoApprove,
-		Concurrency:    gceMaxConcurrency,
-		RetainName:     gceRetainName,
-		Instances:      gceInstances,
-		Throughput:     throughput,
-		Iops:           iops,
-		StoragePoolId:  storagePoolId,
+	config, err := createMigrationConfig(cmd)
+	if err != nil {
+		return err
 	}
+
 	logger.Debugf("Configuration: %+v", config)
-	logger.Infof("Project: %s", projectID)
-	if gceZone != "" {
-		logger.Infof("Zone: %s", gceZone)
+	logger.Infof("Project: %s", config.ProjectID)
+	if config.Zone != "" {
+		logger.Infof("Zone: %s", config.Zone)
 	} else {
-		logger.Infof("Region: %s", gceRegion)
+		logger.Infof("Region: %s", config.Region)
 	}
-	if gceInstances[0] == "*" {
+	if config.Instances[0] == "*" {
 		logger.Infof("Target: All instances in scope (%s)", config.Location())
 	} else {
-		logger.Infof("Target: %s", strings.Join(gceInstances, ", "))
+		logger.Infof("Target: %s", strings.Join(config.Instances, ", "))
 	}
-	logger.Infof("Target disk type: %s", gceTargetDiskType)
+	logger.Infof("Target disk type: %s", config.TargetDiskType)
 
 	ctx := context.Background()
 	gcpClient, err := gcp.NewClients(ctx)
@@ -165,7 +123,7 @@ func runGceConvert(cmd *cobra.Command, args []string) error {
 	}
 	defer gcpClient.Close()
 
-	discoveredInstances, err := migrator.DiscoverInstances(ctx, &config, gcpClient)
+	discoveredInstances, err := migrator.DiscoverInstances(ctx, config, gcpClient)
 	if err != nil {
 		return fmt.Errorf("failed to discover GCE instances: %w", err)
 	}
@@ -176,7 +134,7 @@ func runGceConvert(cmd *cobra.Command, args []string) error {
 	}
 
 	// Create migration manager
-	manager := workflow.NewMigrationManager(gcpClient, &config)
+	manager := workflow.NewMigrationManager(gcpClient, config)
 
 	logger.Starting("⚙️  Migration Phase: GCE Attached Disks")
 

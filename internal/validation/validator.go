@@ -154,3 +154,69 @@ func GetAllDiskTypes() []string {
 	}
 	return diskTypes
 }
+
+// ValidateProjectID validates a GCP project ID
+func ValidateProjectID(projectID string) error {
+	if projectID == "" {
+		return fmt.Errorf("project ID cannot be empty")
+	}
+	// GCP project IDs must be 6-30 characters, lowercase letters, digits, or hyphens
+	if len(projectID) < 6 || len(projectID) > 30 {
+		return fmt.Errorf("project ID must be between 6 and 30 characters")
+	}
+	return nil
+}
+
+// ValidateConcurrency validates the concurrency value is within an acceptable range.
+func ValidateConcurrency(concurrency int, max int) error {
+	if concurrency < 1 || concurrency > max {
+		return fmt.Errorf("concurrency must be between 1 and %d, got %d", max, concurrency)
+	}
+	return nil
+}
+
+// ValidateThroughput validates throughput value is within acceptable range
+func ValidateThroughput(throughput int64) error {
+	if throughput < 140 || throughput > 5000 {
+		return fmt.Errorf("throughput must be between 140 and 5000 MB/s, got %d", throughput)
+	}
+	return nil
+}
+
+// ValidateIOPS validates IOPS value is within acceptable range
+func ValidateIOPS(iops int64) error {
+	if iops < 3000 || iops > 350000 {
+		return fmt.Errorf("IOPS must be between 3000 and 350,000, got %d", iops)
+	}
+	return nil
+}
+
+// ValidateLabelFilter validates the label filter format
+func ValidateLabelFilter(labelFilter string) error {
+	if labelFilter == "" {
+		return nil // empty is valid
+	}
+	if !strings.Contains(labelFilter, "=") {
+		return fmt.Errorf("invalid label format: %s. Expected key=value", labelFilter)
+	}
+	return nil
+}
+
+// ValidateKMSConfig validates KMS configuration completeness
+func ValidateKMSConfig(kmsKey, kmsKeyRing, kmsLocation string) error {
+	if kmsKey == "" {
+		return nil // KMS is optional
+	}
+	if kmsKeyRing == "" || kmsLocation == "" {
+		return fmt.Errorf("--kms-keyring and --kms-location are required when --kms-key is specified")
+	}
+	return nil
+}
+
+// ValidateLocationFlags validates that exactly one of zone or region is specified
+func ValidateLocationFlags(zone, region string) error {
+	if (zone == "" && region == "") || (zone != "" && region != "") {
+		return fmt.Errorf("exactly one of --zone or --region must be specified")
+	}
+	return nil
+}

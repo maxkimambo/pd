@@ -30,6 +30,9 @@ test:
 	@echo "Running tests..."
 	go test -v $(PKG_LIST)
 
+test-quiet:
+	@echo "Running tests quietly..."
+	go test  $(PKG_LIST) 
 # Clean build artifacts
 clean:
 	@echo "Cleaning build artifacts..."
