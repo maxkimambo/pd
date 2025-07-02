@@ -17,10 +17,10 @@ func (w *Workflow) Execute(ctx context.Context, sharedCtx *SharedContext) error 
 	if err := w.validateDependencies(); err != nil {
 		return err
 	}
-	
+
 	// Create DAG from current workflow state
 	dag := w.createDAG()
-	
+
 	// Perform topological sort to determine execution order
 	executionOrder, err := dag.TopologicalSort()
 	if err != nil {
@@ -53,18 +53,18 @@ func (w *Workflow) validateDependencies() error {
 // createDAG creates a DAG from the workflow's current state
 func (w *Workflow) createDAG() *DAG {
 	dag := NewDAG()
-	
+
 	// Add all tasks as nodes
 	for taskID := range w.Tasks {
 		dag.AddNode(taskID)
 	}
-	
+
 	// Add all dependencies as edges
 	for _, task := range w.Tasks {
 		for _, depID := range task.DependsOn {
 			dag.AddEdge(task.ID, depID)
 		}
 	}
-	
+
 	return dag
 }

@@ -21,7 +21,7 @@ var (
 		PersistentPreRun: func(cmd *cobra.Command, args []string) {
 			// Setup the unified logger
 			logger.Setup(verbose || debug, jsonLogs, quiet)
-			
+
 			// Legacy logrus setup (will be removed after full migration)
 			if debug {
 				logrus.SetLevel(logrus.DebugLevel)

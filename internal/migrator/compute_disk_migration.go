@@ -68,7 +68,7 @@ func SnapshotInstanceDisks(ctx context.Context, config *Config, instance *comput
 
 		diskName := attachedDisk.GetDeviceName()
 
- 		disk, err := gcpClient.DiskClient.GetDisk(ctx, config.ProjectID, zone, diskName)
+		disk, err := gcpClient.DiskClient.GetDisk(ctx, config.ProjectID, zone, diskName)
 		if err != nil {
 			logger.Errorf("Failed to get disk %s in zone %s: %v", diskName, zone, err)
 			// return fmt.Errorf("failed to get disk %s in zone %s: %w", diskName, zone, err)
@@ -80,7 +80,7 @@ func SnapshotInstanceDisks(ctx context.Context, config *Config, instance *comput
 			continue
 		}
 
-		snapshotName := fmt.Sprintf("%s-snapshot", utils.AddSuffix(disk.GetName(), 3))
+		snapshotName := fmt.Sprintf("%s-snapshot", utils.AddSuffix(disk.GetName()))
 		kmsParams := &gcp.SnapshotKmsParams{
 			KmsKey:      config.KmsKey,
 			KmsKeyRing:  config.KmsKeyRing,
@@ -230,7 +230,7 @@ func HandleInstanceDiskMigration(ctx context.Context, config *Config, instance *
 func IncrementalSnapshotDisk(ctx context.Context, config *Config, disk *computepb.Disk, gcpClient *gcp.Clients) error {
 	logger.Infof("Creating incremental snapshot for disk %s in zone %s", disk.GetName(), disk.GetZone())
 
-	snapshotName := fmt.Sprintf("%s-snapshot", utils.AddSuffix(disk.GetName(), 3))
+	snapshotName := fmt.Sprintf("%s-snapshot", utils.AddSuffix(disk.GetName()))
 	kmsParams := &gcp.SnapshotKmsParams{
 		KmsKey:      config.KmsKey,
 		KmsKeyRing:  config.KmsKeyRing,

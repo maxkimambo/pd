@@ -54,11 +54,11 @@ func (m *MigrationManager) CreateInstanceMigrationWorkflow(instance *computepb.I
 // ExecuteWorkflow runs a workflow and returns the result
 func (m *MigrationManager) ExecuteWorkflow(ctx context.Context, workflow *taskmanager.Workflow) (*WorkflowResult, error) {
 	startTime := time.Now()
-	
+
 	// Create shared context with necessary data
 	sharedCtx := taskmanager.NewSharedContext()
 	sharedCtx.Set("gcp_client", m.gcpClient)
-	
+
 	// Convert config to map for easier access in tasks
 	configMap := map[string]interface{}{
 		"ProjectID":      m.config.ProjectID,
@@ -79,14 +79,14 @@ func (m *MigrationManager) ExecuteWorkflow(ctx context.Context, workflow *taskma
 	}
 	sharedCtx.Set("config", configMap)
 	sharedCtx.Set("workflow_start_time", startTime)
-	
+
 	logger.Starting(fmt.Sprintf("Starting workflow: %s", workflow.ID))
-	
+
 	// Execute the workflow
 	err := workflow.Execute(ctx, sharedCtx)
-	
+
 	endTime := time.Now()
-	
+
 	// Create result
 	result := &WorkflowResult{
 		WorkflowID:    workflow.ID,
@@ -96,13 +96,13 @@ func (m *MigrationManager) ExecuteWorkflow(ctx context.Context, workflow *taskma
 		Error:         err,
 		Success:       err == nil,
 	}
-	
+
 	if err != nil {
 		logger.Errorf("Workflow %s failed: %v", workflow.ID, err)
 	} else {
 		logger.Successf("Workflow %s completed successfully in %v", workflow.ID, endTime.Sub(startTime))
 	}
-	
+
 	return result, err
 }
 
@@ -112,7 +112,7 @@ func (m *MigrationManager) ReportResults(result *WorkflowResult) {
 	logger.Infof("Workflow ID: %s", result.WorkflowID)
 	logger.Infof("Duration: %v", result.EndTime.Sub(result.StartTime))
 	logger.Infof("Status: %s", m.getStatusString(result.Success))
-	
+
 	// Extract and report migration results if available
 	if migrationResults, ok := result.SharedContext.Get("migration_results"); ok {
 		if results, ok := migrationResults.([]migrator.MigrationResult); ok {
@@ -126,7 +126,7 @@ func (m *MigrationManager) ReportResults(result *WorkflowResult) {
 			}
 		}
 	}
-	
+
 	// Report any verification errors
 	if verificationErrors, ok := result.SharedContext.Get("verification_errors"); ok {
 		if errors, ok := verificationErrors.([]error); ok && len(errors) > 0 {
@@ -136,16 +136,16 @@ func (m *MigrationManager) ReportResults(result *WorkflowResult) {
 			}
 		}
 	}
-	
+
 	// Report cleanup status
 	if cleanupStatus, ok := result.SharedContext.Get("cleanup_status"); ok {
 		logger.Infof("\nCleanup Status: %v", cleanupStatus)
 	}
-	
+
 	if result.Error != nil {
 		logger.Errorf("\nWorkflow Error: %v", result.Error)
 	}
-	
+
 	logger.Info(strings.Repeat("=", 35))
 }
 

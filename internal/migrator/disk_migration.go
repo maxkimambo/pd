@@ -190,7 +190,7 @@ func MigrateSingleDisk(ctx context.Context, config *Config, gcpClient *gcp.Clien
 
 	newDiskName := diskName
 	if !config.RetainName {
-		newDiskName = utils.AddSuffix(diskName, 4)
+		newDiskName = utils.AddSuffix(diskName)
 		logger.WithFieldsMap(map[string]interface{}{
 			"original_disk": diskName,
 			"new_disk":      newDiskName,

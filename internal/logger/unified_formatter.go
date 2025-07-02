@@ -136,7 +136,7 @@ func (f *UnifiedFormatter) formatOpLog(entry *logrus.Entry) ([]byte, error) {
 // SetupUnifiedLogger configures the unified logger with appropriate settings
 func SetupUnifiedLogger(verbose bool, jsonLogs bool, quiet bool) {
 	ul := GetLogger()
-	
+
 	formatter := NewUnifiedFormatter()
 	formatter.JSONFormat = jsonLogs
 

@@ -31,7 +31,7 @@ func (d *DAG) AddEdge(from, to string) {
 	// Ensure both nodes exist
 	d.AddNode(from)
 	d.AddNode(to)
-	
+
 	// Add dependency
 	d.edges[from] = append(d.edges[from], to)
 	d.inDegree[from]++

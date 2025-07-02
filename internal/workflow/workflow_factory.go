@@ -27,7 +27,7 @@ func NewWorkflowFactory(gcpClient *gcp.Clients, config *migrator.Config) *Workfl
 // CreateComputeDiskMigrationWorkflow creates a workflow for migrating disks attached to a compute instance
 func (f *WorkflowFactory) CreateComputeDiskMigrationWorkflow(workflowID string, instance *computepb.Instance) (*taskmanager.Workflow, error) {
 	builder := taskmanager.NewWorkflowBuilder(workflowID)
-	
+
 	// Create task instances
 	validateTask := tasks.NewValidateInstanceTask(instance, f.config.TargetDiskType, f.config, f.gcpClient)
 	checkStateTask := tasks.NewCheckInstanceStateTask()
@@ -37,7 +37,7 @@ func (f *WorkflowFactory) CreateComputeDiskMigrationWorkflow(workflowID string, 
 	startTask := tasks.NewStartInstanceTask()
 	verifyTask := tasks.NewVerifyMigrationTask()
 	cleanupTask := tasks.NewCleanupSnapshotsTask()
-	
+
 	// Add tasks to workflow
 	builder.
 		AddTask("validate_instance", validateTask).
@@ -48,7 +48,7 @@ func (f *WorkflowFactory) CreateComputeDiskMigrationWorkflow(workflowID string, 
 		AddTask("start_instance", startTask).
 		AddTask("verify_migration", verifyTask).
 		AddTask("cleanup_snapshots", cleanupTask)
-	
+
 	// Define dependencies
 	builder.
 		AddDependency("check_instance_state", "validate_instance").
@@ -58,7 +58,7 @@ func (f *WorkflowFactory) CreateComputeDiskMigrationWorkflow(workflowID string, 
 		AddDependency("start_instance", "migrate_disks").
 		AddDependency("verify_migration", "start_instance").
 		AddDependency("cleanup_snapshots", "verify_migration")
-	
+
 	return builder.Build()
 }
 
@@ -73,18 +73,18 @@ func (f *WorkflowFactory) CreateBatchInstanceWorkflow(workflowID string, instanc
 	if len(instances) == 0 {
 		return nil, fmt.Errorf("no instances provided for batch workflow")
 	}
-	
+
 	builder := taskmanager.NewWorkflowBuilder(workflowID)
-	
+
 	var previousInstanceTask string
-	
+
 	for i, instance := range instances {
 		if instance == nil || instance.Name == nil {
 			continue
 		}
-		
+
 		instancePrefix := fmt.Sprintf("instance_%d_%s", i, *instance.Name)
-		
+
 		// Create task instances for this instance
 		validateTask := tasks.NewValidateInstanceTask(instance, f.config.TargetDiskType, f.config, f.gcpClient)
 		checkStateTask := tasks.NewCheckInstanceStateTask()
@@ -94,7 +94,7 @@ func (f *WorkflowFactory) CreateBatchInstanceWorkflow(workflowID string, instanc
 		startTask := tasks.NewStartInstanceTask()
 		verifyTask := tasks.NewVerifyMigrationTask()
 		cleanupTask := tasks.NewCleanupSnapshotsTask()
-		
+
 		// Add tasks with unique IDs
 		builder.
 			AddTask(fmt.Sprintf("%s_validate", instancePrefix), validateTask).
@@ -105,7 +105,7 @@ func (f *WorkflowFactory) CreateBatchInstanceWorkflow(workflowID string, instanc
 			AddTask(fmt.Sprintf("%s_start", instancePrefix), startTask).
 			AddTask(fmt.Sprintf("%s_verify", instancePrefix), verifyTask).
 			AddTask(fmt.Sprintf("%s_cleanup", instancePrefix), cleanupTask)
-		
+
 		// Define dependencies within this instance's tasks
 		builder.
 			AddDependency(fmt.Sprintf("%s_check_state", instancePrefix), fmt.Sprintf("%s_validate", instancePrefix)).
@@ -115,14 +115,14 @@ func (f *WorkflowFactory) CreateBatchInstanceWorkflow(workflowID string, instanc
 			AddDependency(fmt.Sprintf("%s_start", instancePrefix), fmt.Sprintf("%s_migrate", instancePrefix)).
 			AddDependency(fmt.Sprintf("%s_verify", instancePrefix), fmt.Sprintf("%s_start", instancePrefix)).
 			AddDependency(fmt.Sprintf("%s_cleanup", instancePrefix), fmt.Sprintf("%s_verify", instancePrefix))
-		
+
 		// Chain instances sequentially (for now)
 		if previousInstanceTask != "" {
 			builder.AddDependency(fmt.Sprintf("%s_validate", instancePrefix), previousInstanceTask)
 		}
-		
+
 		previousInstanceTask = fmt.Sprintf("%s_cleanup", instancePrefix)
 	}
-	
+
 	return builder.Build()
 }

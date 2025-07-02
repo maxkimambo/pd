@@ -22,8 +22,6 @@ func init() {
 	log = GetLogger()
 }
 
-
-
 // CLIFormatter provides clean output for CLI applications
 type CLIFormatter struct {
 	DisableTimestamp bool
@@ -94,7 +92,7 @@ func Setup(verbose bool, jsonLogs bool, quiet bool) {
 			quiet = false
 		}
 	}
-	
+
 	if envLogFormat := os.Getenv("LOG_FORMAT"); envLogFormat != "" {
 		switch envLogFormat {
 		case "json":
@@ -103,11 +101,11 @@ func Setup(verbose bool, jsonLogs bool, quiet bool) {
 			jsonLogs = false
 		}
 	}
-	
+
 	// Get the unified logger
 	ul := GetLogger()
 	internalLogger := ul.GetInternalLogger()
-	
+
 	// Configure log level
 	var level logrus.Level
 	if quiet {
@@ -117,16 +115,16 @@ func Setup(verbose bool, jsonLogs bool, quiet bool) {
 	} else {
 		level = logrus.InfoLevel
 	}
-	
+
 	// Clear any existing hooks
 	internalLogger.Hooks = make(logrus.LevelHooks)
-	
+
 	// For JSON logs, use standard JSON formatter
 	if jsonLogs {
 		internalLogger.SetFormatter(&logrus.JSONFormatter{})
 		internalLogger.SetLevel(level)
 		internalLogger.SetOutput(io.Discard) // Output handled by hooks
-		
+
 		// Add routing hook for JSON
 		hook := NewOutputRouterHook()
 		hook.UserFormatter = &logrus.JSONFormatter{}
@@ -137,17 +135,17 @@ func Setup(verbose bool, jsonLogs bool, quiet bool) {
 		internalLogger.SetOutput(io.Discard) // Output handled by hooks
 		internalLogger.SetLevel(level)
 		internalLogger.SetFormatter(&logrus.TextFormatter{}) // Dummy formatter
-		
+
 		// Create and configure routing hook
 		hook := NewOutputRouterHook()
-		
+
 		// User formatter - clean output
 		hook.UserFormatter = &CLIFormatter{
 			DisableTimestamp: true,
 			DisableLevel:     true,
 			DisableColors:    false,
 		}
-		
+
 		// Op formatter - detailed output
 		if verbose {
 			hook.OpFormatter = &logrus.TextFormatter{
@@ -161,7 +159,7 @@ func Setup(verbose bool, jsonLogs bool, quiet bool) {
 				DisableColors:    !isatty.IsTerminal(os.Stderr.Fd()),
 			}
 		}
-		
+
 		internalLogger.AddHook(hook)
 	}
 }

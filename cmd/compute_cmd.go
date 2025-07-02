@@ -70,8 +70,15 @@ func init() {
 	computeCmd.Flags().Int64Var(&throughput, "throughput", 140, "Throughput for the new disk in MiB/s (optional, default is 140)")
 	computeCmd.Flags().Int64Var(&iops, "iops", 3000, "IOPS for the new disk (optional, default is 3000)")
 	computeCmd.Flags().StringVarP(&storagePoolId, "pool-id", "s", "", "Storage pool ID to use for the new disks (optional)")
-	computeCmd.MarkFlagRequired("target-disk-type")
-	computeCmd.MarkFlagRequired("instances")
+	err := computeCmd.MarkFlagRequired("target-disk-type")
+	if err != nil {
+
+		logger.Errorf("Failed to mark target-disk-type as required: %s", err)
+	}
+	err = computeCmd.MarkFlagRequired("instances")
+	if err != nil {
+		logger.Errorf("Failed to mark instances as required: %s", err)
+	}
 }
 
 func validateComputeCmdFlags(cmd *cobra.Command, args []string) error {

@@ -21,7 +21,7 @@ func TestUnifiedLoggerInitialization(t *testing.T) {
 	if ul == nil {
 		t.Error("GetLogger should never return nil")
 	}
-	
+
 	// Test that calling GetLogger multiple times returns the same instance
 	ul2 := GetLogger()
 	if ul != ul2 {
@@ -42,12 +42,12 @@ func TestLoggerSetup(t *testing.T) {
 		{"JSON", false, true, false},
 		{"Verbose JSON", true, true, false},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Setup should not panic
 			Setup(tt.verbose, tt.jsonLogs, tt.quiet)
-			
+
 			// Unified logger should still be non-nil
 			if log == nil {
 				t.Error("Unified logger should not be nil after Setup")
@@ -59,22 +59,22 @@ func TestLoggerSetup(t *testing.T) {
 func TestUnifiedLoggerOutput(t *testing.T) {
 	// Create a buffer to capture output
 	var buf bytes.Buffer
-	
+
 	// Get the unified logger and set output
 	ul := GetLogger()
 	ul.GetInternalLogger().SetOutput(&buf)
 	ul.GetInternalLogger().SetLevel(logrus.InfoLevel)
-	
+
 	// Test basic logging
 	ul.Info("test message")
 	output := buf.String()
 	if !strings.Contains(output, "test message") {
 		t.Errorf("Expected output to contain 'test message', got: %s", output)
 	}
-	
+
 	// Clear buffer
 	buf.Reset()
-	
+
 	// Test methods with emojis
 	ul.Starting("starting test")
 	output = buf.String()
@@ -86,22 +86,22 @@ func TestUnifiedLoggerOutput(t *testing.T) {
 func TestFieldsLoggerOutput(t *testing.T) {
 	// Create a buffer to capture output
 	var buf bytes.Buffer
-	
+
 	// Get the unified logger and set output
 	ul := GetLogger()
 	ul.GetInternalLogger().SetOutput(&buf)
 	ul.GetInternalLogger().SetLevel(logrus.InfoLevel)
-	
+
 	// Test basic logging
 	ul.Info("operational message")
 	output := buf.String()
 	if !strings.Contains(output, "operational message") {
 		t.Errorf("Expected output to contain 'operational message', got: %s", output)
 	}
-	
+
 	// Clear buffer
 	buf.Reset()
-	
+
 	// Test with fields
 	ul.WithFieldsMap(map[string]interface{}{
 		"disk": "test-disk",
@@ -115,34 +115,34 @@ func TestFieldsLoggerOutput(t *testing.T) {
 
 func TestLogTypeRouting(t *testing.T) {
 	// This test verifies that log_type field is properly set
-	
+
 	// Create a test hook to capture log entries
 	captureHook := &testHook{entries: make([]*logrus.Entry, 0)}
-	
+
 	// Get the unified logger and add our test hook
 	ul := GetLogger()
 	ul.GetInternalLogger().AddHook(captureHook)
-	
+
 	// Clear existing entries
 	captureHook.entries = make([]*logrus.Entry, 0)
-	
+
 	// Test user-style logger
 	ul.Info("user message", WithLogType(UserLog))
 	if len(captureHook.entries) == 0 {
 		t.Fatal("Expected log entry to be captured")
 	}
-	
+
 	lastEntry := captureHook.entries[len(captureHook.entries)-1]
 	if logType, ok := lastEntry.Data["log_type"]; !ok || logType != string(UserLog) {
 		t.Errorf("Expected log_type to be 'user', got: %v", logType)
 	}
-	
+
 	// Test op-style logger
 	ul.Info("op message", WithLogType(OpLog))
 	if len(captureHook.entries) < 2 {
 		t.Fatal("Expected second log entry to be captured")
 	}
-	
+
 	lastEntry = captureHook.entries[len(captureHook.entries)-1]
 	if logType, ok := lastEntry.Data["log_type"]; !ok || logType != string(OpLog) {
 		t.Errorf("Expected log_type to be 'op', got: %v", logType)

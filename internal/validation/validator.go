@@ -110,9 +110,9 @@ func IsCompatible(machineType, diskType string) ValidationResult {
 // GetSupportedDiskTypes returns all supported disk types for a given machine type
 func GetSupportedDiskTypes(machineType string) []string {
 	machineType = strings.ToLower(strings.TrimSpace(machineType))
-	
+
 	var supportedDiskTypes []string
-	
+
 	// Iterate through all disk types and check if they support this machine type
 	for diskType, diskInfo := range matrix.DiskTypes {
 		for _, supportedMachineType := range diskInfo.SupportedMachineTypes {
@@ -122,27 +122,27 @@ func GetSupportedDiskTypes(machineType string) []string {
 			}
 		}
 	}
-	
+
 	return supportedDiskTypes
 }
 
 // GetAllMachineTypes returns all machine types mentioned in the compatibility matrix
 func GetAllMachineTypes() []string {
 	machineTypeSet := make(map[string]bool)
-	
+
 	// Collect all unique machine types from all disk types
 	for _, diskInfo := range matrix.DiskTypes {
 		for _, machineType := range diskInfo.SupportedMachineTypes {
 			machineTypeSet[machineType] = true
 		}
 	}
-	
+
 	// Convert set to slice
 	var machineTypes []string
 	for machineType := range machineTypeSet {
 		machineTypes = append(machineTypes, machineType)
 	}
-	
+
 	return machineTypes
 }
 

@@ -443,12 +443,12 @@ func TestWorkflow_Execute_DataPassing(t *testing.T) {
 				t.Error("Expected result_from_A to exist in shared context")
 				return errors.New("result_from_A not found")
 			}
-			
+
 			if value != "hello" {
 				t.Errorf("Expected result_from_A to be 'hello', got %v", value)
 				return errors.New("unexpected value")
 			}
-			
+
 			// Set another value to verify chaining
 			sharedCtx.Set("result_from_B", "world")
 			return nil

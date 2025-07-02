@@ -30,23 +30,23 @@ func (t *CheckInstanceStateTask) Execute(ctx context.Context, shared *taskmanage
 		if !ok {
 			return fmt.Errorf("instance not found in shared context")
 		}
-		
+
 		instance, ok := instanceData.(*computepb.Instance)
 		if !ok {
 			return fmt.Errorf("invalid instance type in shared context")
 		}
-		
+
 		// Get GCP client
 		gcpClient, err := getGCPClient(shared)
 		if err != nil {
 			return err
 		}
-		
+
 		logger.Infof("Checking instance state for: %s", *instance.Name)
-		
+
 		// Check if instance is running
 		isRunning := gcpClient.ComputeClient.InstanceIsRunning(ctx, instance)
-		
+
 		// Determine state string
 		var state string
 		if isRunning {
@@ -54,13 +54,13 @@ func (t *CheckInstanceStateTask) Execute(ctx context.Context, shared *taskmanage
 		} else {
 			state = "STOPPED"
 		}
-		
+
 		// Store state in shared context
 		shared.Set("instance_running", isRunning)
 		shared.Set("original_state", state)
-		
+
 		logger.Infof("Instance %s is currently: %s", *instance.Name, state)
-		
+
 		return nil
 	})
 }

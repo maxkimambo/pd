@@ -42,14 +42,14 @@ func (h *OutputRouterHook) Levels() []logrus.Level {
 func (h *OutputRouterHook) Fire(entry *logrus.Entry) error {
 	// Check log type
 	logType, _ := entry.Data["log_type"].(string)
-	
+
 	var formatter logrus.Formatter
 	var writer io.Writer
-	
+
 	if logType == string(UserLog) {
 		formatter = h.UserFormatter
 		writer = h.UserWriter
-		
+
 		// Add emoji to message if present
 		if emoji, ok := entry.Data["emoji"].(string); ok && emoji != "" {
 			entry.Message = emoji + " " + entry.Message
@@ -58,13 +58,13 @@ func (h *OutputRouterHook) Fire(entry *logrus.Entry) error {
 		formatter = h.OpFormatter
 		writer = h.OpWriter
 	}
-	
+
 	// Format the entry
 	bytes, err := formatter.Format(entry)
 	if err != nil {
 		return err
 	}
-	
+
 	// Write to appropriate output
 	_, err = writer.Write(bytes)
 	return err

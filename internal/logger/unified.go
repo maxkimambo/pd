@@ -30,8 +30,8 @@ type UnifiedLogger struct {
 
 var (
 	// unifiedLog is the global logger instance
-	unifiedLog  *UnifiedLogger
-	once sync.Once
+	unifiedLog *UnifiedLogger
+	once       sync.Once
 )
 
 // GetLogger returns the global logger instance, initializing it if necessary

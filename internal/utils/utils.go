@@ -30,10 +30,8 @@ func ExtractMachineType(machineType string) string {
 	return parts[len(parts)-1]
 }
 
-func AddSuffix(name string, length int) string {
-	if length == 0 {
-		length = 4
-	}
+func AddSuffix(name string) string {
+
 	suffix := fmt.Sprintf("%x", rand.Intn(0xFFF))
 	return fmt.Sprintf("%s-%s", name, suffix)
 }

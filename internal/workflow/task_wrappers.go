@@ -15,16 +15,16 @@ func createSnapshotTask(config *migrator.Config) taskmanager.TaskFunc {
 		// Get required data from shared context
 		inst, _ := shared.Get("instance")
 		instance := inst.(*computepb.Instance)
-		
+
 		gcpClient, _ := shared.Get("gcp_client")
 		client := gcpClient.(*gcp.Clients)
-		
+
 		// Call the existing function
 		err := migrator.SnapshotInstanceDisks(ctx, config, instance, client)
 		if err != nil {
 			return err
 		}
-		
+
 		// Set completion status
 		shared.Set("snapshot_status", "completed")
 		return nil
@@ -37,19 +37,19 @@ func createMigrateTask(config *migrator.Config) taskmanager.TaskFunc {
 		// Get required data from shared context
 		inst, _ := shared.Get("instance")
 		instance := inst.(*computepb.Instance)
-		
+
 		gcpClient, _ := shared.Get("gcp_client")
 		client := gcpClient.(*gcp.Clients)
-		
+
 		// Call the existing function
 		results, err := migrator.MigrateInstanceNonBootDisks(ctx, config, instance, client)
 		if err != nil {
 			return err
 		}
-		
+
 		// Store results in shared context
 		shared.Set("migration_results", results)
-		
+
 		// Build migrated disks map
 		migratedDisks := make(map[string]string)
 		for _, result := range results {
@@ -58,7 +58,7 @@ func createMigrateTask(config *migrator.Config) taskmanager.TaskFunc {
 			}
 		}
 		shared.Set("migrated_disks", migratedDisks)
-		
+
 		return nil
 	}
 }
