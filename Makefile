@@ -33,7 +33,31 @@ test:
 test-quiet:
 	@echo "Running tests quietly..."
 	go test  $(PKG_LIST) 
+
+# Run integration tests
+test-integration: build
+	@echo "Running integration tests..."
+	@if [ -z "$(GCP_PROJECT_ID)" ]; then \
+		echo "Error: GCP_PROJECT_ID environment variable is not set"; \
+		exit 1; \
+	fi
+	@cp $(OUTPUT_DIR)/$(BINARY_NAME) integration_tests/$(BINARY_NAME)
+	cd integration_tests && go test -v -timeout 45m ./...
+	@rm -f integration_tests/$(BINARY_NAME)
+
+# Run integration tests in parallel
+test-integration-parallel: build
+	@echo "Running integration tests in parallel..."
+	@if [ -z "$(GCP_PROJECT_ID)" ]; then \
+		echo "Error: GCP_PROJECT_ID environment variable is not set"; \
+		exit 1; \
+	fi
+	@cp $(OUTPUT_DIR)/$(BINARY_NAME) integration_tests/$(BINARY_NAME)
+	cd integration_tests && go test -v -parallel 4 -timeout 45m ./...
+	@rm -f integration_tests/$(BINARY_NAME)
+
 # Clean build artifacts
 clean:
 	@echo "Cleaning build artifacts..."
 	@rm -rf $(OUTPUT_DIR)
+	@rm -f integration_tests/$(BINARY_NAME)
