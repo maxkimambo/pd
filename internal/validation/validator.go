@@ -1,10 +1,14 @@
 package validation
 
 import (
+	"context"
 	_ "embed"
 	"encoding/json"
 	"fmt"
+	"os"
 	"strings"
+
+	"golang.org/x/oauth2/google"
 )
 
 //go:embed compatibility_matrix.json
@@ -218,5 +222,41 @@ func ValidateLocationFlags(zone, region string) error {
 	if (zone == "" && region == "") || (zone != "" && region != "") {
 		return fmt.Errorf("exactly one of --zone or --region must be specified")
 	}
+	return nil
+}
+
+// ValidateGCPAuthentication validates that the user has proper GCP authentication configured
+func ValidateGCPAuthentication() error {
+	ctx := context.Background()
+	
+	// Check if GOOGLE_APPLICATION_CREDENTIALS is set
+	if credPath := os.Getenv("GOOGLE_APPLICATION_CREDENTIALS"); credPath != "" {
+		// Verify the file exists
+		if _, err := os.Stat(credPath); os.IsNotExist(err) {
+			return fmt.Errorf("GOOGLE_APPLICATION_CREDENTIALS points to non-existent file: %s", credPath)
+		}
+		// Try to load the credentials
+		_, err := google.FindDefaultCredentials(ctx, "https://www.googleapis.com/auth/compute")
+		if err != nil {
+			return fmt.Errorf("failed to load credentials from GOOGLE_APPLICATION_CREDENTIALS: %w", err)
+		}
+		return nil
+	}
+	
+	// Try to find default credentials (gcloud auth, metadata service, etc.)
+	_, err := google.FindDefaultCredentials(ctx, "https://www.googleapis.com/auth/compute")
+	if err != nil {
+		return fmt.Errorf(`no valid GCP authentication found. Please authenticate using one of the following methods:
+  1. Set GOOGLE_APPLICATION_CREDENTIALS environment variable to point to a service account key file:
+     export GOOGLE_APPLICATION_CREDENTIALS="/path/to/service-account-key.json"
+  
+  2. Use gcloud to authenticate:
+     gcloud auth application-default login
+  
+  3. Run this application on a GCP environment (GCE, GKE, Cloud Run) with proper IAM roles
+
+Error: %w`, err)
+	}
+	
 	return nil
 }

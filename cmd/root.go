@@ -38,6 +38,11 @@ var (
 				return nil
 			}
 
+			// Validate GCP authentication before any other checks
+			if err := validation.ValidateGCPAuthentication(); err != nil {
+				return err
+			}
+
 			// Validate shared flags
 			projectID, _ := cmd.Flags().GetString("project")
 			if err := validation.ValidateProjectID(projectID); err != nil {
