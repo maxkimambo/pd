@@ -15,16 +15,14 @@ func PromptForConfirmation(autoApprove bool, action, details string) (bool, erro
 	if autoApprove {
 		return true, nil
 	}
-	warningMsg := fmt.Sprintf(`
-	*********************************************************
-	   	WARNING. !!!	
-	  	About to %s
-	  	Details: %s
-	*********************************************************
-			"Are you sure you want to continue? (yes/no): "
-	*********************************************************
-`, action, details)
-	fmt.Print(warningMsg)
+	
+	// Display warning using message box
+	warningMsg := NewBox(WarningMessage, fmt.Sprintf("About to %s", action)).
+		AddLine(fmt.Sprintf("Details: %s", details)).
+		Render()
+	
+	fmt.Println(warningMsg)
+	fmt.Print("Continue? (yes/no): ")
 
 	reader := bufio.NewReader(os.Stdin)
 	input, err := reader.ReadString('\n')
@@ -43,11 +41,14 @@ func PromptForMultipleItems(autoApprove bool, action string, items []string) (bo
 		return true, nil
 	}
 
-	fmt.Printf("\nWARNING: About to %s the following %d item(s):\n", action, len(items))
+	// Build warning message with numbered items
+	warningBox := NewBox(WarningMessage, fmt.Sprintf("About to %s the following %d item(s):", action, len(items)))
 	for i, item := range items {
-		fmt.Printf("  %d. %s\n", i+1, item)
+		warningBox.AddLine(fmt.Sprintf("%d. %s", i+1, item))
 	}
-	fmt.Print("\nAre you sure you want to continue? (yes/no): ")
+	
+	fmt.Println(warningBox.Render())
+	fmt.Print("Continue? (yes/no): ")
 
 	reader := bufio.NewReader(os.Stdin)
 	input, err := reader.ReadString('\n')

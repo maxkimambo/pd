@@ -27,7 +27,11 @@ type MigrationResult struct {
 }
 
 func MigrateDisks(ctx context.Context, config *Config, gcpClient *gcp.Clients, disksToMigrate []*computepb.Disk) ([]MigrationResult, error) {
-	logger.Starting("Starting disk migration...")
+	if config.DryRun {
+		logger.Starting("[DRY-RUN] Starting disk migration simulation...")
+	} else {
+		logger.Starting("Starting disk migration...")
+	}
 	if len(disksToMigrate) == 0 {
 		logger.Info("No disks to migrate")
 		return []MigrationResult{}, nil
@@ -106,15 +110,21 @@ func MigrateSingleDisk(ctx context.Context, config *Config, gcpClient *gcp.Clien
 	kmsParams := config.PopulateKmsParams()
 	err := gcpClient.SnapshotClient.CreateSnapshot(ctx, config.ProjectID, zone, diskName, snapshotName, kmsParams, disk.GetLabels())
 	if err != nil {
-		errMsg := fmt.Sprintf("Failed to create snapshot: %v", err)
-		logger.Errorf("%s snapshot failed", diskName)
-		logger.WithFieldsMap(map[string]interface{}{
-			"disk":  diskName,
-			"zone":  zone,
-			"error": err.Error(),
-		}).Error("snapshot creation failed")
+		if strings.Contains(err.Error(), "quota") {
+			logger.Error(utils.QuotaExceededError("snapshots", zone))
+		} else if strings.Contains(err.Error(), "permission") {
+			logger.Error(utils.PermissionError("create snapshot", diskName))
+		} else {
+			logger.Error(utils.FormatError(utils.ErrorContext{
+				Operation:  "create snapshot",
+				Resource:   diskName,
+				Reason:     err.Error(),
+				Suggestion: "Check disk status and ensure it's not in use",
+				Command:    fmt.Sprintf("gcloud compute disks describe %s --zone=%s", diskName, zone),
+			}, err))
+		}
 		result.Status = "Failed: Snapshot Creation"
-		result.ErrorMessage = errMsg
+		result.ErrorMessage = fmt.Sprintf("Failed to create snapshot: %v", err)
 		labelErr := gcpClient.DiskClient.UpdateDiskLabel(ctx, config.ProjectID, zone, diskName, "migration", "error")
 		if labelErr != nil {
 			logger.WithFieldsMap(map[string]interface{}{
@@ -143,15 +153,24 @@ func MigrateSingleDisk(ctx context.Context, config *Config, gcpClient *gcp.Clien
 		err = gcpClient.DiskClient.DeleteDisk(ctx, config.ProjectID, zone, diskName)
 
 		if err != nil {
-			errMsg := fmt.Sprintf("Failed to delete original disk: %v", err)
-			logger.Errorf("%s deletion failed", diskName)
-			logger.WithFieldsMap(map[string]interface{}{
-				"disk":  diskName,
-				"zone":  zone,
-				"error": err.Error(),
-			}).Error("disk deletion failed")
+			if strings.Contains(err.Error(), "resourceInUse") {
+				logger.Error(utils.FormatError(utils.ErrorContext{
+					Operation:  "delete disk",
+					Resource:   diskName,
+					Reason:     "Disk is still attached to an instance",
+					Suggestion: "Detach the disk from all instances before migration",
+					Command:    fmt.Sprintf("gcloud compute disks describe %s --zone=%s", diskName, zone),
+				}, err))
+			} else {
+				logger.Error(utils.FormatError(utils.ErrorContext{
+					Operation:  "delete disk",
+					Resource:   diskName,
+					Reason:     err.Error(),
+					Suggestion: "Verify disk exists and you have delete permissions",
+				}, err))
+			}
 			result.Status = "Failed: Disk Deletion"
-			result.ErrorMessage = errMsg
+			result.ErrorMessage = fmt.Sprintf("Failed to delete original disk: %v", err)
 			logger.Cleanupf("Cleaning up snapshot %s", snapshotName)
 			logger.WithFieldsMap(map[string]interface{}{
 				"snapshot": snapshotName,

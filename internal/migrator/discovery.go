@@ -14,7 +14,7 @@ import (
 
 // DiscoverDisks discovers GCP Compute Engine persistent disks based on the migration configuration.
 func DiscoverDisks(ctx context.Context, config *Config, gcpClient *gcp.Clients) ([]*computepb.Disk, error) {
-	logger.Starting("🔍 Discovery Phase")
+	logger.Starting("Discovery Phase")
 
 	location := config.Location()
 	logger.Infof("Listing detached disks in %s (Project: %s)", location, config.ProjectID)
@@ -33,7 +33,9 @@ func DiscoverDisks(ctx context.Context, config *Config, gcpClient *gcp.Clients) 
 	}
 
 	logger.Infof("Found %d detached disk(s) matching criteria:", len(disksToMigrate))
-	var sb strings.Builder
+	
+	// Create table formatter
+	table := utils.NewTableFormatter([]string{"#", "Name", "Zone", "Type", "Size"})
 	for i, disk := range disksToMigrate {
 		zone := "unknown"
 		if disk.Zone != nil {
@@ -41,19 +43,79 @@ func DiscoverDisks(ctx context.Context, config *Config, gcpClient *gcp.Clients) 
 			zone = parts[len(parts)-1]
 		}
 
-		sb.WriteString(fmt.Sprintf("  %d. %s", i+1, disk.GetName()))
-		sb.WriteString(fmt.Sprintf(" (Zone: %s", zone))
-		sb.WriteString(fmt.Sprintf(", Type: %s", getShortDiskTypeName(disk.GetType())))
-		sb.WriteString(fmt.Sprintf(", Size: %d GB)", disk.GetSizeGb()))
-		sb.WriteString("----------------------\n")
+		table.AddRow([]string{
+			fmt.Sprintf("%d", i+1),
+			disk.GetName(),
+			zone,
+			getShortDiskTypeName(disk.GetType()),
+			fmt.Sprintf("%d GB", disk.GetSizeGb()),
+		})
 	}
 
-	logger.Info(sb.String())
+	logger.Info("\n" + table.String())
+
+	// Generate migration summary
+	totalSize := int64(0)
+	for _, disk := range disksToMigrate {
+		totalSize += disk.GetSizeGb()
+	}
+	
+	// Build migration summary using message box
+	summaryTitle := "Migration Summary"
+	if config.DryRun {
+		summaryTitle = "[DRY-RUN] Migration Plan"
+	}
+	
+	summaryBox := utils.NewBox(utils.InfoMessage, summaryTitle).
+		AddBullet(fmt.Sprintf("Target disk type: %s", config.TargetDiskType)).
+		AddBullet(fmt.Sprintf("Disks to migrate: %d", len(disksToMigrate))).
+		AddBullet(fmt.Sprintf("Total size: %d GB", totalSize)).
+		AddBullet(fmt.Sprintf("Estimated time: ~%d minutes", len(disksToMigrate)*5)).
+		AddBullet("Snapshots will be created: Yes")
+	
+	if config.RetainName {
+		summaryBox.AddBullet("Original disks will be: Deleted (names retained)")
+	} else {
+		summaryBox.AddBullet("Original disks will be: Kept (new names will be generated)")
+	}
+	
+	fmt.Println(summaryBox.Render())
+
+	if config.DryRun {
+		// Build dry-run actions using report builder for better structure
+		actionsBuilder := utils.NewReportBuilder().
+			Section("[DRY-RUN] Would perform the following actions:")
+		
+		for i, disk := range disksToMigrate {
+			actionsBuilder.AddEmptyLine().
+				AddLine(fmt.Sprintf("%d. Disk: %s", i+1, disk.GetName())).
+				AddIndented(fmt.Sprintf("Create snapshot 'pd-migrate-%s-TIMESTAMP'", disk.GetName()), 1)
+			
+			if config.RetainName {
+				actionsBuilder.
+					AddIndented(fmt.Sprintf("Delete disk '%s'", disk.GetName()), 1).
+					AddIndented(fmt.Sprintf("Create new disk '%s' with type '%s'", disk.GetName(), config.TargetDiskType), 1)
+			} else {
+				actionsBuilder.
+					AddIndented(fmt.Sprintf("Create new disk '%s-migrated' with type '%s'", disk.GetName(), config.TargetDiskType), 1)
+			}
+			actionsBuilder.AddIndented("Clean up snapshot after verification", 1)
+		}
+		
+		fmt.Println(actionsBuilder.Build())
+		
+		// Show info box for dry-run mode
+		dryRunInfo := utils.Info("Dry-Run Mode", "No changes will be made in dry-run mode.")
+		fmt.Println(dryRunInfo)
+		
+		logger.Success("Discovery phase completed (dry-run)")
+		return disksToMigrate, nil
+	}
 
 	confirmed, err := utils.PromptForConfirmation(
 		config.AutoApproveAll,
 		fmt.Sprintf("migrate %d disk(s) to type '%s'", len(disksToMigrate), config.TargetDiskType),
-		"This will create snapshots and recreate disks",
+		"Proceed with migration?",
 	)
 	if err != nil {
 		return nil, err
@@ -79,7 +141,7 @@ func getShortDiskTypeName(typeURL string) string {
 }
 
 func DiscoverInstances(ctx context.Context, config *Config, gcpClient *gcp.Clients) ([]*computepb.Instance, error) {
-	logger.Starting("🔍 Instance Discovery")
+	logger.Starting("Instance Discovery")
 
 	var discoveredInstances []*computepb.Instance
 	var err error
@@ -117,10 +179,9 @@ func DiscoverInstances(ctx context.Context, config *Config, gcpClient *gcp.Clien
 		logger.Info("No instances found matching the specified location.")
 		return []*computepb.Instance{}, nil
 	}
-	var sb strings.Builder
-	sb.WriteString("\n")
-	for _, instance := range discoveredInstances {
-		logger.Infof("\t %s (Zone: %s)", instance.GetName(), utils.ExtractZoneName(instance.GetZone()))
+	logger.Info("\nDiscovered instances:")
+	for i, instance := range discoveredInstances {
+		logger.Infof("  %d. %s (Zone: %s)", i+1, instance.GetName(), utils.ExtractZoneName(instance.GetZone()))
 	}
 	return discoveredInstances, nil
 }
