@@ -32,3 +32,8 @@ output "random_data_size_mb" {
   description = "Size of test data generated on each disk in MB using fio"
   value       = var.random_data_size_mb
 }
+
+output "instance_labels" {
+  description = "Labels applied to the instance"
+  value       = google_compute_instance.default.labels
+}
