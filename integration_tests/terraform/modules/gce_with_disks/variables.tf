@@ -53,3 +53,9 @@ variable "labels" {
     purpose = "integration-test"
   }
 }
+
+variable "random_data_size_mb" {
+  description = "Size of test data to generate on each disk in MB using fio (0 to disable)"
+  type        = number
+  default     = 0
+}
