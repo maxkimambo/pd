@@ -16,5 +16,17 @@ variable "zone" {
 variable "machine_type" {
   description = "Machine type for the test instance"
   type        = string
-  default     = "e2-micro"
+  default     = "c3-standard-4"
+}
+
+variable "disk_type" {
+  description = "Source disk type for migration test"
+  type        = string
+  default     = "pd-balanced"
+}
+
+variable "boot_disk_type" {
+  description = "Boot disk type for the instance"
+  type        = string
+  default     = "pd-balanced"
 }

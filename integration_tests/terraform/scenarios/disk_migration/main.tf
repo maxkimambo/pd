@@ -23,20 +23,20 @@ module "test_disks" {
   disks = [
     {
       name     = "zonal-disk-1"
-      size     = 10
-      type     = "pd-standard"
+      size     = 100
+      type     = var.disk_type
       regional = false
     },
     {
       name     = "zonal-disk-2"
-      size     = 20
-      type     = "pd-standard"
+      size     = 200
+      type     = var.disk_type
       regional = false
     },
     {
       name     = "regional-disk-1"
-      size     = 30
-      type     = "pd-standard"
+      size     = 300
+      type     = var.disk_type
       regional = true
     }
   ]

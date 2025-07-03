@@ -32,19 +32,24 @@ go build -o pd main.go
 
 ## Running Tests
 
-Run all integration tests:
+Run all integration tests from the project root:
 ```bash
-go test -v ./integration_tests/...
+cd integration_tests && go test -v ./...
+```
+
+Or using the Makefile from project root:
+```bash
+make test-integration
 ```
 
 Run specific test:
 ```bash
-go test -v ./integration_tests/... -run TestComputeMigration
+go test -v . -run TestComputeMigration
 ```
 
 Run tests in parallel:
 ```bash
-go test -v -parallel 4 ./integration_tests/...
+go test -v -parallel 4 .
 ```
 
 Skip integration tests (useful for unit tests only):
@@ -56,6 +61,30 @@ Keep resources after test (for debugging):
 ```bash
 go test -v ./integration_tests/... -keep-resources
 ```
+
+## Test Scenarios
+
+The integration tests cover various migration scenarios using different instance types based on disk compatibility:
+
+### Compute Migration Tests
+
+#### Hyperdisk Migrations (using c3-standard-4)
+- Migrate pd-balanced to hyperdisk-balanced
+- Migrate pd-ssd to hyperdisk-balanced
+
+#### Traditional Disk Migrations (using n2-standard-8)
+- Migrate pd-standard to pd-ssd
+- Migrate pd-standard to pd-balanced
+
+### Disk Migration Tests
+
+#### Hyperdisk Migrations
+- Migrate zonal pd-balanced to hyperdisk-balanced
+- Migrate zonal pd-ssd to hyperdisk-balanced
+
+#### Traditional Disk Migrations
+- Migrate zonal pd-standard to pd-balanced
+- Migrate regional pd-standard to pd-ssd
 
 ## Test Structure
 

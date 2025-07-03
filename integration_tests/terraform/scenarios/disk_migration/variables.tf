@@ -17,3 +17,9 @@ variable "region" {
   description = "The Google Cloud region for regional disks"
   type        = string
 }
+
+variable "disk_type" {
+  description = "Source disk type for migration test"
+  type        = string
+  default     = "pd-balanced"
+}

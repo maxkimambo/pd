@@ -31,18 +31,45 @@ func TestComputeMigration(t *testing.T) {
 		zone             string
 		targetDiskType   string
 		expectedDiskType string
+		sourceDiskType   string
+		machineType      string
+		bootDiskType     string
 	}{
 		{
-			name:             "migrate_to_pd_ssd",
+			name:             "migrate_pd_balanced_to_hyperdisk_balanced_c3",
+			zone:             "us-central1-a",
+			targetDiskType:   "hyperdisk-balanced",
+			expectedDiskType: "hyperdisk-balanced",
+			sourceDiskType:   "pd-balanced",
+			machineType:      "c3-standard-4",
+			bootDiskType:     "pd-balanced",
+		},
+		{
+			name:             "migrate_pd_ssd_to_hyperdisk_balanced_c3",
+			zone:             "us-central1-a",
+			targetDiskType:   "hyperdisk-balanced",
+			expectedDiskType: "hyperdisk-balanced",
+			sourceDiskType:   "pd-ssd",
+			machineType:      "c3-standard-4",
+			bootDiskType:     "pd-balanced",
+		},
+		{
+			name:             "migrate_pd_standard_to_pd_ssd_n2",
 			zone:             "us-central1-a",
 			targetDiskType:   "pd-ssd",
 			expectedDiskType: "pd-ssd",
+			sourceDiskType:   "pd-standard",
+			machineType:      "n2-standard-8",
+			bootDiskType:     "pd-standard",
 		},
 		{
-			name:             "migrate_to_pd_balanced",
+			name:             "migrate_pd_standard_to_pd_balanced_n2",
 			zone:             "us-central1-a",
 			targetDiskType:   "pd-balanced",
 			expectedDiskType: "pd-balanced",
+			sourceDiskType:   "pd-standard",
+			machineType:      "n2-standard-8",
+			bootDiskType:     "pd-standard",
 		},
 	}
 
@@ -67,6 +94,9 @@ func TestComputeMigration(t *testing.T) {
 				"resource_prefix": runID,
 				"project_id":      projectID,
 				"zone":            tt.zone,
+				"machine_type":    tt.machineType,
+				"disk_type":       tt.sourceDiskType,
+				"boot_disk_type":  tt.bootDiskType,
 			}
 
 			t.Cleanup(func() {

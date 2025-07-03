@@ -113,12 +113,25 @@ func CreateTestWorkspace(scenarioPath string) (string, error) {
 		return "", fmt.Errorf("failed to create temp dir: %w", err)
 	}
 
-	if err := copyDir(scenarioPath, tempDir); err != nil {
+	// Get absolute path of the scenario
+	absScenarioPath, err := filepath.Abs(scenarioPath)
+	if err != nil {
 		os.RemoveAll(tempDir)
-		return "", fmt.Errorf("failed to copy scenario files: %w", err)
+		return "", fmt.Errorf("failed to get absolute path: %w", err)
 	}
 
-	return tempDir, nil
+	// Copy the entire terraform directory structure to temp location
+	// This ensures module references work correctly
+	terraformRoot := filepath.Dir(filepath.Dir(absScenarioPath))
+	if err := copyDir(terraformRoot, tempDir); err != nil {
+		os.RemoveAll(tempDir)
+		return "", fmt.Errorf("failed to copy terraform files: %w", err)
+	}
+
+	// Return the path to the specific scenario within the temp directory
+	scenarioName := filepath.Base(absScenarioPath)
+	scenarioType := filepath.Base(filepath.Dir(absScenarioPath))
+	return filepath.Join(tempDir, scenarioType, scenarioName), nil
 }
 
 func copyDir(src, dst string) error {

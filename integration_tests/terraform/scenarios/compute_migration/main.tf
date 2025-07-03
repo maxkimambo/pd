@@ -20,17 +20,18 @@ module "test_instance" {
   zone            = var.zone
   instance_name   = "test-migration-instance"
   machine_type    = var.machine_type
+  boot_disk_type  = var.boot_disk_type
   
   attached_disks = [
     {
       name = "data-disk-1"
-      size = 10
-      type = "pd-standard"
+      size = 100
+      type = var.disk_type
     },
     {
       name = "data-disk-2"
-      size = 20
-      type = "pd-standard"
+      size = 200
+      type = var.disk_type
     }
   ]
   

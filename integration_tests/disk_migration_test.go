@@ -32,22 +32,43 @@ func TestDiskMigration(t *testing.T) {
 		region           string
 		targetDiskType   string
 		expectedDiskType string
+		sourceDiskType   string
 		testRegional     bool
 	}{
 		{
-			name:             "migrate_zonal_disks_to_pd_ssd",
+			name:             "migrate_zonal_pd_balanced_to_hyperdisk_balanced",
 			zone:             "us-central1-a",
 			region:           "us-central1",
-			targetDiskType:   "pd-ssd",
-			expectedDiskType: "pd-ssd",
+			targetDiskType:   "hyperdisk-balanced",
+			expectedDiskType: "hyperdisk-balanced",
+			sourceDiskType:   "pd-balanced",
 			testRegional:     false,
 		},
 		{
-			name:             "migrate_regional_disks_to_pd_balanced",
+			name:             "migrate_zonal_pd_ssd_to_hyperdisk_balanced",
+			zone:             "us-central1-a",
+			region:           "us-central1",
+			targetDiskType:   "hyperdisk-balanced",
+			expectedDiskType: "hyperdisk-balanced",
+			sourceDiskType:   "pd-ssd",
+			testRegional:     false,
+		},
+		{
+			name:             "migrate_zonal_pd_standard_to_pd_balanced",
 			zone:             "us-central1-a",
 			region:           "us-central1",
 			targetDiskType:   "pd-balanced",
 			expectedDiskType: "pd-balanced",
+			sourceDiskType:   "pd-standard",
+			testRegional:     false,
+		},
+		{
+			name:             "migrate_regional_pd_standard_to_pd_ssd",
+			zone:             "us-central1-a",
+			region:           "us-central1",
+			targetDiskType:   "pd-ssd",
+			expectedDiskType: "pd-ssd",
+			sourceDiskType:   "pd-standard",
 			testRegional:     true,
 		},
 	}
@@ -74,6 +95,7 @@ func TestDiskMigration(t *testing.T) {
 				"project_id":      projectID,
 				"zone":            tt.zone,
 				"region":          tt.region,
+				"disk_type":       tt.sourceDiskType,
 			}
 
 			t.Cleanup(func() {

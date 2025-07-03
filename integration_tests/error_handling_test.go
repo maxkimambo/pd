@@ -197,7 +197,7 @@ func TestConcurrentMigrations(t *testing.T) {
 	cmd := exec.CommandContext(ctx, pdBinary, "migrate", "disk",
 		"--project", projectID,
 		"--zone", "us-central1-a",
-		"--target-disk-type", "pd-ssd",
+		"--target-disk-type", "hyperdisk-balanced",
 		"--auto-approve",
 		"--concurrency", "3",
 		"--label", "resource_prefix=" + runID)

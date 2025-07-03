@@ -21,7 +21,7 @@ variable "instance_name" {
 variable "machine_type" {
   description = "Machine type for the instance"
   type        = string
-  default     = "e2-micro"
+  default     = "c3-standard-4"
 }
 
 variable "attached_disks" {
@@ -43,7 +43,7 @@ variable "boot_disk_size" {
 variable "boot_disk_type" {
   description = "Type of the boot disk"
   type        = string
-  default     = "pd-standard"
+  default     = "pd-balanced"
 }
 
 variable "labels" {

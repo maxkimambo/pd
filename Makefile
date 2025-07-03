@@ -3,7 +3,7 @@
 # Variables
 BINARY_NAME=pd
 OUTPUT_DIR=bin
-PKG_LIST=$(shell go list ./... | grep -v /vendor/)
+PKG_LIST=$(shell go list ./... | grep -v /vendor/ | grep -v /integration_tests)
 
 # Default target
 all: build test lint fmt
@@ -25,14 +25,18 @@ fmt:
 	@echo "Formatting code..."
 	gofmt -w .
 
-# Run tests
+# Run tests (excluding integration tests)
 test:
-	@echo "Running tests..."
+	@echo "Running tests (excluding integration tests)..."
 	go test -v $(PKG_LIST)
 
 test-quiet:
-	@echo "Running tests quietly..."
-	go test  $(PKG_LIST) 
+	@echo "Running tests quietly (excluding integration tests)..."
+	go test  $(PKG_LIST)
+
+# Run all tests including integration tests
+test-all: test test-integration
+	@echo "All tests completed" 
 
 # Run integration tests
 test-integration: build
