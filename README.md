@@ -5,7 +5,10 @@ Bulk migrate Google Cloud persistent disks between disk types with automatic ins
 ## Installation
 
 ```bash
-make build && make install
+make build 
+
+# Add binary to PATH
+export PATH=$PATH:$(pwd)/bin
 ```
 
 ## Quick Start
