@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"time"
 
 	computepb "cloud.google.com/go/compute/apiv1/computepb"
 	"github.com/maxkimambo/pd/internal/gcp"
@@ -17,6 +18,14 @@ var (
 	RUNNING_STATE    = "RUNNING"
 	STOPPED_STATE    = "STOPPED"
 )
+
+// truncateName truncates a name to the specified length to ensure it fits within GCP naming constraints
+func truncateName(name string, maxLen int) string {
+	if len(name) <= maxLen {
+		return name
+	}
+	return name[:maxLen]
+}
 
 func GetInstanceState(ctx context.Context, instance *computepb.Instance, gcpClient *gcp.Clients) (string, error) {
 	instanceKey := fmt.Sprintf("%s/%s", utils.ExtractZoneName(instance.GetZone()), instance.GetName())
@@ -67,6 +76,10 @@ func SnapshotInstanceDisks(ctx context.Context, config *Config, instance *comput
 		}
 
 		diskName := attachedDisk.GetDeviceName()
+		
+		// Debug logging to understand disk naming
+		logger.Debugf("Processing attached disk - DeviceName: %s, Source: %s", 
+			attachedDisk.GetDeviceName(), attachedDisk.GetSource())
 
 		disk, err := gcpClient.DiskClient.GetDisk(ctx, config.ProjectID, zone, diskName)
 		if err != nil {
@@ -79,8 +92,20 @@ func SnapshotInstanceDisks(ctx context.Context, config *Config, instance *comput
 			logger.Warnf("Disk %s not found, skipping snapshot", diskName)
 			continue
 		}
+		
+		// Debug actual disk name vs device name
+		logger.Debugf("Retrieved disk - Name: %s, DeviceName from attached: %s", 
+			disk.GetName(), diskName)
 
-		snapshotName := fmt.Sprintf("%s-snapshot", utils.AddSuffix(disk.GetName()))
+		// Generate a shorter snapshot name to comply with GCP naming restrictions (max 63 chars)
+		// Use just the disk name and a short timestamp suffix
+		// Format: "<truncated-disk-name>-<short-timestamp>"
+		truncatedDiskName := truncateName(diskName, 40)
+		// Use last 8 digits of Unix timestamp to keep it short
+		shortTimestamp := time.Now().Unix() % 100000000
+		snapshotName := fmt.Sprintf("%s-%d", truncatedDiskName, shortTimestamp)
+		logger.Debugf("Generated snapshot name: %s (length: %d, from disk: %s)", 
+			snapshotName, len(snapshotName), diskName)
 		kmsParams := &gcp.SnapshotKmsParams{
 			KmsKey:      config.KmsKey,
 			KmsKeyRing:  config.KmsKeyRing,
@@ -148,7 +173,28 @@ func MigrateInstanceNonBootDisks(ctx context.Context, config *Config, instance *
 			migrationResult = MigrateSingleDisk(ctx, config, gcpClient, diskToMigrate)
 			results = append(results, migrationResult)
 		}
+		
+		// Check if migration was successful before attempting to reattach
+		if migrationResult.Status != "Success" && migrationResult.Status != "Completed" {
+			logger.Errorf("Skipping disk attachment for %s due to failed migration: %s", disk.GetDeviceName(), migrationResult.ErrorMessage)
+			hasErrors = true
+			continue
+		}
+		
 		newDisk := migrationResult.NewDiskName
+		if newDisk == "" {
+			logger.Errorf("New disk name is empty for %s, cannot reattach", disk.GetDeviceName())
+			result := MigrationResult{
+				DiskName:     disk.GetDeviceName(),
+				Zone:         zone,
+				Status:       "Failed: Empty Disk Name",
+				ErrorMessage: "Migration did not produce a new disk name",
+			}
+			results = append(results, result)
+			hasErrors = true
+			continue
+		}
+		
 		deviceName := disk.GetDeviceName()
 		// reattach the disks to the instance
 		if err := gcpClient.ComputeClient.AttachDisk(ctx, config.ProjectID, zone, instance.GetName(), newDisk, deviceName); err != nil {
@@ -230,7 +276,11 @@ func HandleInstanceDiskMigration(ctx context.Context, config *Config, instance *
 func IncrementalSnapshotDisk(ctx context.Context, config *Config, disk *computepb.Disk, gcpClient *gcp.Clients) error {
 	logger.Infof("Creating incremental snapshot for disk %s in zone %s", disk.GetName(), disk.GetZone())
 
-	snapshotName := fmt.Sprintf("%s-snapshot", utils.AddSuffix(disk.GetName()))
+	// Generate a shorter snapshot name to comply with GCP naming restrictions (max 63 chars)
+	truncatedDiskName := truncateName(disk.GetName(), 40)
+	// Use last 8 digits of Unix timestamp to keep it short
+	shortTimestamp := time.Now().Unix() % 100000000
+	snapshotName := fmt.Sprintf("%s-%d", truncatedDiskName, shortTimestamp)
 	kmsParams := &gcp.SnapshotKmsParams{
 		KmsKey:      config.KmsKey,
 		KmsKeyRing:  config.KmsKeyRing,

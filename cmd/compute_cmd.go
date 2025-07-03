@@ -44,7 +44,7 @@ Examples:
 
 func init() {
 	computeCmd.Flags().StringP("target-disk-type", "t", "", "Target disk type (e.g., pd-ssd, pd-balanced, hyperdisk-balanced) (required)")
-	computeCmd.Flags().String("label", "", "Label filter for disks in key=value format (optional)")
+	computeCmd.Flags().String("label", "", "Label filter for instances in key=value format (optional)")
 	computeCmd.Flags().String("kms-key", "", "KMS key name for snapshot encryption (optional)")
 	computeCmd.Flags().String("kms-keyring", "", "KMS keyring name (required if kms-key is set)")
 	computeCmd.Flags().String("kms-location", "", "KMS key location (required if kms-key is set)")

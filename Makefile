@@ -40,8 +40,8 @@ test-all: test test-integration
 
 # Build binary for integration tests
 build-integration: build
-	@echo "Copying binary to integration tests directory..."
-	@cp $(OUTPUT_DIR)/$(BINARY_NAME) integration_tests/$(BINARY_NAME)
+	@echo "Creating symlink to binary in integration tests directory..."
+	@ln -sf ../$(OUTPUT_DIR)/$(BINARY_NAME) integration_tests/$(BINARY_NAME)
 
 # Run integration tests
 test-integration: build-integration
@@ -51,7 +51,6 @@ test-integration: build-integration
 		exit 1; \
 	fi
 	cd integration_tests && go test -v -timeout 45m ./...
-	@rm -f integration_tests/$(BINARY_NAME)
 
 # Run integration tests in parallel
 test-integration-parallel: build-integration
@@ -61,7 +60,6 @@ test-integration-parallel: build-integration
 		exit 1; \
 	fi
 	cd integration_tests && go test -v -parallel 4 -timeout 45m ./...
-	@rm -f integration_tests/$(BINARY_NAME)
 
 # Clean build artifacts
 clean:
