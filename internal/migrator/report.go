@@ -59,7 +59,7 @@ func CalculateMigrationSummary(results []MigrationResult, resourceType string) M
 func PrintCompletionSummary(summary MigrationSummary, config *Config, startTime time.Time) {
 	// Use the new formatted message box for success message
 	successBox := utils.NewBox(utils.SuccessMessage, "Migration completed!").
-		AddLine(fmt.Sprintf("%s %ss processed", formatCount(summary.TotalProcessed), summary.ResourceType)).
+		AddLine(fmt.Sprintf("Total %ss processed: %d", summary.ResourceType, summary.TotalProcessed)).
 		AddLine(fmt.Sprintf("Successful migrations: %d", summary.SuccessCount)).
 		AddLine(fmt.Sprintf("Failed migrations: %d", summary.FailureCount)).
 		AddLine(fmt.Sprintf("Duration: %v", time.Since(startTime).Round(time.Second)))
@@ -102,12 +102,6 @@ func PrintCompletionSummary(summary MigrationSummary, config *Config, startTime 
 	}
 }
 
-func formatCount(count int) string {
-	if count == 1 {
-		return "Total"
-	}
-	return fmt.Sprintf("Total %d", count)
-}
 
 func GenerateReports(results []MigrationResult) {
 	logger.Starting("Reporting Phase")

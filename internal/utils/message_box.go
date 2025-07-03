@@ -2,12 +2,10 @@ package utils
 
 import (
 	"fmt"
-	"os"
 	"strings"
 	"unicode/utf8"
 
 	"github.com/charmbracelet/lipgloss"
-	"golang.org/x/term"
 )
 
 // MessageType defines the type of message box to render.
@@ -65,7 +63,7 @@ func NewBox(messageType MessageType, title string) *Box {
 		messageType: messageType,
 		title:       title,
 		content:     []string{},
-		width:       getTerminalWidth() - 8, // Default margin
+		width:       80, // Fixed width of 80 characters
 	}
 }
 
@@ -81,6 +79,12 @@ func (b *Box) AddBullet(text string) *Box {
 	return b
 }
 
+// SetWidth sets a custom width for the message box.
+func (b *Box) SetWidth(width int) *Box {
+	b.width = width
+	return b
+}
+
 // Render builds and returns the formatted message box as a string.
 func (b *Box) Render() string {
 	style, prefix := b.getStyleAndPrefix()
@@ -89,7 +93,7 @@ func (b *Box) Render() string {
 	allLines = append(allLines, b.content...)
 	message := strings.Join(allLines, "\n")
 
-	return renderStyledBox(message, style, prefix)
+	return renderStyledBox(message, style, prefix, b.width)
 }
 
 func (b *Box) getStyleAndPrefix() (lipgloss.Style, string) {
@@ -108,10 +112,10 @@ func (b *Box) getStyleAndPrefix() (lipgloss.Style, string) {
 }
 
 // renderStyledBox handles the actual rendering logic.
-func renderStyledBox(message string, style lipgloss.Style, prefix string) string {
-	termWidth := getTerminalWidth()
-	maxWidth := termWidth - 8
-	contentWidth := maxWidth - 6
+func renderStyledBox(message string, style lipgloss.Style, prefix string, width int) string {
+	// Use provided width
+	boxWidth := width
+	contentWidth := boxWidth - 6 // Account for borders and padding
 
 	var wrappedLines []string
 	for _, line := range strings.Split(message, "\n") {
@@ -122,18 +126,12 @@ func renderStyledBox(message string, style lipgloss.Style, prefix string) string
 		}
 	}
 
-	boxWidth := 6
-	for _, line := range wrappedLines {
-		if lineLen := utf8.RuneCountInString(line); lineLen+6 > boxWidth {
-			boxWidth = lineLen + 6
-		}
-	}
-
 	var sb strings.Builder
 	sb.WriteString(style.Render(topLeft + strings.Repeat(horizontal, boxWidth-2) + topRight) + "\n")
 
 	if len(wrappedLines) > 0 {
 		firstLine := wrappedLines[0]
+		// Left align with proper padding
 		padding := boxWidth - utf8.RuneCountInString(firstLine) - 4 - utf8.RuneCountInString(prefix)
 		if padding < 0 {
 			padding = 0
@@ -147,6 +145,7 @@ func renderStyledBox(message string, style lipgloss.Style, prefix string) string
 	}
 
 	for _, line := range wrappedLines[1:] {
+		// Left align subsequent lines with 3 spaces indent
 		padding := boxWidth - utf8.RuneCountInString(line) - 4
 		if padding < 0 {
 			padding = 0
@@ -204,14 +203,6 @@ func Question(title string, lines ...string) string {
 	return box.Render()
 }
 
-// getTerminalWidth returns the terminal width or defaults to 80 if unable to detect.
-func getTerminalWidth() int {
-	width, _, err := term.GetSize(int(os.Stdout.Fd()))
-	if err != nil {
-		return 80
-	}
-	return width
-}
 
 // wrapText wraps text to fit within the specified maximum width.
 func wrapText(text string, maxWidth int) []string {
