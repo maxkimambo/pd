@@ -107,31 +107,21 @@ func (t *Terraform) writeVarsFile(vars map[string]any) (string, error) {
 	return varFile, nil
 }
 
-func CreateTestWorkspace(scenarioPath string) (string, error) {
-	tempDir, err := os.MkdirTemp("", "terraform-test-*")
-	if err != nil {
-		return "", fmt.Errorf("failed to create temp dir: %w", err)
-	}
-
+func CreateTestWorkspace(scenarioPath, targetDir string) error {
 	// Get absolute path of the scenario
 	absScenarioPath, err := filepath.Abs(scenarioPath)
 	if err != nil {
-		os.RemoveAll(tempDir)
-		return "", fmt.Errorf("failed to get absolute path: %w", err)
+		return fmt.Errorf("failed to get absolute path: %w", err)
 	}
 
-	// Copy the entire terraform directory structure to temp location
+	// Copy the entire terraform directory structure to the target directory
 	// This ensures module references work correctly
 	terraformRoot := filepath.Dir(filepath.Dir(absScenarioPath))
-	if err := copyDir(terraformRoot, tempDir); err != nil {
-		os.RemoveAll(tempDir)
-		return "", fmt.Errorf("failed to copy terraform files: %w", err)
+	if err := copyDir(terraformRoot, targetDir); err != nil {
+		return fmt.Errorf("failed to copy terraform files: %w", err)
 	}
 
-	// Return the path to the specific scenario within the temp directory
-	scenarioName := filepath.Base(absScenarioPath)
-	scenarioType := filepath.Base(filepath.Dir(absScenarioPath))
-	return filepath.Join(tempDir, scenarioType, scenarioName), nil
+	return nil
 }
 
 func copyDir(src, dst string) error {

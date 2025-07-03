@@ -5,12 +5,12 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/maxkimambo/pd/integration_tests/internal/terraform"
+	"github.com/maxkimambo/pd/integration_tests/internal/testutil"
 	"github.com/stretchr/testify/require"
 )
 
@@ -24,7 +24,7 @@ func TestErrorHandling(t *testing.T) {
 		t.Fatal("GCP_PROJECT_ID environment variable must be set")
 	}
 
-	pdBinary := filepath.Join("..", "pd")
+	pdBinary := testutil.GetPDBinaryPath()
 
 	tests := []struct {
 		name           string
@@ -97,16 +97,12 @@ func TestErrorHandling(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 			defer cancel()
 
+			var tf *terraform.Terraform
 			var cleanup func()
+			
 			if tt.setupResources {
 				runID := fmt.Sprintf("test-err-%d", time.Now().UnixNano())
 				
-				workDir, err := terraform.CreateTestWorkspace("terraform/scenarios/disk_migration")
-				require.NoError(t, err)
-				defer os.RemoveAll(workDir)
-
-				tf := terraform.New(workDir)
-
 				tfVars := map[string]any{
 					"resource_prefix": runID,
 					"project_id":      projectID,
@@ -114,22 +110,12 @@ func TestErrorHandling(t *testing.T) {
 					"region":          "us-central1",
 				}
 
-				cleanup = func() {
-					destroyCtx, destroyCancel := context.WithTimeout(context.Background(), 10*time.Minute)
-					defer destroyCancel()
-					
-					if err := tf.Destroy(destroyCtx, tfVars); err != nil {
-						t.Errorf("Failed to destroy test resources: %v", err)
-					}
-				}
+				tf, cleanup = testutil.SetupTestWorkspace(t, "terraform/scenarios/disk_migration", tfVars)
+				t.Cleanup(cleanup)
 
 				require.NoError(t, tf.Init(ctx))
-				_, err = tf.Apply(ctx, tfVars)
+				_, err := tf.Apply(ctx, tfVars)
 				require.NoError(t, err)
-			}
-
-			if cleanup != nil {
-				defer cleanup()
 			}
 
 			cmd := exec.CommandContext(ctx, pdBinary, tt.args...)
@@ -161,12 +147,6 @@ func TestConcurrentMigrations(t *testing.T) {
 
 	runID := fmt.Sprintf("test-concurrent-%d", time.Now().UnixNano())
 	
-	workDir, err := terraform.CreateTestWorkspace("terraform/scenarios/disk_migration")
-	require.NoError(t, err)
-	defer os.RemoveAll(workDir)
-
-	tf := terraform.New(workDir)
-
 	tfVars := map[string]any{
 		"resource_prefix": runID,
 		"project_id":      projectID,
@@ -174,14 +154,8 @@ func TestConcurrentMigrations(t *testing.T) {
 		"region":          "us-central1",
 	}
 
-	t.Cleanup(func() {
-		destroyCtx, destroyCancel := context.WithTimeout(context.Background(), 10*time.Minute)
-		defer destroyCancel()
-		
-		if err := tf.Destroy(destroyCtx, tfVars); err != nil {
-			t.Errorf("Failed to destroy test resources: %v", err)
-		}
-	})
+	tf, cleanup := testutil.SetupTestWorkspace(t, "terraform/scenarios/disk_migration", tfVars)
+	t.Cleanup(cleanup)
 
 	require.NoError(t, tf.Init(ctx))
 
@@ -193,7 +167,7 @@ func TestConcurrentMigrations(t *testing.T) {
 
 	time.Sleep(10 * time.Second)
 
-	pdBinary := filepath.Join("..", "pd")
+	pdBinary := testutil.GetPDBinaryPath()
 	cmd := exec.CommandContext(ctx, pdBinary, "migrate", "disk",
 		"--project", projectID,
 		"--zone", "us-central1-a",

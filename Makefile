@@ -1,4 +1,4 @@
-.PHONY: build lint fmt test all clean
+.PHONY: build build-integration lint fmt test all clean clean-integration-tests
 
 # Variables
 BINARY_NAME=pd
@@ -38,25 +38,28 @@ test-quiet:
 test-all: test test-integration
 	@echo "All tests completed" 
 
+# Build binary for integration tests
+build-integration: build
+	@echo "Copying binary to integration tests directory..."
+	@cp $(OUTPUT_DIR)/$(BINARY_NAME) integration_tests/$(BINARY_NAME)
+
 # Run integration tests
-test-integration: build
+test-integration: build-integration
 	@echo "Running integration tests..."
 	@if [ -z "$(GCP_PROJECT_ID)" ]; then \
 		echo "Error: GCP_PROJECT_ID environment variable is not set"; \
 		exit 1; \
 	fi
-	@cp $(OUTPUT_DIR)/$(BINARY_NAME) integration_tests/$(BINARY_NAME)
 	cd integration_tests && go test -v -timeout 45m ./...
 	@rm -f integration_tests/$(BINARY_NAME)
 
 # Run integration tests in parallel
-test-integration-parallel: build
+test-integration-parallel: build-integration
 	@echo "Running integration tests in parallel..."
 	@if [ -z "$(GCP_PROJECT_ID)" ]; then \
 		echo "Error: GCP_PROJECT_ID environment variable is not set"; \
 		exit 1; \
 	fi
-	@cp $(OUTPUT_DIR)/$(BINARY_NAME) integration_tests/$(BINARY_NAME)
 	cd integration_tests && go test -v -parallel 4 -timeout 45m ./...
 	@rm -f integration_tests/$(BINARY_NAME)
 
@@ -65,3 +68,8 @@ clean:
 	@echo "Cleaning build artifacts..."
 	@rm -rf $(OUTPUT_DIR)
 	@rm -f integration_tests/$(BINARY_NAME)
+
+# Clean integration test temporary directories
+clean-integration-tests:
+	@echo "Cleaning integration test temporary directories..."
+	@rm -rf tmp_integration_tests/

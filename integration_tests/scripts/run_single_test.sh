@@ -18,11 +18,17 @@ if [ -z "$PROJECT_ID" ]; then
     exit 1
 fi
 
+# Get the script directory and project root
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+INTEGRATION_TEST_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+
+# Build and copy binary to integration tests directory
 echo "Building pd binary..."
-cd ..
-go build -o pd main.go
+cd "$PROJECT_ROOT"
+make build-integration
 
 echo "Running test: $TEST_NAME"
-cd integration_tests
+cd "$INTEGRATION_TEST_DIR"
 
 go test -run "$TEST_NAME" -timeout 30m "$@" .

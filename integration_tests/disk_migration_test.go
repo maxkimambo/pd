@@ -5,12 +5,11 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"testing"
 	"time"
 
 	"github.com/maxkimambo/pd/integration_tests/internal/gcloud"
-	"github.com/maxkimambo/pd/integration_tests/internal/terraform"
+	"github.com/maxkimambo/pd/integration_tests/internal/testutil"
 	"github.com/stretchr/testify/require"
 )
 
@@ -83,13 +82,6 @@ func TestDiskMigration(t *testing.T) {
 
 			runID := fmt.Sprintf("test-%d", time.Now().UnixNano())
 			
-			workDir, err := terraform.CreateTestWorkspace("terraform/scenarios/disk_migration")
-			require.NoError(t, err)
-			defer os.RemoveAll(workDir)
-
-			tf := terraform.New(workDir)
-			gcClient := gcloud.NewClient(projectID)
-
 			tfVars := map[string]any{
 				"resource_prefix": runID,
 				"project_id":      projectID,
@@ -98,14 +90,9 @@ func TestDiskMigration(t *testing.T) {
 				"disk_type":       tt.sourceDiskType,
 			}
 
-			t.Cleanup(func() {
-				destroyCtx, destroyCancel := context.WithTimeout(context.Background(), 10*time.Minute)
-				defer destroyCancel()
-				
-				if err := tf.Destroy(destroyCtx, tfVars); err != nil {
-					t.Errorf("Failed to destroy test resources: %v", err)
-				}
-			})
+			tf, cleanup := testutil.SetupTestWorkspace(t, "terraform/scenarios/disk_migration", tfVars)
+			t.Cleanup(cleanup)
+			gcClient := gcloud.NewClient(projectID)
 
 			require.NoError(t, tf.Init(ctx))
 
@@ -129,7 +116,7 @@ func TestDiskMigration(t *testing.T) {
 
 			time.Sleep(10 * time.Second)
 
-			pdBinary := filepath.Join("..", "pd")
+			pdBinary := testutil.GetPDBinaryPath()
 			args := []string{"migrate", "disk",
 				"--project", projectID,
 				"--target-disk-type", tt.targetDiskType,

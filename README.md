@@ -207,7 +207,3 @@ make test-all
 ```
 
 See `integration_tests/README.md` for detailed information about the integration test setup.
-
-## License
-
-[License information here]

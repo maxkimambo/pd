@@ -37,12 +37,20 @@ func TestCreateTestWorkspace(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Test CreateTestWorkspace
-	workDir, err := CreateTestWorkspace(testScenario)
+	// Create target directory for test
+	targetDir, err := os.MkdirTemp("", "terraform-test-target-*")
 	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(targetDir)
+
+	// Test CreateTestWorkspace
+	if err := CreateTestWorkspace(testScenario, targetDir); err != nil {
 		t.Fatalf("CreateTestWorkspace failed: %v", err)
 	}
-	defer os.RemoveAll(filepath.Dir(filepath.Dir(workDir)))
+
+	// The actual working directory is within the target directory
+	workDir := filepath.Join(targetDir, "scenarios", "test-scenario")
 
 	// Verify structure
 	if _, err := os.Stat(workDir); err != nil {
