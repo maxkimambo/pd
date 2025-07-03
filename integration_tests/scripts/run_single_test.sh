@@ -4,7 +4,7 @@ set -euo pipefail
 
 if [ $# -lt 1 ]; then
     echo "Usage: $0 <test-name> [additional-go-test-flags]"
-    echo "Example: $0 TestComputeMigration/migrate_to_pd_ssd -v"
+    echo "Example: $0 TestComputeMigration/migrate_pd_balanced_to_hyperdisk_balanced_c3 -v"
     exit 1
 fi
 
