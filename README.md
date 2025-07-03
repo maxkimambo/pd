@@ -1,4 +1,4 @@
-# PD - Google Cloud Persistent Disk Migration Tool
+# [ WIP ] PD - Google Cloud Persistent Disk Migration Tool
 
 A CLI tool for bulk migrating Google Cloud persistent disks from one type to another, supporting both detached disks and disks attached to GCE instances.
 
@@ -18,8 +18,14 @@ A CLI tool for bulk migrating Google Cloud persistent disks from one type to ano
 # Build from source
 make build
 
-# Run tests
+# Run tests (excludes integration tests)
 make test
+
+# Run all tests including integration tests
+make test-all
+
+# Run only integration tests (requires GCP environment)
+make test-integration
 
 # Install
 make install
@@ -181,6 +187,23 @@ make fmt
 make all
 ```
 
-## License
+### Integration Tests
 
-[License information here]
+The project includes comprehensive integration tests that create real GCP resources to verify the migration functionality. These tests are excluded from the normal test run to avoid accidental resource creation and costs.
+
+```bash
+# Set up environment for integration tests
+export GCP_PROJECT_ID="your-test-project-id"
+export GOOGLE_APPLICATION_CREDENTIALS="/path/to/service-account.json"
+
+# Run integration tests
+make test-integration
+
+# Run integration tests in parallel
+make test-integration-parallel
+
+# Run all tests including integration tests
+make test-all
+```
+
+See `integration_tests/README.md` for detailed information about the integration test setup.

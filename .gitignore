@@ -36,3 +36,4 @@ go.work
 .DS_Store
 Thumbs.db
 tmp/
+tmp_integration_tests/

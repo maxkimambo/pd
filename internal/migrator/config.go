@@ -20,6 +20,7 @@ type Config struct {
 	Throughput     int64
 	StoragePoolId  string
 	Instances      []string
+	DryRun         bool
 }
 
 func (c *Config) PopulateKmsParams() *gcp.SnapshotKmsParams {
