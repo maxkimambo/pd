@@ -59,6 +59,10 @@ func (sc *SnapshotClient) CreateSnapshot(ctx context.Context, projectID, zone, d
 
 	sourceDiskURL := fmt.Sprintf("projects/%s/zones/%s/disks/%s", projectID, zone, diskName)
 
+	// Debug logging for snapshot creation
+	logger.Debugf("Creating snapshot with name: %s (length: %d)", snapshotName, len(snapshotName))
+	logger.Debugf("Source disk URL: %s", sourceDiskURL)
+	
 	snapshotResource := &computepb.Snapshot{
 		Name:       proto.String(snapshotName),
 		Labels:     labels,

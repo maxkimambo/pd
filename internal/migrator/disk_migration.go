@@ -14,6 +14,7 @@ import (
 	computepb "cloud.google.com/go/compute/apiv1/computepb"
 )
 
+
 type MigrationResult struct {
 	DiskName        string
 	Zone            string
@@ -97,7 +98,12 @@ func MigrateSingleDisk(ctx context.Context, config *Config, gcpClient *gcp.Clien
 		Status:       "Pending",
 	}
 
-	snapshotName := fmt.Sprintf("pd-migrate-%s-%d", diskName, time.Now().Unix())
+	// Generate a shorter snapshot name to comply with GCP naming restrictions (max 63 chars)
+	// Use same format as compute disk migration for consistency
+	truncatedDiskName := truncateName(diskName, 40)
+	// Use last 8 digits of Unix timestamp to keep it short
+	shortTimestamp := time.Now().Unix() % 100000000
+	snapshotName := fmt.Sprintf("%s-%d", truncatedDiskName, shortTimestamp)
 	result.SnapshotName = snapshotName
 
 	logger.Snapshotf("Creating snapshot for %s", diskName)
