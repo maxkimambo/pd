@@ -114,11 +114,22 @@ func CreateTestWorkspace(scenarioPath, targetDir string) error {
 		return fmt.Errorf("failed to get absolute path: %w", err)
 	}
 
+	// Check if the scenario directory exists
+	if _, err := os.Stat(absScenarioPath); os.IsNotExist(err) {
+		return fmt.Errorf("scenario path does not exist: %s", absScenarioPath)
+	}
+
 	// Copy the entire terraform directory structure to the target directory
 	// This ensures module references work correctly
 	terraformRoot := filepath.Dir(filepath.Dir(absScenarioPath))
+	
+	// Debug: Check if terraformRoot exists
+	if _, err := os.Stat(terraformRoot); os.IsNotExist(err) {
+		return fmt.Errorf("terraform root does not exist: %s", terraformRoot)
+	}
+	
 	if err := copyDir(terraformRoot, targetDir); err != nil {
-		return fmt.Errorf("failed to copy terraform files: %w", err)
+		return fmt.Errorf("failed to copy terraform files from %s to %s: %w", terraformRoot, targetDir, err)
 	}
 
 	return nil
@@ -130,8 +141,12 @@ func copyDir(src, dst string) error {
 			return err
 		}
 
-		if strings.Contains(path, ".terraform") {
-			return filepath.SkipDir
+		// Skip .terraform directories but not .terraform.lock.hcl files
+		if strings.Contains(path, ".terraform") && !strings.HasSuffix(path, ".terraform.lock.hcl") {
+			if info.IsDir() {
+				return filepath.SkipDir
+			}
+			return nil
 		}
 
 		relPath, err := filepath.Rel(src, path)
@@ -145,7 +160,13 @@ func copyDir(src, dst string) error {
 			return os.MkdirAll(dstPath, info.Mode())
 		}
 
-		return copyFile(path, dstPath)
+		// Only copy .tf, .hcl, and .json files
+		if strings.HasSuffix(path, ".tf") || strings.HasSuffix(path, ".hcl") || 
+		   strings.HasSuffix(path, ".json") || strings.HasSuffix(path, ".tfvars") {
+			return copyFile(path, dstPath)
+		}
+
+		return nil
 	})
 }
 
