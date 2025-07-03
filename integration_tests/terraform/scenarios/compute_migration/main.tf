@@ -35,6 +35,8 @@ module "test_instance" {
     }
   ]
   
+  random_data_size_mb = var.random_data_size_mb
+  
   labels = {
     purpose     = "integration-test"
     test_type   = "compute-migration"

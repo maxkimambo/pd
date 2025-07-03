@@ -30,3 +30,9 @@ variable "boot_disk_type" {
   type        = string
   default     = "pd-balanced"
 }
+
+variable "random_data_size_mb" {
+  description = "Size of test data to generate on each disk in MB using fio"
+  type        = number
+  default     = 0
+}

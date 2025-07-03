@@ -33,6 +33,7 @@ func TestComputeMigration(t *testing.T) {
 		sourceDiskType   string
 		machineType      string
 		bootDiskType     string
+		randomDataSizeMB int
 	}{
 		{
 			name:             "migrate_pd_balanced_to_hyperdisk_balanced_c3",
@@ -42,6 +43,7 @@ func TestComputeMigration(t *testing.T) {
 			sourceDiskType:   "pd-balanced",
 			machineType:      "c3-standard-4",
 			bootDiskType:     "pd-balanced",
+			randomDataSizeMB: 10240, // 10GB
 		},
 		{
 			name:             "migrate_pd_ssd_to_hyperdisk_balanced_c3",
@@ -51,6 +53,7 @@ func TestComputeMigration(t *testing.T) {
 			sourceDiskType:   "pd-ssd",
 			machineType:      "c3-standard-4",
 			bootDiskType:     "pd-balanced",
+			randomDataSizeMB: 10240, // 10GB
 		},
 		{
 			name:             "migrate_pd_standard_to_pd_ssd_n2",
@@ -60,6 +63,7 @@ func TestComputeMigration(t *testing.T) {
 			sourceDiskType:   "pd-standard",
 			machineType:      "n2-standard-8",
 			bootDiskType:     "pd-standard",
+			randomDataSizeMB: 10240, // 10GB
 		},
 		{
 			name:             "migrate_pd_standard_to_pd_balanced_n2",
@@ -69,6 +73,7 @@ func TestComputeMigration(t *testing.T) {
 			sourceDiskType:   "pd-standard",
 			machineType:      "n2-standard-8",
 			bootDiskType:     "pd-standard",
+			randomDataSizeMB: 10240, // 10GB
 		},
 	}
 
@@ -83,12 +88,13 @@ func TestComputeMigration(t *testing.T) {
 			runID := fmt.Sprintf("test-%d", time.Now().UnixNano())
 			
 			tfVars := map[string]any{
-				"resource_prefix": runID,
-				"project_id":      projectID,
-				"zone":            tt.zone,
-				"machine_type":    tt.machineType,
-				"disk_type":       tt.sourceDiskType,
-				"boot_disk_type":  tt.bootDiskType,
+				"resource_prefix":    runID,
+				"project_id":         projectID,
+				"zone":               tt.zone,
+				"machine_type":       tt.machineType,
+				"disk_type":          tt.sourceDiskType,
+				"boot_disk_type":     tt.bootDiskType,
+				"random_data_size_mb": tt.randomDataSizeMB,
 			}
 
 			tf, cleanup := testutil.SetupTestWorkspace(t, "terraform/scenarios/compute_migration", tfVars)

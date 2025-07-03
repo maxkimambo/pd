@@ -33,6 +33,7 @@ func TestDiskMigration(t *testing.T) {
 		expectedDiskType string
 		sourceDiskType   string
 		testRegional     bool
+		randomDataSizeMB int
 	}{
 		{
 			name:             "migrate_zonal_pd_balanced_to_hyperdisk_balanced",
@@ -42,6 +43,7 @@ func TestDiskMigration(t *testing.T) {
 			expectedDiskType: "hyperdisk-balanced",
 			sourceDiskType:   "pd-balanced",
 			testRegional:     false,
+			randomDataSizeMB: 10240, // 10GB
 		},
 		{
 			name:             "migrate_zonal_pd_ssd_to_hyperdisk_balanced",
@@ -51,6 +53,7 @@ func TestDiskMigration(t *testing.T) {
 			expectedDiskType: "hyperdisk-balanced",
 			sourceDiskType:   "pd-ssd",
 			testRegional:     false,
+			randomDataSizeMB: 10240, // 10GB
 		},
 		{
 			name:             "migrate_zonal_pd_standard_to_pd_balanced",
@@ -60,6 +63,7 @@ func TestDiskMigration(t *testing.T) {
 			expectedDiskType: "pd-balanced",
 			sourceDiskType:   "pd-standard",
 			testRegional:     false,
+			randomDataSizeMB: 10240, // 10GB
 		},
 		{
 			name:             "migrate_regional_pd_standard_to_pd_ssd",
@@ -69,6 +73,7 @@ func TestDiskMigration(t *testing.T) {
 			expectedDiskType: "pd-ssd",
 			sourceDiskType:   "pd-standard",
 			testRegional:     true,
+			randomDataSizeMB: 10240, // 10GB
 		},
 	}
 
