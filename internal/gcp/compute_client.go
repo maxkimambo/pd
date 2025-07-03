@@ -15,8 +15,8 @@ import (
 type ComputeClientInterface interface {
 	StartInstance(ctx context.Context, projectID, zone, instanceName string) error
 	StopInstance(ctx context.Context, projectID, zone, instanceName string) error
-	ListInstancesInZone(ctx context.Context, projectID, zone string) ([]*computepb.Instance, error)
-	AggregatedListInstances(ctx context.Context, projectID string) ([]*computepb.Instance, error)
+	ListInstancesInZone(ctx context.Context, projectID, zone, filter string) ([]*computepb.Instance, error)
+	AggregatedListInstances(ctx context.Context, projectID, filter string) ([]*computepb.Instance, error)
 	GetInstance(ctx context.Context, projectID, zone, instanceName string) (*computepb.Instance, error)
 	InstanceIsRunning(ctx context.Context, instance *computepb.Instance) bool
 	GetInstanceDisks(ctx context.Context, projectID, zone, instanceName string) ([]*computepb.AttachedDisk, error)
@@ -105,12 +105,18 @@ func (cc *ComputeClient) StopInstance(ctx context.Context, projectID, zone, inst
 	return nil
 }
 
-func (cc *ComputeClient) ListInstancesInZone(ctx context.Context, projectID, zone string) ([]*computepb.Instance, error) {
+func (cc *ComputeClient) ListInstancesInZone(ctx context.Context, projectID, zone, filter string) ([]*computepb.Instance, error) {
 
 	req := &computepb.ListInstancesRequest{
 		Project: projectID,
 		Zone:    zone,
 	}
+	
+	// Apply filter if provided
+	if filter != "" {
+		req.Filter = &filter
+	}
+	
 	it := cc.client.List(ctx, req)
 	var instances []*computepb.Instance
 	for {
@@ -127,18 +133,26 @@ func (cc *ComputeClient) ListInstancesInZone(ctx context.Context, projectID, zon
 		"project":   projectID,
 		"zone":      zone,
 		"instances": len(instances),
+		"filter":    filter,
 	}).Info("Instances found")
 	return instances, nil
 }
 
-func (cc *ComputeClient) AggregatedListInstances(ctx context.Context, projectID string) ([]*computepb.Instance, error) {
+func (cc *ComputeClient) AggregatedListInstances(ctx context.Context, projectID, filter string) ([]*computepb.Instance, error) {
 	logger.WithFieldsMap(map[string]interface{}{
 		"project": projectID,
+		"filter":  filter,
 	}).Info("Listing all compute instances in project (aggregated list)")
 
 	req := &computepb.AggregatedListInstancesRequest{
 		Project: projectID,
 	}
+	
+	// Apply filter if provided
+	if filter != "" {
+		req.Filter = &filter
+	}
+	
 	it := cc.client.AggregatedList(ctx, req)
 	var instances []*computepb.Instance
 	for {
@@ -156,6 +170,7 @@ func (cc *ComputeClient) AggregatedListInstances(ctx context.Context, projectID 
 	logger.WithFieldsMap(map[string]interface{}{
 		"project": projectID,
 		"count":   len(instances),
+		"filter":  filter,
 	}).Info("Successfully listed all instances in project.")
 	return instances, nil
 }

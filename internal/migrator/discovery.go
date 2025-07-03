@@ -143,10 +143,21 @@ func getShortDiskTypeName(typeURL string) string {
 func DiscoverInstances(ctx context.Context, config *Config, gcpClient *gcp.Clients) ([]*computepb.Instance, error) {
 	logger.Starting("Instance Discovery")
 
+	// Build GCP filter string from label filter
+	var gcpFilter string
+	if config.LabelFilter != "" {
+		filter, err := utils.BuildGcpLabelFilter(config.LabelFilter)
+		if err != nil {
+			return nil, fmt.Errorf("invalid label filter: %w", err)
+		}
+		gcpFilter = filter
+		logger.Infof("Applying label filter: %s", config.LabelFilter)
+	}
+
 	var discoveredInstances []*computepb.Instance
 	var err error
 	if len(config.Instances) > 0 && config.Instances[0] != "*" {
-		// get instances by names
+		// get instances by names - apply label filtering on client side
 		for _, instanceName := range config.Instances {
 			logger.Infof("Getting compute instance %s", instanceName)
 			instance, err := gcpClient.ComputeClient.GetInstance(ctx, config.ProjectID, config.Zone, instanceName)
@@ -154,6 +165,17 @@ func DiscoverInstances(ctx context.Context, config *Config, gcpClient *gcp.Clien
 				return nil, fmt.Errorf("failed to get instance %s in zone %s: %w", instanceName, config.Zone, err)
 			}
 			if instance != nil {
+				// Check if instance matches label filter
+				if config.LabelFilter != "" {
+					matches, err := utils.MatchesLabel(instance.Labels, config.LabelFilter)
+					if err != nil {
+						return nil, fmt.Errorf("error checking label filter: %w", err)
+					}
+					if !matches {
+						logger.Warnf("Instance %s does not match label filter %s, skipping", instanceName, config.LabelFilter)
+						continue
+					}
+				}
 				discoveredInstances = append(discoveredInstances, instance)
 			} else {
 				logger.Warnf("Instance %s not found in zone %s", instanceName, config.Zone)
@@ -161,13 +183,13 @@ func DiscoverInstances(ctx context.Context, config *Config, gcpClient *gcp.Clien
 		}
 	} else if config.Zone != "" {
 		logger.Infof("Listing instances in zone %s", config.Zone)
-		discoveredInstances, err = listInstancesInZone(ctx, config.ProjectID, config.Zone, gcpClient)
+		discoveredInstances, err = listInstancesInZone(ctx, config.ProjectID, config.Zone, gcpFilter, gcpClient)
 		if err != nil {
 			return nil, fmt.Errorf("failed to discover instances in zone %s: %w", config.Zone, err)
 		}
 	} else if config.Region != "" {
 		logger.Infof("Listing instances in region %s", config.Region)
-		discoveredInstances, err = listInstancesInRegion(ctx, config.ProjectID, config.Region, gcpClient)
+		discoveredInstances, err = listInstancesInRegion(ctx, config.ProjectID, config.Region, gcpFilter, gcpClient)
 		if err != nil {
 			return nil, fmt.Errorf("failed to discover instances in region %s: %w", config.Region, err)
 		}
@@ -176,7 +198,7 @@ func DiscoverInstances(ctx context.Context, config *Config, gcpClient *gcp.Clien
 	}
 
 	if len(discoveredInstances) == 0 {
-		logger.Info("No instances found matching the specified location.")
+		logger.Info("No instances found matching the specified criteria.")
 		return []*computepb.Instance{}, nil
 	}
 	logger.Info("\nDiscovered instances:")
@@ -186,17 +208,17 @@ func DiscoverInstances(ctx context.Context, config *Config, gcpClient *gcp.Clien
 	return discoveredInstances, nil
 }
 
-func listInstancesInZone(ctx context.Context, projectID, zone string, gcpClient *gcp.Clients) ([]*computepb.Instance, error) {
+func listInstancesInZone(ctx context.Context, projectID, zone, filter string, gcpClient *gcp.Clients) ([]*computepb.Instance, error) {
 
-	instances, err := gcpClient.ComputeClient.ListInstancesInZone(ctx, projectID, zone)
+	instances, err := gcpClient.ComputeClient.ListInstancesInZone(ctx, projectID, zone, filter)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list instances in zone %s: %w", zone, err)
 	}
 	return instances, nil
 }
 
-func listInstancesInRegion(ctx context.Context, projectID, region string, gcpClient *gcp.Clients) ([]*computepb.Instance, error) {
-	allInstances, err := gcpClient.ComputeClient.AggregatedListInstances(ctx, projectID)
+func listInstancesInRegion(ctx context.Context, projectID, region, filter string, gcpClient *gcp.Clients) ([]*computepb.Instance, error) {
+	allInstances, err := gcpClient.ComputeClient.AggregatedListInstances(ctx, projectID, filter)
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve aggregated instances list for project %s: %w", projectID, err)
 	}
